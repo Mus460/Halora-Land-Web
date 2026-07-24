@@ -1,0 +1,32 @@
+[
+  {
+    "id": 20,
+    "proyekId": 1,
+    "kategori": "beton",
+    "uraianPekerjaan": "Beton Kolom K-250",
+    "volume": 8.5,
+    "satuan": "m3",
+    "hargaSatuan": 1200000,
+    "totalBiaya": 10200000,
+    "metodeHitung": "ahsp",
+    "levelPekerjaan": "Lantai 1",
+    "tipePekerjaan": "kolom",
+    "createdAt": "2026-02-07T00:00:00Z",
+    "updatedAt": "2026-02-07T00:00:00Z"
+  },
+  {
+    "id": 21,
+    "proyekId": 1,
+    "kategori": "beton",
+    "uraianPekerjaan": "Beton Balok K-250",
+    "volume": 12,
+    "satuan": "m3",
+    "hargaSatuan": 1150000,
+    "totalBiaya": 13800000,
+    "metodeHitung": "ahsp",
+    "levelPekerjaan": "Lantai 1",
+    "tipePekerjaan": "balok",
+    "createdAt": "2026-02-07T00:00:00Z",
+    "updatedAt": "2026-02-07T00:00:00Z"
+  }
+]

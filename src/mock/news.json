@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "title": "Database AHSP PUPR 2026 Sudah Tersedia!",
+    "content": "Database Analisa Harga Satuan Pekerjaan (AHSP) PUPR 2026 sudah dapat digunakan. Silakan import dari menu Master Data > AHSP Import.",
+    "isActive": true,
+    "createdAt": "2026-01-15T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "title": "Pembaruan Fitur Kurva S",
+    "content": "Fitur Kurva S telah diperbarui dengan kemampuan export gambar dan perbandingan planned vs actual yang lebih detail.",
+    "isActive": true,
+    "createdAt": "2026-02-01T00:00:00Z"
+  }
+]

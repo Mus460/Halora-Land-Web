@@ -1,0 +1,17 @@
+[
+  {
+    "id": 40,
+    "proyekId": 1,
+    "kategori": "dinding",
+    "uraianPekerjaan": "Pasangan Dinding Bata Ringan 10cm",
+    "volume": 120,
+    "satuan": "m2",
+    "hargaSatuan": 95000,
+    "totalBiaya": 11400000,
+    "metodeHitung": "ahsp",
+    "levelPekerjaan": "Lantai 1",
+    "tipePekerjaan": null,
+    "createdAt": "2026-02-09T00:00:00Z",
+    "updatedAt": "2026-02-09T00:00:00Z"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "proyekId": 1,
+    "namaMaterial": "Semen Portland 50kg",
+    "satuan": "sak",
+    "volume": 100,
+    "hargaSatuan": 65000,
+    "totalBiaya": 6500000,
+    "tanggal": "2026-02-10T00:00:00Z",
+    "keterangan": "Untuk pondasi dan struktur",
+    "createdAt": "2026-02-10T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "proyekId": 1,
+    "namaMaterial": "Besi Beton Ulir 10mm",
+    "satuan": "batang",
+    "volume": 50,
+    "hargaSatuan": 95000,
+    "totalBiaya": 4750000,
+    "tanggal": "2026-02-12T00:00:00Z",
+    "keterangan": "Untuk kolom dan balok",
+    "createdAt": "2026-02-12T00:00:00Z"
+  }
+]

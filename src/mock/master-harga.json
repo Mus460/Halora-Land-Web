@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "nama": "Semen Portland",
+    "satuan": "kg",
+    "harga": 1500,
+    "kategori": "material",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "nama": "Pasir Pasang",
+    "satuan": "m3",
+    "harga": 350000,
+    "kategori": "material",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 3,
+    "nama": "Batu Belah 2/3",
+    "satuan": "m3",
+    "harga": 280000,
+    "kategori": "material",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 4,
+    "nama": "Besi Beton Ulir 10mm",
+    "satuan": "kg",
+    "harga": 16500,
+    "kategori": "material",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 5,
+    "nama": "Bata Ringan (Hebel) 10cm",
+    "satuan": "m3",
+    "harga": 850000,
+    "kategori": "material",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 6,
+    "nama": "Tukang Batu",
+    "satuan": "OH",
+    "harga": 150000,
+    "kategori": "upah",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 7,
+    "nama": "Tukang Besi",
+    "satuan": "OH",
+    "harga": 160000,
+    "kategori": "upah",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 8,
+    "nama": "Pekerja",
+    "satuan": "OH",
+    "harga": 120000,
+    "kategori": "upah",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 9,
+    "nama": "Molen Beton",
+    "satuan": "jam",
+    "harga": 85000,
+    "kategori": "alat",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 10,
+    "nama": "Stamper",
+    "satuan": "jam",
+    "harga": 75000,
+    "kategori": "alat",
+    "isGlobal": true,
+    "userId": null,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  }
+]

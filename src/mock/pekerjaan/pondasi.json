@@ -1,0 +1,32 @@
+[
+  {
+    "id": 10,
+    "proyekId": 1,
+    "kategori": "pondasi",
+    "uraianPekerjaan": "Galian Tanah Pondasi",
+    "volume": 25,
+    "satuan": "m3",
+    "hargaSatuan": 85000,
+    "totalBiaya": 2125000,
+    "metodeHitung": "ahsp",
+    "levelPekerjaan": "Pekerjaan Utama",
+    "tipePekerjaan": null,
+    "createdAt": "2026-02-06T00:00:00Z",
+    "updatedAt": "2026-02-06T00:00:00Z"
+  },
+  {
+    "id": 11,
+    "proyekId": 1,
+    "kategori": "pondasi",
+    "uraianPekerjaan": "Pondasi Batu Kali",
+    "volume": 18,
+    "satuan": "m3",
+    "hargaSatuan": 450000,
+    "totalBiaya": 8100000,
+    "metodeHitung": "ahsp",
+    "levelPekerjaan": "Pekerjaan Utama",
+    "tipePekerjaan": null,
+    "createdAt": "2026-02-06T00:00:00Z",
+    "updatedAt": "2026-02-06T00:00:00Z"
+  }
+]

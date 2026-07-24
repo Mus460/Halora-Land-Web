@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "proyekId": 1,
+    "tanggal": "2026-02-10T00:00:00Z",
+    "kategori": "Material",
+    "jumlah": 15000000,
+    "keterangan": "Pembelian material pondasi",
+    "createdAt": "2026-02-10T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "proyekId": 1,
+    "tanggal": "2026-02-15T00:00:00Z",
+    "kategori": "Upah",
+    "jumlah": 8500000,
+    "keterangan": "Upah tukang minggu 1",
+    "createdAt": "2026-02-15T00:00:00Z"
+  },
+  {
+    "id": 3,
+    "proyekId": 1,
+    "tanggal": "2026-02-20T00:00:00Z",
+    "kategori": "Material",
+    "jumlah": 22000000,
+    "keterangan": "Pembelian besi beton",
+    "createdAt": "2026-02-20T00:00:00Z"
+  }
+]

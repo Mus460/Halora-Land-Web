@@ -1,0 +1,364 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  USER
+  DEMO
+}
+
+enum TipeProyek {
+  gedung
+  infra
+}
+
+enum RoleTimProyek {
+  owner
+  editor
+  viewer
+}
+
+enum KategoriPekerjaan {
+  persiapan
+  pondasi
+  beton
+  kanopi
+  baja
+  tangga
+  atap
+  dinding
+  plesteran
+  acian
+  keramik
+  paving
+  pengecatan
+  pintu
+  interior
+  toilet
+  mep
+  custom
+}
+
+enum MetodeHitung {
+  ahsp
+  manual
+  harga_borong
+  harga_manual
+  harga_custom
+}
+
+enum TipeKomponen {
+  material
+  upah
+  alat
+}
+
+enum StatusInvoice {
+  draft
+  sent
+  paid
+}
+
+enum StatusFeedback {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+model User {
+  id           Int              @id @default(autoincrement())
+  namaLengkap  String
+  email        String           @unique
+  password     String
+  role         Role             @default(USER)
+  accountType  String           @default("free")
+  isDemo       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  
+  proyek       Proyek[]
+  timProyek    TimProyek[]
+  masterAnalisa MasterAnalisa[]
+  masterHarga  MasterHarga[]
+  feedback     Feedback[]
+  feedbackReply FeedbackReply[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Proyek {
+  id           Int              @id @default(autoincrement())
+  userId       Int
+  namaProyek   String
+  lokasi       String?
+  tipe         TipeProyek       @default(gedung)
+  nilaiKontrak Decimal?         @db.Decimal(15, 2)
+  timeline     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timProyek    TimProyek[]
+  pekerjaan    Pekerjaan[]
+  rekap        Rekap[]
+  invoice      Invoice[]
+  logistik     Logistik[]
+  realisasi    Realisasi[]
+  auditLogs    AuditLog[]
+
+  @@map("proyek")
+}
+
+model TimProyek {
+  id        Int              @id @default(autoincrement())
+  proyekId  Int
+  userId    Int
+  role      RoleTimProyek
+  createdAt DateTime         @default(now())
+  
+  proyek    Proyek           @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([proyekId, userId])
+  @@map("tim_proyek")
+}
+
+model Pekerjaan {
+  id               Int                @id @default(autoincrement())
+  proyekId         Int
+  kategori         KategoriPekerjaan
+  uraianPekerjaan  String
+  volume           Decimal            @db.Decimal(15, 4)
+  satuan           String
+  hargaSatuan      Decimal            @db.Decimal(15, 2)
+  totalBiaya       Decimal            @db.Decimal(15, 2)
+  metodeHitung     MetodeHitung
+  levelPekerjaan   String?
+  tipePekerjaan    String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  proyek           Proyek             @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+  detailAnalisa    DetailAnalisa[]
+  auditLogs        AuditLog[]
+
+  @@map("pekerjaan")
+}
+
+model DetailAnalisa {
+  id                  Int            @id @default(autoincrement())
+  pekerjaanId         Int
+  
+  // References (for tracking/audit)
+  masterHargaId       Int?
+  masterAnalisaId     Int?
+  
+  // Snapshot fields (frozen at creation)
+  nama                String
+  satuan              String
+  koef                Decimal        @db.Decimal(10, 6)
+  hargaSatuan         Decimal        @db.Decimal(15, 2)
+  totalBiaya          Decimal        @db.Decimal(15, 2)
+  tipe                TipeKomponen
+  
+  // Snapshot metadata
+  snapshotAt          DateTime       @default(now())
+  sourceKode          String?
+  
+  pekerjaan           Pekerjaan      @relation(fields: [pekerjaanId], references: [id], onDelete: Cascade)
+  masterHarga         MasterHarga?   @relation(fields: [masterHargaId], references: [id], onDelete: SetNull)
+  masterAnalisa       MasterAnalisa? @relation(fields: [masterAnalisaId], references: [id], onDelete: SetNull)
+
+  @@map("detail_analisa")
+}
+
+model MasterAnalisa {
+  id              Int              @id @default(autoincrement())
+  kode            String
+  nama            String
+  level           Int
+  parentId        Int?
+  satuan          String?
+  isGlobal        Boolean          @default(false)
+  userId          Int?
+  createdAt       DateTime         @default(now())
+  
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parent          MasterAnalisa?   @relation("MasterAnalisaHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        MasterAnalisa[]  @relation("MasterAnalisaHierarchy")
+  rincianAnalisa  RincianAnalisa[]
+  detailAnalisa   DetailAnalisa[]
+
+  @@unique([kode, userId])
+  @@map("master_analisa")
+}
+
+model RincianAnalisa {
+  id               Int            @id @default(autoincrement())
+  masterAnalisaId  Int
+  komponenId       Int
+  koef             Decimal        @db.Decimal(10, 6)
+  tipe             TipeKomponen
+  
+  masterAnalisa    MasterAnalisa  @relation(fields: [masterAnalisaId], references: [id], onDelete: Cascade)
+  komponen         MasterHarga    @relation(fields: [komponenId], references: [id], onDelete: Cascade)
+
+  @@map("rincian_analisa")
+}
+
+model MasterHarga {
+  id            Int              @id @default(autoincrement())
+  nama          String
+  satuan        String
+  harga         Decimal          @db.Decimal(15, 2)
+  kategori      TipeKomponen
+  isGlobal      Boolean          @default(false)
+  userId        Int?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  user          User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  detailAnalisa DetailAnalisa[]
+  rincianAnalisa RincianAnalisa[]
+
+  @@map("master_harga")
+}
+
+model Rekap {
+  id        Int      @id @default(autoincrement())
+  proyekId  Int
+  kategori  String
+  uraian    String
+  urutan    Int
+  margin    Decimal? @db.Decimal(5, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  proyek    Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+
+  @@map("rekap")
+}
+
+model Invoice {
+  id        Int           @id @default(autoincrement())
+  proyekId  Int
+  nomor     String        @unique
+  tanggal   DateTime
+  total     Decimal       @db.Decimal(15, 2)
+  status    StatusInvoice @default(draft)
+  createdAt DateTime      @default(now())
+  
+  proyek    Proyek        @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+
+  @@map("invoice")
+}
+
+model Logistik {
+  id           Int      @id @default(autoincrement())
+  proyekId     Int
+  namaMaterial String
+  satuan       String
+  volume       Decimal  @db.Decimal(15, 4)
+  hargaSatuan  Decimal  @db.Decimal(15, 2)
+  totalBiaya   Decimal  @db.Decimal(15, 2)
+  tanggal      DateTime?
+  keterangan   String?
+  createdAt    DateTime @default(now())
+  
+  proyek       Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+
+  @@map("logistik")
+}
+
+model Realisasi {
+  id         Int      @id @default(autoincrement())
+  proyekId   Int
+  tanggal    DateTime
+  kategori   String
+  jumlah     Decimal  @db.Decimal(15, 2)
+  keterangan String?
+  createdAt  DateTime @default(now())
+  
+  proyek     Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+
+  @@map("realisasi")
+}
+
+model Feedback {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  subject   String
+  message   String         @db.Text
+  status    StatusFeedback @default(open)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies   FeedbackReply[]
+
+  @@map("feedback")
+}
+
+model FeedbackReply {
+  id         Int      @id @default(autoincrement())
+  feedbackId Int
+  userId     Int
+  message    String   @db.Text
+  isAdmin    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("feedback_reply")
+}
+
+model News {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String   @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("news")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  proyekId    Int?
+  pekerjaanId Int?
+  userId      Int
+  action      String
+  entityType  String
+  entityId    Int?
+  
+  oldValue    Json?
+  newValue    Json?
+  
+  description String?
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proyek      Proyek?   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
+  pekerjaan   Pekerjaan? @relation(fields: [pekerjaanId], references: [id], onDelete: Cascade)
+
+  @@index([proyekId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}
