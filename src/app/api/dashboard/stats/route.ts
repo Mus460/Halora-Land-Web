@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/session'
+import { getCurrentSupabaseUser } from '@/lib/supabase-auth'
 
 /**
  * GET /api/dashboard/stats
@@ -8,7 +8,7 @@ import { getCurrentUser } from '@/lib/session'
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentUser()
+    const session = await getCurrentSupabaseUser()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

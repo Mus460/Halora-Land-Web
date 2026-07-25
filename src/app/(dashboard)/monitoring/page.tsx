@@ -1,4 +1,5 @@
 "use client";
+import { useProject } from "@/contexts/ProjectContext";
 
 import { useState, useEffect } from "react";
 import { ClipboardCheck } from "lucide-react";
@@ -11,7 +12,7 @@ import toast from "react-hot-toast";
 export default function MonitoringPage() {
   const [monitoring, setMonitoring] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const proyekId = 1; // TODO: get from context/URL
+  const { currentProyekId: proyekId } = useProject();
 
   useEffect(() => {
     fetchData();

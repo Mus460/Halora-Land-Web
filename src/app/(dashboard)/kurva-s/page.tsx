@@ -1,4 +1,5 @@
 "use client";
+import { useProject } from "@/contexts/ProjectContext";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import toast from "react-hot-toast";
 export default function KurvaSPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const proyekId = 1; // TODO: get from context/URL
+  const { currentProyekId: proyekId } = useProject();
 
   useEffect(() => {
     fetchData();

@@ -14,9 +14,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState({
     namaLengkap: "",
     email: "",
-    namaUsaha: "",
-    alamat: "",
-    telepon: "",
   });
   const [loading, setLoading] = useState(true);
 
@@ -39,9 +36,6 @@ export default function ProfilePage() {
       setProfile({
         namaLengkap: result.user.namaLengkap || "",
         email: result.user.email || "",
-        namaUsaha: "",
-        alamat: "",
-        telepon: "",
       });
     } catch (error) {
       console.error('Fetch error:', error);
@@ -74,14 +68,34 @@ export default function ProfilePage() {
     }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (password.new !== password.confirm) {
       toast.error("Password baru tidak cocok");
       return;
     }
-    // TODO: implement password change API
-    toast.success("Password berhasil diubah");
-    setPassword({ current: "", new: "", confirm: "" });
+
+    if (password.new.length < 6) {
+      toast.error("Password minimal 6 karakter");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password.new }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Gagal mengubah password');
+      }
+
+      toast.success("Password berhasil diubah");
+      setPassword({ current: "", new: "", confirm: "" });
+    } catch (error: any) {
+      toast.error(error.message || "Gagal mengubah password");
+    }
   };
 
   if (loading) {
@@ -101,7 +115,7 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5" />
-              Informasi Usaha
+              Informasi Profil
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -122,33 +136,6 @@ export default function ProfilePage() {
                   setProfile({ ...profile, email: e.target.value })
                 }
                 type="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Nama Usaha</Label>
-              <Input
-                value={profile.namaUsaha}
-                onChange={(e) =>
-                  setProfile({ ...profile, namaUsaha: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Alamat</Label>
-              <Input
-                value={profile.alamat}
-                onChange={(e) =>
-                  setProfile({ ...profile, alamat: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Telepon</Label>
-              <Input
-                value={profile.telepon}
-                onChange={(e) =>
-                  setProfile({ ...profile, telepon: e.target.value })
-                }
               />
             </div>
             <Button

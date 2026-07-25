@@ -1,4 +1,5 @@
 "use client";
+import { useProject } from "@/contexts/ProjectContext";
 
 import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
@@ -14,10 +15,16 @@ import toast from "react-hot-toast";
 export default function RealisasiPage() {
   const [data, setData] = useState<Realisasi[]>([]);
   const [loading, setLoading] = useState(true);
-  const proyekId = 1; // TODO: get from context/URL
+  const { currentProyekId: proyekId } = useProject();
 
   useEffect(() => {
-    fetchData();
+    if (proyekId) {
+      fetchData();
+    }
+  }, [proyekId]);
+
+  const fetchData = async () => {
+    if (!proyekId) return;
   }, []);
 
   const fetchData = async () => {

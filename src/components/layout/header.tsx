@@ -4,6 +4,7 @@ import { Bell, Menu, Search } from "lucide-react";
 import { useSidebarStore } from "@/stores/use-sidebar-store";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "./user-menu";
+import { ProjectSelector } from "@/components/shared/project-selector";
 
 export function Header() {
   const { toggle } = useSidebarStore();
@@ -21,13 +22,8 @@ export function Header() {
           <Menu className="w-5 h-5" />
         </Button>
 
-        {/* AHSP Banner - desktop */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full">
-          <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-          <span className="text-xs font-semibold text-amber-700">
-            DATABASE AHSP 2026 SUDAH AKTIF
-          </span>
-        </div>
+        {/* Project Selector */}
+        <ProjectSelector />
       </div>
 
       {/* Right */}

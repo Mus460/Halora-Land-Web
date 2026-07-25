@@ -17,19 +17,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useProject } from "@/contexts/ProjectContext";
 
 export default function RekapPage() {
+  const { currentProyekId: proyekId } = useProject();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showMargin, setShowMargin] = useState(false);
   const [margin, setMargin] = useState(10);
-  const proyekId = 1; // TODO: get from context/URL
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (proyekId) {
+      fetchData();
+    }
+  }, [proyekId]);
 
   const fetchData = async () => {
+    if (!proyekId) return;
+    
     try {
       setLoading(true);
       const response = await fetch(`/api/proyek/${proyekId}/rekap`);
@@ -46,6 +51,15 @@ export default function RekapPage() {
 
   if (loading || !data) {
     return <div className="p-8 text-center">Memuat data...</div>;
+  }
+
+  if (!proyekId) {
+    return (
+      <div className="p-8 text-center">
+        <Calculator className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+        <p className="text-gray-600">Silakan pilih proyek terlebih dahulu</p>
+      </div>
+    );
   }
 
   const rekapItems = data.breakdown || [];

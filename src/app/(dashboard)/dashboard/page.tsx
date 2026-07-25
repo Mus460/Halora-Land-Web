@@ -19,11 +19,25 @@ import toast from "react-hot-toast";
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
+    fetchUser();
   }, []);
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch('/api/auth/me');
+      if (response.ok) {
+        const result = await response.json();
+        setUser(result.user);
+      }
+    } catch (error) {
+      console.error('Fetch user error:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -50,7 +64,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Selamat datang kembali, Budi!"
+        description={`Selamat datang kembali, ${user?.namaLengkap || 'User'}!`}
         actions={
           <Link href="/proyek">
             <Button className="bg-amber-500 hover:bg-amber-600">

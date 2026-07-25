@@ -9,17 +9,22 @@ import { DataTable } from "@/components/shared/data-table";
 import { formatCurrency, formatDateShort } from "@/lib/utils";
 import type { Logistik } from "@/types";
 import toast from "react-hot-toast";
+import { useProject } from "@/contexts/ProjectContext";
 
 export default function LogistikPage() {
+  const { currentProyekId: proyekId } = useProject();
   const [data, setData] = useState<Logistik[]>([]);
   const [loading, setLoading] = useState(true);
-  const proyekId = 1; // TODO: get from context/URL
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (proyekId) {
+      fetchData();
+    }
+  }, [proyekId]);
 
   const fetchData = async () => {
+    if (!proyekId) return;
+    
     try {
       setLoading(true);
       const response = await fetch(`/api/proyek/${proyekId}/logistik`);

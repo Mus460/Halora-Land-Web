@@ -55,18 +55,23 @@ export async function createRouteHandlerClient(request: NextRequest) {
 /**
  * Get current user session from Supabase Auth
  * Returns user data if authenticated, null otherwise
+ * Uses getUser() for server-side verification (more secure than getSession())
  */
 export async function getSupabaseSession() {
   const supabase = await createServerClient()
   
-  const { data: { session }, error } = await supabase.auth.getSession()
+  // Use getUser() to verify session with Supabase Auth server
+  const { data: { user }, error } = await supabase.auth.getUser()
   
-  if (error || !session) {
+  if (error || !user) {
     return null
   }
 
+  // Get session after user verification
+  const { data: { session } } = await supabase.auth.getSession()
+
   return {
-    user: session.user,
+    user,
     session,
   }
 }
