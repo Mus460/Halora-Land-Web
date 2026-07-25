@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calculator } from "lucide-react";
+import { Calculator, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   Card,
@@ -23,6 +23,28 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showResendButton, setShowResendButton] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    
+    // Show success message for verified email
+    if (params.get('verified') === 'true') {
+      toast.success('Email berhasil diverifikasi! Silakan login.');
+    }
+    
+    // Show success message for new registration
+    if (params.get('registered') === 'true') {
+      toast.success('Akun berhasil dibuat! Cek email untuk verifikasi.');
+    }
+    
+    // Show error if any
+    const error = params.get('error');
+    if (error) {
+      toast.error(decodeURIComponent(error));
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +60,15 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || "Login gagal");
+        const errorMsg = data.error || "Login gagal";
+        
+        // Detect email not confirmed error
+        if (errorMsg.includes('Email not confirmed')) {
+          toast.error('Email belum diverifikasi. Cek inbox Anda.');
+          setShowResendButton(true);
+        } else {
+          toast.error(errorMsg);
+        }
         return;
       }
 
@@ -49,6 +79,37 @@ export default function LoginPage() {
       toast.error("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast.error('Masukkan email terlebih dahulu');
+      return;
+    }
+
+    setIsResending(true);
+
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Gagal mengirim email');
+        return;
+      }
+
+      toast.success('Email verifikasi telah dikirim. Cek inbox Anda.');
+      setShowResendButton(false);
+    } catch (error) {
+      toast.error('Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -138,6 +199,18 @@ export default function LoginPage() {
             >
               {isLoading ? "Memproses..." : "Masuk"}
             </Button>
+            {showResendButton && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 border-amber-500 text-amber-600 hover:bg-amber-50"
+                onClick={handleResendVerification}
+                disabled={isResending}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {isResending ? "Mengirim..." : "Kirim Ulang Email Verifikasi"}
+              </Button>
+            )}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <Separator />

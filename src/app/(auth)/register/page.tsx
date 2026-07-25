@@ -54,8 +54,8 @@ export default function RegisterPage() {
         return;
       }
 
-      toast.success("Registrasi berhasil!");
-      router.push("/dashboard");
+      toast.success(data.message || "Akun berhasil dibuat! Cek email untuk verifikasi.");
+      router.push("/login?registered=true");
       router.refresh();
     } catch (error) {
       toast.error("Terjadi kesalahan. Silakan coba lagi.");

@@ -106,8 +106,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Login error:', error)
+    
+    // Preserve exact error message for client detection
+    const errorMessage = error.message || 'Email atau password salah'
+    
     return NextResponse.json(
-      { error: error.message || 'Email atau password salah' },
+      { error: errorMessage },
       { status: 401 }
     )
   }
