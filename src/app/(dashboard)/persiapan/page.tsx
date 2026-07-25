@@ -2,7 +2,6 @@
 
 import { Ruler } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { TIPE_PERSIAPAN } from "@/lib/constants";
 
 export default function PersiapanPage() {
@@ -12,7 +11,7 @@ export default function PersiapanPage() {
       title="Persiapan"
       description="Pekerjaan persiapan lokasi konstruksi"
       icon={Ruler}
-      initialData={getPekerjaanByKategori("persiapan")}
+      proyekId={1}
       formFields={[
         {
           name: "tipe_persiapan",

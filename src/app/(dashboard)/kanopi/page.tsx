@@ -2,7 +2,6 @@
 
 import { Umbrella } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { JENIS_KANOPI } from "@/lib/constants";
 
 export default function KanopiPage() {
@@ -12,7 +11,7 @@ export default function KanopiPage() {
       title="Kanopi"
       description="Pekerjaan kanopi dan atap tambahan"
       icon={Umbrella}
-      initialData={getPekerjaanByKategori("kanopi")}
+      proyekId={1}
       formFields={[
         {
           name: "jenis_kanopi",

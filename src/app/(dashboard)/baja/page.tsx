@@ -2,7 +2,6 @@
 
 import { Construction } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 
 export default function BajaPage() {
   return (
@@ -11,7 +10,7 @@ export default function BajaPage() {
       title="Baja Struktural"
       description="Pekerjaan rangka baja dan struktur baja"
       icon={Construction}
-      initialData={getPekerjaanByKategori("baja")}
+      proyekId={1}
     />
   );
 }

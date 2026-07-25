@@ -1,17 +1,38 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { formatCurrency, formatDateShort } from "@/lib/utils";
-import { getLogistik } from "@/mock";
 import type { Logistik } from "@/types";
-import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function LogistikPage() {
-  const [data] = useState<Logistik[]>(getLogistik(1));
+  const [data, setData] = useState<Logistik[]>([]);
+  const [loading, setLoading] = useState(true);
+  const proyekId = 1; // TODO: get from context/URL
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/proyek/${proyekId}/logistik`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.logistik || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const columns: ColumnDef<Logistik>[] = [
     {

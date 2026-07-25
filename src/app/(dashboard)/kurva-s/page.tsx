@@ -1,13 +1,39 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
-import { getKurvaSData } from "@/mock";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function KurvaSPage() {
-  const data = getKurvaSData();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const proyekId = 1; // TODO: get from context/URL
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/proyek/${proyekId}/kurva-s`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !data) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -29,7 +55,7 @@ export default function KurvaSPage() {
         <CardContent>
           {/* Simple chart placeholder */}
           <div className="h-[400px] flex items-end gap-2 p-4 border rounded-lg">
-            {data.labels.map((label, i) => {
+            {data.labels.map((label: string, i: number) => {
               const maxVal = Math.max(...data.planned, ...data.actual);
               const plannedHeight =
                 maxVal > 0 ? (data.planned[i] / maxVal) * 350 : 0;
@@ -84,7 +110,7 @@ export default function KurvaSPage() {
               </tr>
             </thead>
             <tbody>
-              {data.labels.map((label, i) => {
+              {data.labels.map((label: string, i: number) => {
                 const deviasi = data.actual[i] - data.planned[i];
                 return (
                   <tr key={label} className="border-b">

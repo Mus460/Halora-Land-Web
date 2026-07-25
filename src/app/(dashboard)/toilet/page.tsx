@@ -2,7 +2,6 @@
 
 import { Bath } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 
 export default function ToiletPage() {
   return (
@@ -11,7 +10,7 @@ export default function ToiletPage() {
       title="Toilet/Sanitair"
       description="Pekerjaan sanitair dan perlengkapan toilet"
       icon={Bath}
-      initialData={getPekerjaanByKategori("toilet")}
+      proyekId={1}
       formFields={[
         {
           name: "bathub",

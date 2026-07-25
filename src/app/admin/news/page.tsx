@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, Newspaper } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatDate } from "@/lib/utils";
-import { getNewsList } from "@/mock";
 import toast from "react-hot-toast";
 import type { News } from "@/types";
 import {
@@ -24,42 +23,80 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminNewsPage() {
-  const [data, setData] = useState<News[]>(getNewsList());
+  const [data, setData] = useState<News[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<News | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const handleDelete = () => {
-    if (deleteId) {
-      setData((prev) => prev.filter((item) => item.id !== deleteId));
-      toast.success("Berita berhasil dihapus");
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/news');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.news || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
     }
-    setShowDelete(false);
-    setDeleteId(null);
   };
 
-  const handleSubmit = (formData: Partial<News>) => {
-    if (editItem) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.id === editItem.id ? { ...item, ...formData } : item
-        )
-      );
-      toast.success("Berita berhasil diupdate");
-    } else {
-      const newItem: News = {
-        id: Date.now(),
-        title: formData.title || "",
-        content: formData.content || "",
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      setData((prev) => [newItem, ...prev]);
-      toast.success("Berita berhasil ditambahkan");
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const response = await fetch(`/api/news/${deleteId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Delete failed');
+      
+      toast.success("Berita berhasil dihapus");
+      await fetchData();
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Gagal menghapus berita');
+    } finally {
+      setShowDelete(false);
+      setDeleteId(null);
     }
-    setEditItem(null);
   };
+
+  const handleSubmit = async (formData: Partial<News>) => {
+    try {
+      const method = editItem ? 'PUT' : 'POST';
+      const url = editItem ? `/api/news/${editItem.id}` : '/api/news';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Submit failed');
+      }
+
+      toast.success(editItem ? "Berita berhasil diupdate" : "Berita berhasil ditambahkan");
+      await fetchData();
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error(error instanceof Error ? error.message : 'Gagal menyimpan berita');
+    } finally {
+      setEditItem(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
 
   return (
     <div className="space-y-6">

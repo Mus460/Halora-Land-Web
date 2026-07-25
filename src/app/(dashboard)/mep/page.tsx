@@ -2,7 +2,6 @@
 
 import { Zap } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 
 export default function MEPPage() {
   return (
@@ -11,7 +10,7 @@ export default function MEPPage() {
       title="Instalasi MEP"
       description="Pekerjaan mekanikal, elektrikal, dan plumbing"
       icon={Zap}
-      initialData={getPekerjaanByKategori("mep")}
+      proyekId={1}
     />
   );
 }

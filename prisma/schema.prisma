@@ -76,23 +76,24 @@ enum StatusFeedback {
 }
 
 model User {
-  id           Int              @id @default(autoincrement())
-  namaLengkap  String
-  email        String           @unique
-  password     String
-  role         Role             @default(USER)
-  accountType  String           @default("free")
-  isDemo       Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id              Int              @id @default(autoincrement())
+  namaLengkap     String
+  email           String           @unique
+  password        String
+  role            Role             @default(USER)
+  accountType     String           @default("free")
+  isDemo          Boolean          @default(false)
+  supabaseAuthId  String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   
-  proyek       Proyek[]
-  timProyek    TimProyek[]
-  masterAnalisa MasterAnalisa[]
-  masterHarga  MasterHarga[]
-  feedback     Feedback[]
-  feedbackReply FeedbackReply[]
-  auditLogs    AuditLog[]
+  proyek          Proyek[]
+  timProyek       TimProyek[]
+  masterAnalisa   MasterAnalisa[]
+  masterHarga     MasterHarga[]
+  feedback        Feedback[]
+  feedbackReply   FeedbackReply[]
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -126,11 +127,14 @@ model TimProyek {
   userId    Int
   role      RoleTimProyek
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   
   proyek    Proyek           @relation(fields: [proyekId], references: [id], onDelete: Cascade)
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([proyekId, userId])
+  @@index([userId])
+  @@index([proyekId])
   @@map("tim_proyek")
 }
 
@@ -153,6 +157,8 @@ model Pekerjaan {
   detailAnalisa    DetailAnalisa[]
   auditLogs        AuditLog[]
 
+  @@index([proyekId])
+  @@index([kategori])
   @@map("pekerjaan")
 }
 
@@ -180,6 +186,9 @@ model DetailAnalisa {
   masterHarga         MasterHarga?   @relation(fields: [masterHargaId], references: [id], onDelete: SetNull)
   masterAnalisa       MasterAnalisa? @relation(fields: [masterAnalisaId], references: [id], onDelete: SetNull)
 
+  @@index([pekerjaanId])
+  @@index([masterHargaId])
+  @@index([masterAnalisaId])
   @@map("detail_analisa")
 }
 
@@ -193,6 +202,7 @@ model MasterAnalisa {
   isGlobal        Boolean          @default(false)
   userId          Int?
   createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   
   user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   parent          MasterAnalisa?   @relation("MasterAnalisaHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
@@ -201,6 +211,8 @@ model MasterAnalisa {
   detailAnalisa   DetailAnalisa[]
 
   @@unique([kode, userId])
+  @@index([userId])
+  @@index([parentId])
   @@map("master_analisa")
 }
 
@@ -210,10 +222,14 @@ model RincianAnalisa {
   komponenId       Int
   koef             Decimal        @db.Decimal(10, 6)
   tipe             TipeKomponen
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   
   masterAnalisa    MasterAnalisa  @relation(fields: [masterAnalisaId], references: [id], onDelete: Cascade)
   komponen         MasterHarga    @relation(fields: [komponenId], references: [id], onDelete: Cascade)
 
+  @@index([masterAnalisaId])
+  @@index([komponenId])
   @@map("rincian_analisa")
 }
 
@@ -232,6 +248,8 @@ model MasterHarga {
   detailAnalisa DetailAnalisa[]
   rincianAnalisa RincianAnalisa[]
 
+  @@unique([nama, userId, kategori])
+  @@index([userId])
   @@map("master_harga")
 }
 
@@ -247,6 +265,7 @@ model Rekap {
   
   proyek    Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
 
+  @@index([proyekId])
   @@map("rekap")
 }
 
@@ -258,9 +277,11 @@ model Invoice {
   total     Decimal       @db.Decimal(15, 2)
   status    StatusInvoice @default(draft)
   createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
   
   proyek    Proyek        @relation(fields: [proyekId], references: [id], onDelete: Cascade)
 
+  @@index([proyekId])
   @@map("invoice")
 }
 
@@ -275,9 +296,11 @@ model Logistik {
   tanggal      DateTime?
   keterangan   String?
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   
   proyek       Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
 
+  @@index([proyekId])
   @@map("logistik")
 }
 
@@ -289,9 +312,11 @@ model Realisasi {
   jumlah     Decimal  @db.Decimal(15, 2)
   keterangan String?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   
   proyek     Proyek   @relation(fields: [proyekId], references: [id], onDelete: Cascade)
 
+  @@index([proyekId])
   @@map("realisasi")
 }
 
@@ -307,6 +332,7 @@ model Feedback {
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies   FeedbackReply[]
 
+  @@index([userId])
   @@map("feedback")
 }
 
@@ -317,10 +343,13 @@ model FeedbackReply {
   message    String   @db.Text
   isAdmin    Boolean  @default(false)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   
   feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([feedbackId])
+  @@index([userId])
   @@map("feedback_reply")
 }
 
@@ -330,6 +359,7 @@ model News {
   content   String   @db.Text
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("news")
 }

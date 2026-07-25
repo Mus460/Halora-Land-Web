@@ -2,7 +2,6 @@
 
 import { MoveUpRight } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 
 export default function TanggaPage() {
   return (
@@ -11,7 +10,7 @@ export default function TanggaPage() {
       title="Tangga"
       description="Pekerjaan tangga dan railing"
       icon={MoveUpRight}
-      initialData={getPekerjaanByKategori("tangga")}
+      proyekId={1}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquare, Plus, Send } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatDate } from "@/lib/utils";
-import { getFeedbackList } from "@/mock";
 import { FEEDBACK_STATUS } from "@/lib/constants";
 import {
   Dialog,
@@ -24,9 +23,51 @@ import toast from "react-hot-toast";
 import type { Feedback } from "@/types";
 
 export default function FeedbackPage() {
-  const [data, setData] = useState<Feedback[]>(getFeedbackList());
+  const [data, setData] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selected, setSelected] = useState<Feedback | null>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/feedback');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.feedback || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (formData: { subject: string; message: string; kategori?: string }) => {
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Submit failed');
+      }
+
+      toast.success('Feedback berhasil dikirim');
+      setShowForm(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error(error instanceof Error ? error.message : 'Gagal mengirim feedback');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -104,20 +145,7 @@ export default function FeedbackPage() {
       <FeedbackFormDialog
         open={showForm}
         onOpenChange={setShowForm}
-        onSubmit={(data) => {
-          const newFeedback: Feedback = {
-            id: Date.now(),
-            userId: 2,
-            subject: data.subject || "",
-            message: data.message || "",
-            status: "open",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            replies: [],
-          };
-          setData((prev) => [newFeedback, ...prev]);
-          toast.success("Feedback berhasil dikirim");
-        }}
+        onSubmit={handleSubmit}
       />
 
       {/* Detail Dialog */}
@@ -167,7 +195,7 @@ function FeedbackFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { subject?: string; message?: string }) => void;
+  onSubmit: (data: { subject: string; message: string; kategori?: string }) => void;
 }) {
   const [form, setForm] = useState({ subject: "", message: "" });
 

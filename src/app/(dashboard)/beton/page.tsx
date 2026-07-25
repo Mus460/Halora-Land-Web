@@ -2,7 +2,6 @@
 
 import { Pickaxe } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { TIPE_BETON, LEVEL_PEKERJAAN, MUTU_BETON } from "@/lib/constants";
 
 export default function BetonPage() {
@@ -12,7 +11,7 @@ export default function BetonPage() {
       title="Beton Struktur"
       description="Pekerjaan beton bertulang (kolom, balok, plat, dll)"
       icon={Pickaxe}
-      initialData={getPekerjaanByKategori("beton")}
+      proyekId={1}
       showLevelPekerjaan={true}
       showTipePekerjaan={true}
       tipeOptions={TIPE_BETON}

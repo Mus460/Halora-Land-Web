@@ -2,7 +2,6 @@
 
 import { Map } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 
 export default function PavingPage() {
   return (
@@ -11,7 +10,7 @@ export default function PavingPage() {
       title="Paving & Halaman"
       description="Pekerjaan paving block dan penghijauan"
       icon={Map}
-      initialData={getPekerjaanByKategori("paving")}
+      proyekId={1}
     />
   );
 }

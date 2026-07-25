@@ -1,19 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, Search, LibraryBig } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getMasterAnalisaTree } from "@/mock";
 import type { MasterAnalisa } from "@/types";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function MasterAnalisaPage() {
-  const tree = getMasterAnalisaTree();
+  const [tree, setTree] = useState<MasterAnalisa[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/master-analisa?level=0'); // Fetch root nodes
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setTree(result.data || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTree = search
     ? tree.filter(
@@ -39,16 +59,20 @@ export default function MasterAnalisaPage() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="space-y-1">
-            {filteredTree.map((node) => (
-              <TreeNode key={node.id} node={node} level={0} search={search} />
-            ))}
-            {filteredTree.length === 0 && (
-              <p className="text-center text-gray-500 py-8">
-                Tidak ditemukan data analisa
-              </p>
-            )}
-          </div>
+          {loading ? (
+            <p className="text-center text-gray-500 py-8">Memuat data...</p>
+          ) : (
+            <div className="space-y-1">
+              {filteredTree.map((node) => (
+                <TreeNode key={node.id} node={node} level={0} search={search} />
+              ))}
+              {filteredTree.length === 0 && (
+                <p className="text-center text-gray-500 py-8">
+                  Tidak ditemukan data analisa
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

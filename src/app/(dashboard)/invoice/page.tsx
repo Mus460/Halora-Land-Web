@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { formatCurrency, formatDateShort } from "@/lib/utils";
-import { getInvoiceList } from "@/mock";
 import { INVOICE_STATUS } from "@/lib/constants";
 import type { Invoice } from "@/types";
-import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function InvoicePage() {
-  const [data] = useState<Invoice[]>(getInvoiceList(1));
+  const [data, setData] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const proyekId = 1; // TODO: get from context/URL
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/proyek/${proyekId}/invoice`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.invoices || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const columns: ColumnDef<Invoice>[] = [
     {

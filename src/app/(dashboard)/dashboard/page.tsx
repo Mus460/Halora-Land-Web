@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   Building2,
   Calculator,
@@ -12,12 +15,36 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { getDashboardData, getProyekList, getNewsList } from "@/mock";
+import toast from "react-hot-toast";
 
 export default function DashboardPage() {
-  const dashboard = getDashboardData();
-  const projects = getProyekList();
-  const news = getNewsList();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/dashboard/stats');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !data) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
+
+  const { stats, recentProjects } = data;
 
   return (
     <div className="space-y-6">
@@ -38,25 +65,25 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Proyek"
-          value={dashboard.stats.totalProyek}
+          value={stats.totalProyek}
           icon={<Building2 className="w-6 h-6" />}
           description="proyek terdaftar"
         />
         <StatCard
           title="Proyek Aktif"
-          value={dashboard.stats.proyekAktif}
+          value={stats.proyekAktif}
           icon={<ClipboardCheck className="w-6 h-6" />}
           description="sedang dikerjakan"
         />
         <StatCard
           title="Total RAB"
-          value={formatCurrency(dashboard.stats.totalRAB)}
+          value={formatCurrency(stats.totalRAB)}
           icon={<Calculator className="w-6 h-6" />}
           description="nilai keseluruhan"
         />
         <StatCard
           title="Total Pekerjaan"
-          value={dashboard.stats.totalPekerjaan}
+          value={stats.totalPekerjaan}
           icon={<TrendingUp className="w-6 h-6" />}
           description="item pekerjaan"
         />
@@ -75,7 +102,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {projects.slice(0, 5).map((project) => (
+              {recentProjects.map((project: any) => (
                 <Link
                   key={project.id}
                   href={`/proyek/${project.id}`}
@@ -87,7 +114,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">
-                        {project.namaProyek}
+                        {project.nama}
                       </p>
                       <p className="text-xs text-gray-500">
                         {project.lokasi || "Lokasi belum diatur"}
@@ -96,12 +123,12 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-gray-900">
-                      {project.nilaiKontrak
-                        ? formatCurrency(project.nilaiKontrak)
+                      {project.totalRAB
+                        ? formatCurrency(project.totalRAB)
                         : "-"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {formatDate(project.updatedAt)}
+                      {formatDate(project.createdAt)}
                     </p>
                   </div>
                 </Link>
@@ -110,30 +137,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* News */}
+        {/* News - removed, no API */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Pengumuman</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {news.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 rounded-lg border bg-amber-50/50"
-                >
-                  <h4 className="font-semibold text-sm text-gray-900 mb-1">
-                    {item.title}
-                  </h4>
-                  <p className="text-xs text-gray-600 line-clamp-3">
-                    {item.content}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {formatDate(item.createdAt)}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-gray-500">Tidak ada pengumuman</p>
           </CardContent>
         </Card>
       </div>

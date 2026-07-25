@@ -2,7 +2,6 @@
 
 import { House } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { JENIS_RANGKA_ATAP, JENIS_ATAP, BENTUK_ATAP } from "@/lib/constants";
 
 export default function AtapPage() {
@@ -12,7 +11,7 @@ export default function AtapPage() {
       title="Pek. Atap"
       description="Pekerjaan rangka atap dan penutup atap"
       icon={House}
-      initialData={getPekerjaanByKategori("atap")}
+      proyekId={1}
       formFields={[
         {
           name: "jenis_rangka",

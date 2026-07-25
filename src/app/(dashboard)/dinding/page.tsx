@@ -2,7 +2,6 @@
 
 import { Grid3X3 } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { JENIS_DINDING } from "@/lib/constants";
 
 export default function DindingPage() {
@@ -12,7 +11,7 @@ export default function DindingPage() {
       title="Pas. Dinding"
       description="Pekerjaan pasangan dinding"
       icon={Grid3X3}
-      initialData={getPekerjaanByKategori("dinding")}
+      proyekId={1}
       formFields={[
         {
           name: "jenis_dinding",

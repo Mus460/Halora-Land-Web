@@ -1,22 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { getMonitoringData } from "@/mock";
+import toast from "react-hot-toast";
 
 export default function MonitoringPage() {
-  const monitoring = getMonitoringData();
+  const [monitoring, setMonitoring] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const proyekId = 1; // TODO: get from context/URL
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/monitoring?proyekId=${proyekId}`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setMonitoring(result.monitoring || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
 
   const totalItems = monitoring.reduce(
     (sum, cat) => sum + cat.items.length,
     0
   );
   const completedItems = monitoring.reduce(
-    (sum, cat) => sum + cat.items.filter((i) => i.progress === 100).length,
+    (sum, cat) => sum + cat.items.filter((i: any) => i.progress === 100).length,
     0
   );
   const overallProgress =
@@ -55,7 +80,7 @@ export default function MonitoringPage() {
         {monitoring.map((kategori) => {
           const kategoriTotal = kategori.items.length;
           const kategoriDone = kategori.items.filter(
-            (i) => i.progress === 100
+            (i: any) => i.progress === 100
           ).length;
           const kategoriProgress =
             kategoriTotal > 0
@@ -76,7 +101,7 @@ export default function MonitoringPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Progress value={kategoriProgress} className="h-2" />
-                {kategori.items.map((item) => (
+                {kategori.items.map((item: any) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between py-2 border-b last:border-0"

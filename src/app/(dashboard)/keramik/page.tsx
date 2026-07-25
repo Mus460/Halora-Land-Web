@@ -2,7 +2,6 @@
 
 import { LayoutGrid } from "lucide-react";
 import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
-import { getPekerjaanByKategori } from "@/mock";
 import { JENIS_KERAMIK } from "@/lib/constants";
 
 export default function KeramikPage() {
@@ -12,7 +11,7 @@ export default function KeramikPage() {
       title="Lantai/Keramik"
       description="Pekerjaan lantai keramik dan granit"
       icon={LayoutGrid}
-      initialData={getPekerjaanByKategori("keramik")}
+      proyekId={1}
       formFields={[
         {
           name: "jenis_keramik",

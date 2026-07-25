@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatCurrency } from "@/lib/utils";
 import { LEVEL_PEKERJAAN } from "@/lib/constants";
-import toast from "react-hot-toast";
+import { usePekerjaan } from "@/hooks/usePekerjaan";
 import type { Pekerjaan, KategoriPekerjaan, MetodeHitung } from "@/types";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -47,7 +47,7 @@ interface PekerjaanPageProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  initialData: Pekerjaan[];
+  proyekId?: number; // Changed from initialData to proyekId
   formFields?: FormField[];
   showLevelPekerjaan?: boolean;
   showTipePekerjaan?: boolean;
@@ -59,13 +59,13 @@ export function PekerjaanPage({
   title,
   description,
   icon: Icon,
-  initialData,
+  proyekId = 1, // Default to proyekId 1 for now
   formFields = [],
   showLevelPekerjaan = false,
   showTipePekerjaan = false,
   tipeOptions = [],
 }: PekerjaanPageProps) {
-  const [data, setData] = useState<Pekerjaan[]>(initialData);
+  const { data, loading, createPekerjaan, updatePekerjaan, deletePekerjaan } = usePekerjaan({ kategori, proyekId });
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Pekerjaan | null>(null);
   const [showDelete, setShowDelete] = useState(false);
@@ -152,45 +152,29 @@ export function PekerjaanPage({
 
   const totalBiaya = data.reduce((sum, item) => sum + item.totalBiaya, 0);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId) {
-      setData((prev) => prev.filter((item) => item.id !== deleteId));
-      toast.success("Pekerjaan berhasil dihapus");
+      const success = await deletePekerjaan(deleteId);
+      if (success) {
+        setShowDelete(false);
+        setDeleteId(null);
+      }
     }
-    setShowDelete(false);
-    setDeleteId(null);
   };
 
-  const handleSubmit = (formData: Partial<Pekerjaan>) => {
+  const handleSubmit = async (formData: Partial<Pekerjaan>) => {
+    let success = false;
+    
     if (editItem) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.id === editItem.id
-            ? { ...item, ...formData, updatedAt: new Date().toISOString() }
-            : item
-        )
-      );
-      toast.success("Pekerjaan berhasil diupdate");
+      success = await updatePekerjaan(editItem.id, formData);
     } else {
-      const newItem: Pekerjaan = {
-        id: Date.now(),
-        proyekId: 1,
-        kategori,
-        uraianPekerjaan: formData.uraianPekerjaan || "",
-        volume: formData.volume || 0,
-        satuan: formData.satuan || "m2",
-        hargaSatuan: formData.hargaSatuan || 0,
-        totalBiaya: (formData.volume || 0) * (formData.hargaSatuan || 0),
-        metodeHitung: formData.metodeHitung || "ahsp",
-        levelPekerjaan: formData.levelPekerjaan || null,
-        tipePekerjaan: formData.tipePekerjaan || null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setData((prev) => [...prev, newItem]);
-      toast.success("Pekerjaan berhasil ditambahkan");
+      success = await createPekerjaan(formData);
     }
-    setEditItem(null);
+    
+    if (success) {
+      setEditItem(null);
+      setShowForm(false);
+    }
   };
 
   return (

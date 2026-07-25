@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Save, Lock } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +12,13 @@ import toast from "react-hot-toast";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState({
-    namaLengkap: "Budi Kontraktor",
-    email: "budi@example.com",
-    namaUsaha: "CV. Bangun Jaya",
-    alamat: "Jl. Merdeka No. 123, Bandung",
-    telepon: "081234567890",
+    namaLengkap: "",
+    email: "",
+    namaUsaha: "",
+    alamat: "",
+    telepon: "",
   });
+  const [loading, setLoading] = useState(true);
 
   const [password, setPassword] = useState({
     current: "",
@@ -25,8 +26,52 @@ export default function ProfilePage() {
     confirm: "",
   });
 
-  const handleSaveProfile = () => {
-    toast.success("Profil berhasil disimpan");
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/auth/me');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setProfile({
+        namaLengkap: result.user.namaLengkap || "",
+        email: result.user.email || "",
+        namaUsaha: "",
+        alamat: "",
+        telepon: "",
+      });
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat profil');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          namaLengkap: profile.namaLengkap,
+          email: profile.email,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Update failed');
+      }
+
+      toast.success("Profil berhasil disimpan");
+    } catch (error) {
+      console.error('Update error:', error);
+      toast.error(error instanceof Error ? error.message : 'Gagal update profil');
+    }
   };
 
   const handleChangePassword = () => {
@@ -34,9 +79,14 @@ export default function ProfilePage() {
       toast.error("Password baru tidak cocok");
       return;
     }
+    // TODO: implement password change API
     toast.success("Password berhasil diubah");
     setPassword({ current: "", new: "", confirm: "" });
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
 
   return (
     <div className="space-y-6">

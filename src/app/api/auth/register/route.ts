@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hashPassword, signToken } from '@/lib/auth'
-import { setAuthCookie } from '@/lib/session'
+import { signUpWithPassword } from '@/lib/supabase-auth'
+import { rateLimit, getClientIp } from '@/lib/rate-limit'
+import { logAudit, getClientInfo } from '@/lib/audit-log'
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 requests per 15 minutes per IP
+  const ip = getClientIp(request)
+  const rateLimitResult = rateLimit({
+    id: `register:${ip}`,
+    limit: 5,
+    windowSec: 15 * 60,
+  })
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { 
+        error: 'Terlalu banyak percobaan. Coba lagi nanti.',
+        retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
+      },
+      { 
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil((rateLimitResult.reset - Date.now()) / 1000)),
+          'X-RateLimit-Limit': String(rateLimitResult.limit),
+          'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+          'X-RateLimit-Reset': String(rateLimitResult.reset),
+        }
+      }
+    )
+  }
+
   try {
     const { namaLengkap, email, password } = await request.json()
 
@@ -21,6 +48,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if email already exists in our User table
     const existingUser = await prisma.user.findUnique({
       where: { email },
     })
@@ -32,26 +60,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const hashedPassword = await hashPassword(password)
+    // Sign up with Supabase Auth
+    const { user: supabaseUser } = await signUpWithPassword(email, password, {
+      namaLengkap,
+    })
 
+    if (!supabaseUser) {
+      return NextResponse.json(
+        { error: 'Gagal membuat akun' },
+        { status: 500 }
+      )
+    }
+
+    // Create user in our User table
     const user = await prisma.user.create({
       data: {
         namaLengkap,
         email,
-        password: hashedPassword,
+        password: '', // No longer needed, Supabase handles auth
         role: 'USER',
-        accountType: 'free',
+        accountType: 'FREE',
         isDemo: false,
+        supabaseAuthId: supabaseUser.id,
       },
     })
 
-    const token = await signToken({
+    // Audit log
+    const clientInfo = getClientInfo(request)
+    await logAudit({
       userId: user.id,
-      email: user.email,
-      role: user.role,
+      action: 'REGISTER',
+      resource: 'USER',
+      resourceId: user.id,
+      ...clientInfo,
     })
-
-    await setAuthCookie(token)
 
     return NextResponse.json({
       user: {
@@ -62,11 +104,12 @@ export async function POST(request: NextRequest) {
         accountType: user.accountType,
         isDemo: user.isDemo,
       },
+      message: 'Registrasi berhasil. Silakan cek email untuk verifikasi.',
     }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register error:', error)
     return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
+      { error: error.message || 'Terjadi kesalahan server' },
       { status: 500 }
     )
   }

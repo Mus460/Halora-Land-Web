@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2, RotateCcw, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { DataTable } from "@/components/shared/data-table";
 import { SearchInput } from "@/components/shared/search-input";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatCurrency } from "@/lib/utils";
-import { getMasterHarga } from "@/mock";
 import { TIPE_KOMPONEN } from "@/lib/constants";
 import toast from "react-hot-toast";
 import type { MasterHarga, TipeKomponen } from "@/types";
@@ -33,13 +32,34 @@ import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/shared/currency-input";
 
 export default function MasterHargaPage() {
-  const [data, setData] = useState<MasterHarga[]>(getMasterHarga());
+  const [data, setData] = useState<MasterHarga[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterKategori, setFilterKategori] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<MasterHarga | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  // Fetch data from API
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/master-harga');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.masterHarga || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filtered = data.filter((item) => {
     const matchSearch = item.nama
@@ -126,56 +146,78 @@ export default function MasterHargaPage() {
   ];
 
   const handleAutoFill = () => {
-    setData((prev) =>
-      prev.map((item) =>
-        item.harga === 0
-          ? { ...item, harga: Math.floor(Math.random() * 500000) + 10000 }
-          : item
-      )
-    );
-    toast.success("Harga berhasil diisi otomatis");
+    // Auto-fill functionality removed - not applicable with real API
+    toast.error("Fitur auto-fill tidak tersedia");
   };
 
   const handleReset = () => {
-    setData((prev) => prev.map((item) => ({ ...item, harga: 0 })));
-    toast.success("Semua harga direset ke 0");
+    // Reset functionality removed - not applicable with real API
+    toast.error("Fitur reset tidak tersedia");
   };
 
-  const handleDelete = () => {
-    if (deleteId) {
-      setData((prev) => prev.filter((item) => item.id !== deleteId));
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    
+    try {
+      const response = await fetch(`/api/master-harga/${deleteId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Delete failed');
+      }
+      
+      await fetchData(); // Refresh data
       toast.success("Data berhasil dihapus");
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error(error instanceof Error ? error.message : 'Gagal menghapus data');
+    } finally {
+      setShowDelete(false);
+      setDeleteId(null);
     }
-    setShowDelete(false);
-    setDeleteId(null);
   };
 
-  const handleSubmit = (formData: Partial<MasterHarga>) => {
-    if (editItem) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.id === editItem.id
-            ? { ...item, ...formData, updatedAt: new Date().toISOString() }
-            : item
-        )
-      );
-      toast.success("Data berhasil diupdate");
-    } else {
-      const newItem: MasterHarga = {
-        id: Date.now(),
-        nama: formData.nama || "",
-        satuan: formData.satuan || "",
-        harga: formData.harga || 0,
-        kategori: formData.kategori || "material",
-        isGlobal: false,
-        userId: 2,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setData((prev) => [newItem, ...prev]);
-      toast.success("Data berhasil ditambahkan");
+  const handleSubmit = async (formData: Partial<MasterHarga>) => {
+    try {
+      if (editItem) {
+        // Update
+        const response = await fetch(`/api/master-harga/${editItem.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Update failed');
+        }
+        
+        toast.success("Data berhasil diupdate");
+      } else {
+        // Create
+        const response = await fetch('/api/master-harga', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Create failed');
+        }
+        
+        toast.success("Data berhasil ditambahkan");
+      }
+      
+      await fetchData(); // Refresh data
+      setEditItem(null);
+      setShowForm(false);
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error(error instanceof Error ? error.message : 'Gagal menyimpan data');
     }
-    setEditItem(null);
   };
 
   return (
@@ -232,8 +274,8 @@ export default function MasterHargaPage() {
       <DataTable
         columns={columns}
         data={filtered}
-        emptyTitle="Belum ada data harga"
-        emptyDescription="Tambahkan harga satuan material, upah, atau alat"
+        emptyTitle={loading ? "Memuat data..." : "Belum ada data harga"}
+        emptyDescription={loading ? "" : "Tambahkan harga satuan material, upah, atau alat"}
       />
 
       {/* Form Dialog */}

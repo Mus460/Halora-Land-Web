@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Wallet, TrendingDown, TrendingUp, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,32 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDateShort } from "@/lib/utils";
-import { getRealisasi, getAllPekerjaan } from "@/mock";
 import type { Realisasi } from "@/types";
+import toast from "react-hot-toast";
 
 export default function RealisasiPage() {
-  const [data] = useState<Realisasi[]>(getRealisasi(1));
-  const pekerjaan = getAllPekerjaan(1);
+  const [data, setData] = useState<Realisasi[]>([]);
+  const [loading, setLoading] = useState(true);
+  const proyekId = 1; // TODO: get from context/URL
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/proyek/${proyekId}/realisasi`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.realisasi || []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const columns: ColumnDef<Realisasi>[] = [
     {
@@ -48,8 +68,9 @@ export default function RealisasiPage() {
     },
   ];
 
-  const totalRAB = pekerjaan.reduce((sum, p) => sum + p.totalBiaya, 0);
   const totalPengeluaran = data.reduce((sum, r) => sum + r.jumlah, 0);
+  // TODO: fetch totalRAB from API or pass via props
+  const totalRAB = 0; // Placeholder
   const selisih = totalRAB - totalPengeluaran;
 
   return (

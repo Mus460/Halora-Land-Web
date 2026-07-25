@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calculator, FileDown, Settings } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
-import { getRekap, getAllPekerjaan } from "@/mock";
+import toast from "react-hot-toast";
 import {
   Dialog,
   DialogContent,
@@ -19,22 +19,47 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function RekapPage() {
-  const rekapItems = getRekap();
-  const pekerjaan = getAllPekerjaan(1);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [showMargin, setShowMargin] = useState(false);
   const [margin, setMargin] = useState(10);
+  const proyekId = 1; // TODO: get from context/URL
 
-  const subtotal = pekerjaan.reduce((sum, p) => sum + p.totalBiaya, 0);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/proyek/${proyekId}/rekap`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !data) {
+    return <div className="p-8 text-center">Memuat data...</div>;
+  }
+
+  const rekapItems = data.breakdown || [];
+  const subtotal = data.totalRAB || 0;
   const overhead = subtotal * 0.1;
   const profit = (subtotal + overhead) * (margin / 100);
   const ppn = (subtotal + overhead + profit) * 0.11;
   const total = subtotal + overhead + profit + ppn;
 
-  const grouped = pekerjaan.reduce((acc, item) => {
+  const grouped = rekapItems.reduce((acc: any, item: any) => {
     if (!acc[item.kategori]) acc[item.kategori] = [];
     acc[item.kategori].push(item);
     return acc;
-  }, {} as Record<string, typeof pekerjaan>);
+  }, {} as Record<string, typeof rekapItems>);
 
   return (
     <div className="space-y-6">
@@ -59,7 +84,8 @@ export default function RekapPage() {
         {/* Main Table */}
         <div className="lg:col-span-2 space-y-4">
           {Object.entries(grouped).map(([kategori, items]) => {
-            const kategoriTotal = items.reduce(
+            const itemsArray = items as any[];
+            const kategoriTotal = itemsArray.reduce(
               (sum, item) => sum + item.totalBiaya,
               0
             );
@@ -92,7 +118,7 @@ export default function RekapPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item) => (
+                      {itemsArray.map((item: any) => (
                         <tr key={item.id} className="border-b last:border-0">
                           <td className="px-4 py-2">
                             <p className="font-medium">{item.uraianPekerjaan}</p>
@@ -120,7 +146,7 @@ export default function RekapPage() {
             );
           })}
 
-          {pekerjaan.length === 0 && (
+          {rekapItems.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center text-gray-500">
                 <Calculator className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -167,7 +193,7 @@ export default function RekapPage() {
               <div className="text-center">
                 <p className="text-sm text-gray-500">Total Item</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {pekerjaan.length}
+                  {rekapItems.length}
                 </p>
               </div>
             </CardContent>
