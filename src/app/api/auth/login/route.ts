@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
       ...clientInfo,
     })
 
-    return NextResponse.json({
+    // Create response with user data
+    const response = NextResponse.json({
       user: {
         id: user.id,
         namaLengkap: user.namaLengkap,
@@ -104,6 +105,32 @@ export async function POST(request: NextRequest) {
         isDemo: user.isDemo,
       },
     })
+
+    // Set Supabase session cookies for SSR
+    if (session) {
+      // Extract project ref from Supabase URL
+      const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.split('//')[1].split('.')[0]
+      
+      // Set auth token cookie (Supabase SSR format)
+      response.cookies.set({
+        name: `sb-${projectRef}-auth-token`,
+        value: JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at,
+          expires_in: session.expires_in,
+          token_type: session.token_type,
+          user: session.user,
+        }),
+        path: '/',
+        maxAge: session.expires_in,
+        httpOnly: false, // Client-side Supabase SDK needs to read this
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      })
+    }
+
+    return response
   } catch (error: any) {
     console.error('Login error:', error)
     
