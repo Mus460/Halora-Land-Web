@@ -7,9 +7,10 @@ export class ApiError extends Error {
 }
 
 export async function getJsonBody<T>(request: Request): Promise<T> {
-  const contentType = request.headers.get('content-type')
-  if (contentType !== 'application/json') {
-    throw new ApiError('Content-Type must be application/json', 400)
+  const raw = request.headers.get('content-type') ?? ''
+  const mediaType = raw.split(';')[0].trim().toLowerCase()
+  if (mediaType !== 'application/json') {
+    throw new ApiError('Content-Type must be application/json', 415)
   }
   try {
     return await request.json() as T

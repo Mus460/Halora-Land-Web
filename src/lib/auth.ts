@@ -1,9 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { hash, compare } from 'bcryptjs'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-this-in-production-min-32-chars'
-)
+const secret = process.env.JWT_SECRET
+if (!secret) {
+  throw new Error('JWT_SECRET environment variable is required')
+}
+if (secret.length < 32) {
+  throw new Error('JWT_SECRET must be at least 32 characters')
+}
+const JWT_SECRET = new TextEncoder().encode(secret)
 
 export interface JWTPayload {
   userId: number

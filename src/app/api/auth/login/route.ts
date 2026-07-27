@@ -120,21 +120,18 @@ export async function POST(request: NextRequest) {
         }),
         path: '/',
         maxAge: session.expires_in,
-        httpOnly: false, // Client-side Supabase SDK needs to read this
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
       })
     }
 
     return response
-  } catch (error: any) {
-    console.error('Login error:', error)
-    
-    // Preserve exact error message for client detection
-    const errorMessage = error.message || 'Email atau password salah'
+  } catch {
+    console.error('Login error')
     
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Email atau password salah' },
       { status: 401 }
     )
   }

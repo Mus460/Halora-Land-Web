@@ -3,16 +3,26 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { loadAHSPWorkbook, parseAHSPSheet, getKategoriFromSheet } from '@/lib/ahsp-parser'
 import path from 'path'
+import { z } from 'zod'
+
+const importBodySchema = z.object({
+  kategori: z.string().optional(),
+  sheetName: z.string().min(1),
+  forceReimport: z.boolean().optional()
+})
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getCurrentUser()
-    if (!session || session.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { kategori, sheetName, forceReimport } = body
+    const { kategori, sheetName, forceReimport } = importBodySchema.parse(body)
 
     if (!sheetName) {
       return NextResponse.json({ error: 'sheetName is required' }, { status: 400 })
@@ -127,8 +137,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getCurrentUser()
-    if (!session || session.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Get import status for all sheets

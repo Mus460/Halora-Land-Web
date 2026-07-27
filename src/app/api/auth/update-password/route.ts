@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@/lib/supabase-auth'
+import { getCurrentSupabaseUser } from '@/lib/supabase-auth'
+import { updatePasswordSchema } from '@/lib/schemas'
+import { getJsonBody } from '@/lib/api-utils'
 
-/**
- * Update Password
- * Updates user password after password reset flow
- */
 export async function POST(request: NextRequest) {
   try {
-    const { password } = await request.json()
-
-    if (!password) {
-      return NextResponse.json(
-        { error: 'Password harus diisi' },
-        { status: 400 }
-      )
+    const session = await getCurrentSupabaseUser()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password minimal 6 karakter' },
-        { status: 400 }
-      )
-    }
+    const { password } = updatePasswordSchema.parse(await getJsonBody(request))
 
     const supabase = await createRouteHandlerClient(request)
     
@@ -38,8 +28,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Update password error:', error)
+    
     return NextResponse.json(
-      { error: error.message || 'Gagal mengubah password' },
+      { error: 'Gagal mengubah password' },
       { status: 500 }
     )
   }

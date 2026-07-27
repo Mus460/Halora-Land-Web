@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentSupabaseUser } from '@/lib/supabase-auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const profileUpdateSchema = z.object({
+  namaLengkap: z.string().min(2).max(100).optional(),
+  email: z.string().email('Format email tidak valid').optional()
+})
 
 export async function GET() {
   try {
@@ -56,9 +62,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { namaLengkap, email } = body
+    const { namaLengkap, email } = profileUpdateSchema.parse(body)
 
-    // Check if email already exists (if changing)
     if (email && email !== session.email) {
       const existing = await prisma.user.findUnique({
         where: { email }

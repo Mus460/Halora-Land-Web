@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get('entityType')
     const action = searchParams.get('action')
     const userIdRaw = searchParams.get('userId')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const rawLimit = Number(searchParams.get('limit') ?? '50')
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 200) : 50
 
     const where: any = {}
 

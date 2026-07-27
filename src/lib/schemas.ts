@@ -6,6 +6,14 @@ export const loginSchema = z.object({
   password: z.string().min(8, 'Password minimal 8 karakter')
 })
 
+export const updatePasswordSchema = z.object({
+  password: z.string()
+    .min(8, 'Password minimal 8 karakter')
+    .regex(/[A-Z]/, 'Password harus ada huruf besar')
+    .regex(/[a-z]/, 'Password harus ada huruf kecil')
+    .regex(/[0-9]/, 'Password harus ada angka')
+})
+
 export const registerSchema = z.object({
   email: z.string().email('Format email tidak valid'),
   password: z.string()
@@ -13,27 +21,18 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Password harus ada huruf besar')
     .regex(/[a-z]/, 'Password harus ada huruf kecil')
     .regex(/[0-9]/, 'Password harus ada angka'),
-  name: z.string().min(2, 'Nama minimal 2 karakter').max(100)
+  namaLengkap: z.string().min(2, 'Nama minimal 2 karakter').max(100)
 })
 
 // === PEKERJAAN ===
 export const createPekerjaanSchema = z.object({
   proyekId: z.number().int().positive(),
-  kategori: z.enum([
-    'pekerjaan_persiapan',
-    'pekerjaan_tanah',
-    'pekerjaan_dinding',
-    'pekerjaan_atap',
-    'pekerjaan_plafon',
-    'pekerjaan_lantai',
-    'pekerjaan_kusen',
-    'pekerjaan_finish'
-  ]),
+  kategori: z.enum(['persiapan', 'pondasi', 'beton', 'kanopi', 'baja', 'tangga', 'atap', 'dinding', 'plesteran', 'acian', 'keramik', 'paving', 'pengecatan', 'pintu', 'interior', 'toilet', 'mep', 'custom']),
   uraianPekerjaan: z.string().min(1).max(500),
   volume: z.number().positive('Volume harus > 0'),
   satuan: z.string().min(1).max(50),
-  metodeHitung: z.enum(['ahsp', 'manual']),
-  levelPekerjaan: z.number().int().min(1).max(3).default(1),
+  metodeHitung: z.enum(['ahsp', 'manual', 'harga_borong', 'harga_manual', 'harga_custom']),
+  levelPekerjaan: z.string().optional(),
   tipePekerjaan: z.enum(['UTAMA', 'SUB']).default('UTAMA'),
   masterAnalisaId: z.number().int().positive().optional(),
   hargaSatuan: z.number().min(0).max(999_999_999_999).optional(),
@@ -48,7 +47,7 @@ export const createPekerjaanSchema = z.object({
 // === PROYEK ===
 export const createProyekSchema = z.object({
   namaProyek: z.string().min(3, 'Nama proyek minimal 3 karakter').max(200),
-  jenisProyek: z.enum(['gedung', 'infrastruktur']),
+  jenisProyek: z.enum(['gedung', 'infra']),
   lokasi: z.string().min(1).max(500),
   tanggalMulai: z.string().datetime().optional(),
   tanggalSelesai: z.string().datetime().optional(),
@@ -77,7 +76,7 @@ export const createMasterHargaSchema = z.object({
 export const createInvoiceSchema = z.object({
   tanggal: z.string().datetime(),
   total: z.number().min(0).max(999_999_999_999),
-  status: z.enum(['draft', 'sent', 'paid', 'cancelled']).default('draft'),
+  status: z.enum(['draft', 'sent', 'paid']).default('draft'),
 })
 
 // === LOGISTIK ===
