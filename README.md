@@ -149,4 +149,4 @@ Private Project — All Rights Reserved
 
 ---
 
-**Status:** Development phase — feature set subject to change.
+**Status:** Pusing phase — feature set subject to change.
