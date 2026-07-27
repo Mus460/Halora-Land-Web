@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createMasterAnalisaSchema } from '@/lib/schemas'
 
 /**
  * GET /api/master-analisa/[id]
@@ -17,7 +19,7 @@ export async function GET(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const id = parseId(idParam, 'id')
 
     const masterAnalisa = await prisma.masterAnalisa.findUnique({
       where: { id },
@@ -72,12 +74,8 @@ export async function GET(
     }
 
     return NextResponse.json(masterAnalisa)
-  } catch (error: any) {
-    console.error('[master-analisa/[id] GET]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }
 
@@ -96,9 +94,10 @@ export async function PUT(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
-    const body = await request.json()
-    const { kode, nama, satuan, parentId } = body
+    const id = parseId(idParam, 'id')
+    
+    const body = await getJsonBody(request)
+    const validated = createMasterAnalisaSchema.partial().parse(body)
 
     // Get existing
     const existing = await prisma.masterAnalisa.findUnique({
@@ -122,10 +121,10 @@ export async function PUT(
     }
 
     // Check kode uniqueness if changed
-    if (kode && kode !== existing.kode) {
+    if (validated.kode && validated.kode !== existing.kode) {
       const duplicate = await prisma.masterAnalisa.findFirst({
         where: {
-          kode,
+          kode: validated.kode,
           userId: existing.userId,
           id: { not: id }
         }
@@ -142,10 +141,10 @@ export async function PUT(
     const updated = await prisma.masterAnalisa.update({
       where: { id },
       data: {
-        kode: kode || existing.kode,
-        nama: nama || existing.nama,
-        satuan: satuan !== undefined ? satuan : existing.satuan,
-        parentId: parentId !== undefined ? parentId : existing.parentId
+        kode: validated.kode ?? existing.kode,
+        nama: validated.nama ?? existing.nama,
+        satuan: validated.satuan !== undefined ? validated.satuan : existing.satuan,
+        parentId: validated.parentId !== undefined ? validated.parentId : existing.parentId
       },
       include: {
         user: {
@@ -163,12 +162,8 @@ export async function PUT(
     })
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    console.error('[master-analisa/[id] PUT]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }
 
@@ -187,7 +182,7 @@ export async function DELETE(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const id = parseId(idParam, 'id')
 
     // Get existing
     const existing = await prisma.masterAnalisa.findUnique({
@@ -229,11 +224,7 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'Master analisa deleted successfully' })
-  } catch (error: any) {
-    console.error('[master-analisa/[id] DELETE]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

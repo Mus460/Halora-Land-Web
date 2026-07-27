@@ -36,7 +36,7 @@ export function ProjectSelector() {
       <Building2 className="w-4 h-4 text-gray-500 hidden sm:block" />
       <Select
         value={currentProyekId?.toString() || ''}
-        onValueChange={(value) => setCurrentProyekId(parseInt(value))}
+        onValueChange={(value) => value && setCurrentProyekId(parseInt(value))}
       >
         <SelectTrigger className="w-[200px] sm:w-[250px]">
           <SelectValue placeholder="Pilih proyek" />

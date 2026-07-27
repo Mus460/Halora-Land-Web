@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createRealisasiSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check access
     const proyek = await prisma.proyek.findUnique({
@@ -81,8 +83,7 @@ export async function GET(
       monthlyTrend
     })
   } catch (error) {
-    console.error('Get realisasi error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -97,7 +98,7 @@ export async function POST(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check edit access
     const proyek = await prisma.proyek.findUnique({
@@ -118,28 +119,21 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { tanggal, kategori, jumlah, keterangan } = body
-
-    if (!tanggal || !kategori || !jumlah) {
-      return NextResponse.json({ 
-        error: 'tanggal, kategori, jumlah are required' 
-      }, { status: 400 })
-    }
+    const body = await getJsonBody(request)
+    const validated = createRealisasiSchema.parse(body)
 
     const realisasi = await prisma.realisasi.create({
       data: {
         proyekId,
-        tanggal: new Date(tanggal),
-        kategori,
-        jumlah,
-        keterangan: keterangan || '',
+        tanggal: new Date(validated.tanggal),
+        kategori: validated.kategori,
+        jumlah: validated.jumlah,
+        keterangan: validated.keterangan || '',
       }
     })
 
     return NextResponse.json({ realisasi }, { status: 201 })
   } catch (error) {
-    console.error('Create realisasi error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

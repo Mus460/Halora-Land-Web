@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { snapshotAHSP } from '@/lib/snapshot'
 import { createAuditLog } from '@/lib/audit'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * POST /api/pekerjaan/[id]/recalculate
@@ -19,7 +20,7 @@ export async function POST(
     }
 
     const { id: idParam } = await params
-    const pekerjaanId = parseInt(idParam)
+    const pekerjaanId = parseId(idParam, 'pekerjaanId')
 
     // Get pekerjaan with detail
     const pekerjaan = await prisma.pekerjaan.findUnique({
@@ -117,11 +118,7 @@ export async function POST(
       diff,
       percentChange
     })
-  } catch (error: any) {
-    console.error('[pekerjaan/[id]/recalculate POST]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

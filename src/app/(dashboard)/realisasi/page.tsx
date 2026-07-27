@@ -11,23 +11,26 @@ import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDateShort } from "@/lib/utils";
 import type { Realisasi } from "@/types";
 import toast from "react-hot-toast";
+import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
 
 export default function RealisasiPage() {
+  const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
+  
+  if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
+  if (proyekList.length === 0) {
+    return (
+      <EmptyProyekState
+        title="Belum Ada Data Keuangan"
+        description="Buat proyek untuk mencatat realisasi keuangan dan pengeluaran"
+      />
+    );
+  }
+  
   const [data, setData] = useState<Realisasi[]>([]);
   const [loading, setLoading] = useState(true);
-  const { currentProyekId: proyekId } = useProject();
-
-  useEffect(() => {
-    if (proyekId) {
-      fetchData();
-    }
-  }, [proyekId]);
 
   const fetchData = async () => {
     if (!proyekId) return;
-  }, []);
-
-  const fetchData = async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/proyek/${proyekId}/realisasi`);
@@ -41,6 +44,12 @@ export default function RealisasiPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (proyekId) {
+      fetchData();
+    }
+  }, [proyekId]);
 
   const columns: ColumnDef<Realisasi>[] = [
     {

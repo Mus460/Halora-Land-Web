@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { handleError, getJsonBody } from '@/lib/api-utils'
+import { createMasterHargaSchema } from '@/lib/schemas'
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,11 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ masterHarga })
   } catch (error) {
-    console.error('Get master harga error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -79,26 +77,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { nama, satuan, harga, kategori, isGlobal } = body
-
-    if (!nama || !satuan || harga === undefined || !kategori) {
-      return NextResponse.json(
-        { error: 'Field required: nama, satuan, harga, kategori' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const validated = createMasterHargaSchema.parse(body)
 
     // Only admin can create global master harga
     const canCreateGlobal = session.role === 'ADMIN'
-    const finalIsGlobal = isGlobal && canCreateGlobal
+    const finalIsGlobal = validated.isGlobal && canCreateGlobal
 
     const masterHarga = await prisma.masterHarga.create({
       data: {
-        nama,
-        satuan,
-        harga: parseFloat(harga),
-        kategori,
+        nama: validated.nama,
+        satuan: validated.satuan,
+        harga: validated.harga,
+        kategori: validated.kategori,
         isGlobal: finalIsGlobal,
         userId: finalIsGlobal ? null : session.userId,
       },
@@ -115,10 +106,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ masterHarga }, { status: 201 })
   } catch (error) {
-    console.error('Create master harga error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

@@ -199,8 +199,17 @@ model MasterAnalisa {
   level           Int
   parentId        Int?
   satuan          String?
+  hargaSatuan     Decimal?         @db.Decimal(15, 2)
+  kategori        String?
   isGlobal        Boolean          @default(false)
   userId          Int?
+  
+  // AHSP support fields
+  isSystem        Boolean          @default(false)
+  ahspKode        String?
+  ahspSheet       String?
+  biayaUmum       Decimal?         @default(0.10) @db.Decimal(5, 4)
+  
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   
@@ -213,20 +222,32 @@ model MasterAnalisa {
   @@unique([kode, userId])
   @@index([userId])
   @@index([parentId])
+  @@index([kategori, isSystem])
+  @@index([ahspKode])
+  @@index([ahspSheet])
   @@map("master_analisa")
 }
 
 model RincianAnalisa {
   id               Int            @id @default(autoincrement())
   masterAnalisaId  Int
-  komponenId       Int
+  komponenId       Int?           // Nullable for snapshot-only records
   koef             Decimal        @db.Decimal(10, 6)
   tipe             TipeKomponen
+  
+  // Snapshot fields (for AHSP breakdown)
+  nama             String?
+  satuan           String?
+  hargaSatuan      Decimal?       @db.Decimal(15, 2)
+  jumlahHarga      Decimal?       @db.Decimal(15, 2)
+  kodeReferensi    String?        // L.01, M.123, E.456
+  urutan           Int            @default(0)
+  
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   
   masterAnalisa    MasterAnalisa  @relation(fields: [masterAnalisaId], references: [id], onDelete: Cascade)
-  komponen         MasterHarga    @relation(fields: [komponenId], references: [id], onDelete: Cascade)
+  komponen         MasterHarga?   @relation(fields: [komponenId], references: [id], onDelete: Cascade)
 
   @@index([masterAnalisaId])
   @@index([komponenId])
@@ -241,6 +262,11 @@ model MasterHarga {
   kategori      TipeKomponen
   isGlobal      Boolean          @default(false)
   userId        Int?
+  
+  // AHSP support
+  kodeAHSP      String?
+  isSystem      Boolean          @default(false)
+  
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   

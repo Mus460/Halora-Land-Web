@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createProyekSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,11 +15,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
-
-    if (isNaN(proyekId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const proyekId = parseId(id, 'proyekId')
 
     const proyek = await prisma.proyek.findUnique({
       where: { id: proyekId },
@@ -71,11 +69,7 @@ export async function GET(
 
     return NextResponse.json({ proyek })
   } catch (error) {
-    console.error('Get proyek detail error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -90,11 +84,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
-
-    if (isNaN(proyekId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const proyekId = parseId(id, 'proyekId')
 
     const existing = await prisma.proyek.findUnique({
       where: { id: proyekId },
@@ -117,17 +107,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { namaProyek, lokasi, tipe, nilaiKontrak, timeline } = body
+    const body = await getJsonBody(request)
+    const validated = createProyekSchema.partial().parse(body)
 
     const proyek = await prisma.proyek.update({
       where: { id: proyekId },
       data: {
-        namaProyek: namaProyek !== undefined ? namaProyek : existing.namaProyek,
-        lokasi: lokasi !== undefined ? lokasi : existing.lokasi,
-        tipe: tipe !== undefined ? tipe : existing.tipe,
-        nilaiKontrak: nilaiKontrak !== undefined ? (nilaiKontrak ? parseFloat(nilaiKontrak) : null) : existing.nilaiKontrak,
-        timeline: timeline !== undefined ? timeline : existing.timeline,
+        namaProyek: validated.namaProyek ?? existing.namaProyek,
+        lokasi: validated.lokasi ?? existing.lokasi,
+        tipe: (validated.jenisProyek as 'gedung' | 'infra') ?? existing.tipe,
+        nilaiKontrak: validated.nilaiKontrak ?? existing.nilaiKontrak,
+        timeline: existing.timeline,
       },
       include: {
         user: {
@@ -148,11 +138,7 @@ export async function PUT(
 
     return NextResponse.json({ proyek })
   } catch (error) {
-    console.error('Update proyek error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -167,11 +153,7 @@ export async function DELETE(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
-
-    if (isNaN(proyekId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const proyekId = parseId(id, 'proyekId')
 
     const existing = await prisma.proyek.findUnique({
       where: { id: proyekId }
@@ -192,10 +174,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Proyek berhasil dihapus' })
   } catch (error) {
-    console.error('Delete proyek error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

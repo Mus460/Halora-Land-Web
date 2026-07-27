@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { snapshotAHSP } from '@/lib/snapshot'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createPekerjaanSchema } from '@/lib/schemas'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,8 +25,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Check access to project
+    const proyekIdNum = parseId(proyekId, 'proyekId')
     const proyek = await prisma.proyek.findUnique({
-      where: { id: parseInt(proyekId) },
+      where: { id: proyekIdNum },
       include: {
         timProyek: true,
       }
@@ -44,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     const where: any = {
-      proyekId: parseInt(proyekId)
+      proyekId: proyekIdNum
     }
 
     if (kategori) {
@@ -72,11 +75,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ pekerjaan })
   } catch (error) {
-    console.error('Get pekerjaan error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -87,7 +86,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const body = await getJsonBody(request)
+    const validated = createPekerjaanSchema.parse(body)
     const {
       proyekId,
       kategori,
@@ -97,25 +97,15 @@ export async function POST(request: NextRequest) {
       metodeHitung,
       levelPekerjaan,
       tipePekerjaan,
-      
-      // For AHSP mode
       masterAnalisaId,
-      
-      // For manual mode
       hargaSatuan: manualHargaSatuan,
       detailAnalisa: manualDetailAnalisa
-    } = body
-
-    if (!proyekId || !kategori || !uraianPekerjaan || !volume || !satuan) {
-      return NextResponse.json(
-        { error: 'Field required: proyekId, kategori, uraianPekerjaan, volume, satuan' },
-        { status: 400 }
-      )
-    }
+    } = validated
 
     // Check access to project
+    const proyekIdNum = parseId(String(proyekId), 'proyekId')
     const proyek = await prisma.proyek.findUnique({
-      where: { id: parseInt(proyekId) },
+      where: { id: proyekIdNum },
       include: {
         timProyek: true,
       }
@@ -174,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     const pekerjaan = await prisma.pekerjaan.create({
       data: {
-        proyekId: parseInt(proyekId),
+        proyekId: proyekIdNum,
         kategori,
         uraianPekerjaan,
         volume: parseFloat(volume),
@@ -199,11 +189,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ pekerjaan }, { status: 201 })
-  } catch (error: any) {
-    console.error('Create pekerjaan error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

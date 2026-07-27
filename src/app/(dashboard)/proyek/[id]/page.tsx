@@ -148,8 +148,8 @@ export default function ProyekDetailPage() {
     );
   }
 
-  const totalBiaya = proyek.pekerjaan.reduce(
-    (sum, p) => sum + p.totalBiaya,
+  const totalBiaya = (proyek.pekerjaan || []).reduce(
+    (sum, p) => sum + (Number(p.totalBiaya) || 0),
     0
   );
 
@@ -332,7 +332,7 @@ export default function ProyekDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {proyek.pekerjaan.map((pekerjaan) => (
+                  {(proyek.pekerjaan || []).map((pekerjaan) => (
                     <div
                       key={pekerjaan.id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -397,7 +397,7 @@ export default function ProyekDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {proyek.timProyek.map((tim) => (
+                  {(proyek.timProyek || []).map((tim) => (
                     <div key={tim.id} className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
                         <span className="text-xs font-semibold text-gray-600">

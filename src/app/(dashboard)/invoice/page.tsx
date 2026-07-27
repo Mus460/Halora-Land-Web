@@ -12,9 +12,21 @@ import { INVOICE_STATUS } from "@/lib/constants";
 import type { Invoice } from "@/types";
 import toast from "react-hot-toast";
 import { useProject } from "@/contexts/ProjectContext";
+import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
 
 export default function InvoicePage() {
-  const { currentProyekId: proyekId } = useProject();
+  const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
+  
+  if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
+  if (proyekList.length === 0) {
+    return (
+      <EmptyProyekState
+        title="Belum Ada Invoice"
+        description="Buat proyek untuk mulai membuat dan mengelola invoice"
+      />
+    );
+  }
+  
   const [data, setData] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 

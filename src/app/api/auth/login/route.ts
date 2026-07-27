@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { signInWithPassword } from '@/lib/supabase-auth'
 import { rateLimit, getClientIp } from '@/lib/rate-limit'
 import { logAudit, getClientInfo } from '@/lib/audit-log'
+import { loginSchema } from '@/lib/schemas'
+import { getJsonBody, handleError } from '@/lib/api-utils'
 
 export async function POST(request: NextRequest) {
   // Rate limit: 10 requests per 15 minutes per IP
@@ -32,14 +34,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, password } = await request.json()
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email dan password harus diisi' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const { email, password } = loginSchema.parse(body)
 
     // Sign in with Supabase Auth
     const { user: supabaseUser, session } = await signInWithPassword(email, password)

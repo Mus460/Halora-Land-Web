@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { Prisma } from '@prisma/client'
+import { handleError, getJsonBody } from '@/lib/api-utils'
+import { createMasterAnalisaSchema } from '@/lib/schemas'
 
 /**
  * GET /api/master-analisa
@@ -24,7 +27,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const isGlobal = searchParams.get('isGlobal')
 
-    const where: any = {}
+    const where: Prisma.MasterAnalisaWhereInput = {}
 
     // Filter by level
     if (level !== null) {
@@ -103,12 +106,8 @@ export async function GET(request: NextRequest) {
       total: masterAnalisa.length,
       data: masterAnalisa
     })
-  } catch (error: any) {
-    console.error('[master-analisa GET]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }
 
@@ -123,19 +122,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { kode, nama, level, parentId, satuan, isGlobal } = body
-
-    // Validation
-    if (!kode || !nama || level === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields: kode, nama, level' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const validated = createMasterAnalisaSchema.parse(body)
 
     // Only ADMIN can create global master analisa
-    if (isGlobal && session.role !== 'ADMIN') {
+    if (validated.isGlobal && session.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only admin can create global master analisa' },
         { status: 403 }
@@ -145,8 +136,8 @@ export async function POST(request: NextRequest) {
     // Check if kode already exists
     const existing = await prisma.masterAnalisa.findFirst({
       where: {
-        kode,
-        userId: isGlobal ? null : session.userId
+        kode: validated.kode,
+        userId: validated.isGlobal ? null : session.userId
       }
     })
 
@@ -158,9 +149,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify parent exists if parentId provided
-    if (parentId) {
+    if (validated.parentId) {
       const parent = await prisma.masterAnalisa.findUnique({
-        where: { id: parentId }
+        where: { id: validated.parentId }
       })
       if (!parent) {
         return NextResponse.json(
@@ -172,13 +163,13 @@ export async function POST(request: NextRequest) {
 
     const masterAnalisa = await prisma.masterAnalisa.create({
       data: {
-        kode,
-        nama,
-        level,
-        parentId: parentId || null,
-        satuan: satuan || null,
-        isGlobal: isGlobal || false,
-        userId: isGlobal ? null : session.userId
+        kode: validated.kode,
+        nama: validated.nama,
+        level: validated.level,
+        parentId: validated.parentId || null,
+        satuan: validated.satuan || null,
+        isGlobal: validated.isGlobal || false,
+        userId: validated.isGlobal ? null : session.userId
       },
       include: {
         user: {
@@ -191,11 +182,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(masterAnalisa, { status: 201 })
-  } catch (error: any) {
-    console.error('[master-analisa POST]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

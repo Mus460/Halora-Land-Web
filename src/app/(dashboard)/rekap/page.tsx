@@ -18,9 +18,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProject } from "@/contexts/ProjectContext";
+import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
 
 export default function RekapPage() {
-  const { currentProyekId: proyekId } = useProject();
+  const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
+  
+  if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
+  if (proyekList.length === 0) {
+    return (
+      <EmptyProyekState
+        title="Belum Ada Data Rekapitulasi"
+        description="Buat proyek dan tambahkan pekerjaan untuk melihat rekapitulasi biaya"
+      />
+    );
+  }
+  
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showMargin, setShowMargin] = useState(false);
@@ -51,15 +63,6 @@ export default function RekapPage() {
 
   if (loading || !data) {
     return <div className="p-8 text-center">Memuat data...</div>;
-  }
-
-  if (!proyekId) {
-    return (
-      <div className="p-8 text-center">
-        <Calculator className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-        <p className="text-gray-600">Silakan pilih proyek terlebih dahulu</p>
-      </div>
-    );
   }
 
   const rekapItems = data.breakdown || [];

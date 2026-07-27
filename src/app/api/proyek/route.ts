@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { Prisma } from '@prisma/client'
+import { handleError, getJsonBody } from '@/lib/api-utils'
+import { createProyekSchema } from '@/lib/schemas'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +16,7 @@ export async function GET(request: NextRequest) {
     const tipe = searchParams.get('tipe') as 'gedung' | 'infra' | null
     const search = searchParams.get('search')
 
-    const where: any = {}
+    const where: Prisma.ProyekWhereInput = {}
 
     // Filter by user (non-admin only see their own projects + shared projects)
     if (session.role !== 'ADMIN') {
@@ -31,7 +34,6 @@ export async function GET(request: NextRequest) {
     // Search by name or location
     if (search) {
       where.AND = [
-        where.AND || {},
         {
           OR: [
             { namaProyek: { contains: search, mode: 'insensitive' } },
@@ -74,11 +76,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ proyek })
   } catch (error) {
-    console.error('Get proyek error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -89,24 +87,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { namaProyek, lokasi, tipe, nilaiKontrak, timeline } = body
-
-    if (!namaProyek) {
-      return NextResponse.json(
-        { error: 'Nama proyek harus diisi' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const validated = createProyekSchema.parse(body)
 
     const proyek = await prisma.proyek.create({
       data: {
         userId: session.userId,
-        namaProyek,
-        lokasi: lokasi || null,
-        tipe: tipe || 'gedung',
-        nilaiKontrak: nilaiKontrak ? parseFloat(nilaiKontrak) : null,
-        timeline: timeline || null,
+        namaProyek: validated.namaProyek,
+        lokasi: validated.lokasi || null,
+        tipe: (validated.jenisProyek as 'gedung' | 'infra') || 'gedung',
+        nilaiKontrak: validated.nilaiKontrak || null,
+        timeline: null,
       },
       include: {
         user: {
@@ -127,10 +118,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ proyek }, { status: 201 })
   } catch (error) {
-    console.error('Create proyek error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

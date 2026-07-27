@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { validateSnapshot, compareSnapshot } from '@/lib/snapshot'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * GET /api/pekerjaan/[id]/validate-snapshot
@@ -18,7 +19,7 @@ export async function GET(
     }
 
     const { id: idParam } = await params
-    const pekerjaanId = parseInt(idParam)
+    const pekerjaanId = parseId(idParam, 'pekerjaanId')
 
     // Get pekerjaan with proyek
     const pekerjaan = await prisma.pekerjaan.findUnique({
@@ -64,11 +65,7 @@ export async function GET(
         ? 'Snapshot is up-to-date'
         : `${validation.changes.length} komponen harga berubah`
     })
-  } catch (error: any) {
-    console.error('[pekerjaan/[id]/validate-snapshot GET]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

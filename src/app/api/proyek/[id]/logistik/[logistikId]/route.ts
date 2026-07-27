@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createLogistikSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
     }
 
     const { logistikId } = await params
-    const id = parseInt(logistikId)
+    const id = parseId(logistikId, 'logistikId')
 
     const logistik = await prisma.logistik.findUnique({
       where: { id },
@@ -39,8 +41,7 @@ export async function GET(
 
     return NextResponse.json({ logistik })
   } catch (error) {
-    console.error('Get logistik error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -55,7 +56,7 @@ export async function PUT(
     }
 
     const { logistikId } = await params
-    const id = parseInt(logistikId)
+    const id = parseId(logistikId, 'logistikId')
 
     const logistik = await prisma.logistik.findUnique({
       where: { id },
@@ -79,29 +80,28 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { namaMaterial, satuan, volume, hargaSatuan, tanggal } = body
+    const body = await getJsonBody(request)
+    const validated = createLogistikSchema.partial().parse(body)
 
-    const newVolume = volume || logistik.volume
-    const newHargaSatuan = hargaSatuan || logistik.hargaSatuan
+    const newVolume = validated.volume ?? logistik.volume
+    const newHargaSatuan = validated.hargaSatuan ?? logistik.hargaSatuan
     const totalBiaya = Number(newVolume) * Number(newHargaSatuan)
 
     const updated = await prisma.logistik.update({
       where: { id },
       data: {
-        ...(namaMaterial && { namaMaterial }),
-        ...(satuan && { satuan }),
-        ...(volume && { volume }),
-        ...(hargaSatuan && { hargaSatuan }),
-        ...(tanggal && { tanggal: new Date(tanggal) }),
+        ...(validated.namaMaterial && { namaMaterial: validated.namaMaterial }),
+        ...(validated.satuan && { satuan: validated.satuan }),
+        ...(validated.volume !== undefined && { volume: validated.volume }),
+        ...(validated.hargaSatuan !== undefined && { hargaSatuan: validated.hargaSatuan }),
+        ...(validated.tanggal && { tanggal: new Date(validated.tanggal) }),
         totalBiaya,
       }
     })
 
     return NextResponse.json({ logistik: updated })
   } catch (error) {
-    console.error('Update logistik error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -116,7 +116,7 @@ export async function DELETE(
     }
 
     const { logistikId } = await params
-    const id = parseInt(logistikId)
+    const id = parseId(logistikId, 'logistikId')
 
     const logistik = await prisma.logistik.findUnique({
       where: { id },
@@ -144,7 +144,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Delete logistik error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

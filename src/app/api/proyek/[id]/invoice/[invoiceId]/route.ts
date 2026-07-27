@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createInvoiceSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
     }
 
     const { invoiceId } = await params
-    const id = parseInt(invoiceId)
+    const id = parseId(invoiceId, 'invoiceId')
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -39,8 +41,7 @@ export async function GET(
 
     return NextResponse.json({ invoice })
   } catch (error) {
-    console.error('Get invoice error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -55,7 +56,7 @@ export async function PUT(
     }
 
     const { invoiceId } = await params
-    const id = parseInt(invoiceId)
+    const id = parseId(invoiceId, 'invoiceId')
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -79,22 +80,21 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { tanggal, total, status } = body
+    const body = await getJsonBody(request)
+    const validated = createInvoiceSchema.partial().parse(body)
 
     const updated = await prisma.invoice.update({
       where: { id },
       data: {
-        ...(tanggal && { tanggal: new Date(tanggal) }),
-        ...(total && { total }),
-        ...(status && { status }),
+        ...(validated.tanggal && { tanggal: new Date(validated.tanggal) }),
+        ...(validated.total !== undefined && { total: validated.total }),
+        ...(validated.status && { status: validated.status }),
       }
     })
 
     return NextResponse.json({ invoice: updated })
   } catch (error) {
-    console.error('Update invoice error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -109,7 +109,7 @@ export async function DELETE(
     }
 
     const { invoiceId } = await params
-    const id = parseInt(invoiceId)
+    const id = parseId(invoiceId, 'invoiceId')
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -137,7 +137,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Delete invoice error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

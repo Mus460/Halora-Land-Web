@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * GET /api/master-analisa/[id]/rincian
@@ -17,7 +18,7 @@ export async function GET(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const id = parseId(idParam, 'master-analisa id')
 
     // Verify master analisa exists
     const masterAnalisa = await prisma.masterAnalisa.findUnique({
@@ -62,12 +63,8 @@ export async function GET(
       totalHargaSatuan,
       data: rincianAnalisa
     })
-  } catch (error: any) {
-    console.error('[master-analisa/[id]/rincian GET]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }
 
@@ -86,7 +83,7 @@ export async function POST(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const id = parseId(idParam, 'master-analisa id')
     const body = await request.json()
     const { komponenId, koef, tipe } = body
 
@@ -163,12 +160,8 @@ export async function POST(
     })
 
     return NextResponse.json(rincian, { status: 201 })
-  } catch (error: any) {
-    console.error('[master-analisa/[id]/rincian POST]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }
 
@@ -188,7 +181,7 @@ export async function DELETE(
     }
 
     const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const id = parseId(idParam, 'master-analisa id')
     const body = await request.json()
     const { rincianId } = body
 
@@ -233,11 +226,7 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'Rincian deleted successfully' })
-  } catch (error: any) {
-    console.error('[master-analisa/[id]/rincian DELETE]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

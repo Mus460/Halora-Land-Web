@@ -60,6 +60,11 @@ export default function DashboardPage() {
 
   const { stats, recentProjects } = data;
 
+  // Guard against null/undefined stats
+  if (!stats) {
+    return <div className="p-8 text-center">Data tidak tersedia</div>;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -79,25 +84,25 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Proyek"
-          value={stats.totalProyek}
+          value={stats.totalProyek || 0}
           icon={<Building2 className="w-6 h-6" />}
           description="proyek terdaftar"
         />
         <StatCard
           title="Proyek Aktif"
-          value={stats.proyekAktif}
+          value={stats.proyekAktif || 0}
           icon={<ClipboardCheck className="w-6 h-6" />}
           description="sedang dikerjakan"
         />
         <StatCard
           title="Total RAB"
-          value={formatCurrency(stats.totalRAB)}
+          value={formatCurrency(stats.totalRAB || 0)}
           icon={<Calculator className="w-6 h-6" />}
           description="nilai keseluruhan"
         />
         <StatCard
           title="Total Pekerjaan"
-          value={stats.totalPekerjaan}
+          value={stats.totalPekerjaan || 0}
           icon={<TrendingUp className="w-6 h-6" />}
           description="item pekerjaan"
         />
@@ -116,7 +121,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentProjects.map((project: any) => (
+              {(recentProjects || []).map((project: any) => (
                 <Link
                   key={project.id}
                   href={`/proyek/${project.id}`}

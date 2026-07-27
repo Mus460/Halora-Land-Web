@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * GET /api/monitoring
@@ -14,29 +15,41 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const proyekId = searchParams.get('proyekId')
+    const proyekIdRaw = searchParams.get('proyekId')
 
-    if (!proyekId) {
+    if (!proyekIdRaw) {
       return NextResponse.json({ error: 'proyekId required' }, { status: 400 })
     }
 
-    // Verify project ownership
+    const proyekId = parseId(proyekIdRaw, 'proyekId')
+
+    // Verify project ownership or team access
     const proyek = await prisma.proyek.findUnique({
-      where: { id: parseInt(proyekId) },
-      select: { userId: true }
+      where: { id: proyekId },
+      select: { 
+        userId: true,
+        timProyek: {
+          select: { userId: true }
+        }
+      }
     })
 
     if (!proyek) {
       return NextResponse.json({ error: 'Proyek tidak ditemukan' }, { status: 404 })
     }
 
-    if (proyek.userId !== session.userId) {
+    const hasAccess =
+      session.role === 'ADMIN' ||
+      proyek.userId === session.userId ||
+      proyek.timProyek.some(t => t.userId === session.userId)
+
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Get all pekerjaan grouped by kategori
     const pekerjaan = await prisma.pekerjaan.findMany({
-      where: { proyekId: parseInt(proyekId) },
+      where: { proyekId },
       orderBy: [
         { kategori: 'asc' },
         { uraianPekerjaan: 'asc' }
@@ -77,10 +90,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ monitoring })
   } catch (error) {
-    console.error('Monitoring error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

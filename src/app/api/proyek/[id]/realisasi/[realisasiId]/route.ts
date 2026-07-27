@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createRealisasiSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
     }
 
     const { realisasiId } = await params
-    const id = parseInt(realisasiId)
+    const id = parseId(realisasiId, 'realisasiId')
 
     const realisasi = await prisma.realisasi.findUnique({
       where: { id },
@@ -39,8 +41,7 @@ export async function GET(
 
     return NextResponse.json({ realisasi })
   } catch (error) {
-    console.error('Get realisasi error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -55,7 +56,7 @@ export async function PUT(
     }
 
     const { realisasiId } = await params
-    const id = parseInt(realisasiId)
+    const id = parseId(realisasiId, 'realisasiId')
 
     const realisasi = await prisma.realisasi.findUnique({
       where: { id },
@@ -79,23 +80,22 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { tanggal, kategori, jumlah, keterangan } = body
+    const body = await getJsonBody(request)
+    const validated = createRealisasiSchema.partial().parse(body)
 
     const updated = await prisma.realisasi.update({
       where: { id },
       data: {
-        ...(tanggal && { tanggal: new Date(tanggal) }),
-        ...(kategori && { kategori }),
-        ...(jumlah && { jumlah }),
-        ...(keterangan !== undefined && { keterangan }),
+        ...(validated.tanggal && { tanggal: new Date(validated.tanggal) }),
+        ...(validated.kategori && { kategori: validated.kategori }),
+        ...(validated.jumlah !== undefined && { jumlah: validated.jumlah }),
+        ...(validated.keterangan !== undefined && { keterangan: validated.keterangan }),
       }
     })
 
     return NextResponse.json({ realisasi: updated })
   } catch (error) {
-    console.error('Update realisasi error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -110,7 +110,7 @@ export async function DELETE(
     }
 
     const { realisasiId } = await params
-    const id = parseInt(realisasiId)
+    const id = parseId(realisasiId, 'realisasiId')
 
     const realisasi = await prisma.realisasi.findUnique({
       where: { id },
@@ -138,7 +138,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Delete realisasi error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

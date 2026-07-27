@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createPekerjaanSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,11 +15,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const pekerjaanId = parseInt(id)
-
-    if (isNaN(pekerjaanId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const pekerjaanId = parseId(id, 'pekerjaanId')
 
     const pekerjaan = await prisma.pekerjaan.findUnique({
       where: { id: pekerjaanId },
@@ -51,11 +49,7 @@ export async function GET(
 
     return NextResponse.json({ pekerjaan })
   } catch (error) {
-    console.error('Get pekerjaan detail error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -70,11 +64,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const pekerjaanId = parseInt(id)
-
-    if (isNaN(pekerjaanId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const pekerjaanId = parseId(id, 'pekerjaanId')
 
     const existing = await prisma.pekerjaan.findUnique({
       where: { id: pekerjaanId },
@@ -101,7 +91,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
+    const body = await getJsonBody(request)
+    const validated = createPekerjaanSchema.partial().parse(body)
     const {
       kategori,
       uraianPekerjaan,
@@ -111,7 +102,7 @@ export async function PUT(
       metodeHitung,
       levelPekerjaan,
       tipePekerjaan,
-    } = body
+    } = validated
 
     const newVolume = volume !== undefined ? parseFloat(volume) : existing.volume
     const newHargaSatuan = hargaSatuan !== undefined ? parseFloat(hargaSatuan) : existing.hargaSatuan
@@ -141,11 +132,7 @@ export async function PUT(
 
     return NextResponse.json({ pekerjaan })
   } catch (error) {
-    console.error('Update pekerjaan error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -160,11 +147,7 @@ export async function DELETE(
     }
 
     const { id } = await params
-    const pekerjaanId = parseInt(id)
-
-    if (isNaN(pekerjaanId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const pekerjaanId = parseId(id, 'pekerjaanId')
 
     const existing = await prisma.pekerjaan.findUnique({
       where: { id: pekerjaanId },
@@ -197,10 +180,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Pekerjaan berhasil dihapus' })
   } catch (error) {
-    console.error('Delete pekerjaan error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

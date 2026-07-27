@@ -10,9 +10,21 @@ import { formatCurrency, formatDateShort } from "@/lib/utils";
 import type { Logistik } from "@/types";
 import toast from "react-hot-toast";
 import { useProject } from "@/contexts/ProjectContext";
+import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
 
 export default function LogistikPage() {
-  const { currentProyekId: proyekId } = useProject();
+  const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
+  
+  if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
+  if (proyekList.length === 0) {
+    return (
+      <EmptyProyekState
+        title="Belum Ada Data Logistik"
+        description="Buat proyek untuk mencatat pengiriman material dan logistik"
+      />
+    );
+  }
+  
   const [data, setData] = useState<Logistik[]>([]);
   const [loading, setLoading] = useState(true);
 

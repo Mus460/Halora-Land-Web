@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * GET /api/proyek/:id/kurva-s
@@ -17,11 +18,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
-
-    if (isNaN(proyekId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const proyekId = parseId(id, 'proyekId')
 
     // Verify project ownership
     const proyek = await prisma.proyek.findUnique({
@@ -29,6 +26,9 @@ export async function GET(
       select: {
         id: true,
         userId: true,
+        timProyek: {
+          select: { userId: true }
+        }
       }
     })
 
@@ -36,7 +36,12 @@ export async function GET(
       return NextResponse.json({ error: 'Proyek tidak ditemukan' }, { status: 404 })
     }
 
-    if (proyek.userId !== session.userId) {
+    const hasAccess =
+      session.role === 'ADMIN' ||
+      proyek.userId === session.userId ||
+      proyek.timProyek.some(t => t.userId === session.userId)
+
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -52,10 +57,6 @@ export async function GET(
       actual,
     })
   } catch (error) {
-    console.error('Kurva S error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

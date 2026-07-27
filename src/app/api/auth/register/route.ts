@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { signUpWithPassword } from '@/lib/supabase-auth'
 import { rateLimit, getClientIp } from '@/lib/rate-limit'
 import { logAudit, getClientInfo } from '@/lib/audit-log'
+import { registerSchema } from '@/lib/schemas'
+import { getJsonBody, handleError } from '@/lib/api-utils'
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 requests per 15 minutes per IP
@@ -32,21 +34,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { namaLengkap, email, password } = await request.json()
-
-    if (!namaLengkap || !email || !password) {
-      return NextResponse.json(
-        { error: 'Semua field harus diisi' },
-        { status: 400 }
-      )
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password minimal 6 karakter' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const { namaLengkap, email, password } = registerSchema.parse(body)
 
     // Check if email already exists in our User table
     const existingUser = await prisma.user.findUnique({
@@ -106,11 +95,7 @@ export async function POST(request: NextRequest) {
       },
       message: 'Registrasi berhasil. Silakan cek email untuk verifikasi.',
     }, { status: 201 })
-  } catch (error: any) {
-    console.error('Register error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

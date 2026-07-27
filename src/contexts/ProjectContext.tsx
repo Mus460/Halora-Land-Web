@@ -31,7 +31,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [currentProyekId, setCurrentProyekIdState] = useState<number | null>(null);
   const [proyek, setProyek] = useState<Proyek | null>(null);
   const [proyekList, setProyekList] = useState<Proyek[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -64,11 +64,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/proyek');
       if (response.ok) {
         const data = await response.json();
-        setProyekList(data.proyekList || []);
+        setProyekList(data.proyek || []);
         
         // Auto-select first project if none selected
-        if (!currentProyekId && data.proyekList.length > 0) {
-          const firstId = data.proyekList[0].id;
+        if (!currentProyekId && data.proyek && data.proyek.length > 0) {
+          const firstId = data.proyek[0].id;
           setCurrentProyekIdState(firstId);
           localStorage.setItem('currentProyekId', String(firstId));
         }

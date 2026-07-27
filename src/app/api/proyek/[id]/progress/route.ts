@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +14,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check access
     const proyek = await prisma.proyek.findUnique({
@@ -81,8 +82,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Get progress error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -97,7 +97,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check edit access
     const proyek = await prisma.proyek.findUnique({
@@ -127,10 +127,12 @@ export async function PUT(
       }, { status: 400 })
     }
 
+    const pekerjaanIdParsed = parseId(pekerjaanId.toString(), 'pekerjaanId')
+
     // Verify pekerjaan belongs to this project
     const pekerjaan = await prisma.pekerjaan.findFirst({
       where: { 
-        id: parseInt(pekerjaanId),
+        id: pekerjaanIdParsed,
         proyekId 
       }
     })
@@ -144,14 +146,13 @@ export async function PUT(
     return NextResponse.json({ 
       success: true,
       progress: {
-        pekerjaanId: parseInt(pekerjaanId),
+        pekerjaanId: pekerjaanIdParsed,
         progress: parseFloat(progress),
         notes: notes || '',
         updatedAt: new Date(),
       }
     })
   } catch (error) {
-    console.error('Update progress error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

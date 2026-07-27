@@ -14,7 +14,7 @@ import {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/proyek", label: "Proyek", icon: Building2 },
-  { href: "/rekap", label: "RAB", icon: Calculator },
+  { href: "/rab", label: "RAB", icon: Calculator },
   { href: "/master-harga", label: "Harga", icon: Tag },
   { href: "/profile", label: "Lainnya", icon: Settings },
 ];

@@ -51,6 +51,7 @@ const SIDEBAR_SECTIONS = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/proyek", label: "Data Proyek", icon: Building2 },
+      { href: "/rab", label: "RAB", icon: Calculator },
     ],
   },
   {

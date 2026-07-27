@@ -69,73 +69,84 @@ export async function POST(
       })
     }
 
-    const results = []
+    const results: Array<{
+      id: number
+      uraian: string
+      oldTotal: number
+      newTotal: number
+      diff: number
+      percentChange: number
+    }> = []
     let totalOldCost = 0
     let totalNewCost = 0
     let skippedCount = 0
 
-    // Recalculate each pekerjaan
-    for (const pekerjaan of pekerjaanList) {
-      const masterAnalisaId = pekerjaan.detailAnalisa[0]?.masterAnalisaId
+    // Recalculate each pekerjaan in a single transaction
+    await prisma.$transaction(async (tx) => {
+      for (const pekerjaan of pekerjaanList) {
+        const masterAnalisaId = pekerjaan.detailAnalisa[0]?.masterAnalisaId
 
-      if (!masterAnalisaId) {
-        skippedCount++
-        continue
-      }
+        if (!masterAnalisaId) {
+          skippedCount++
+          continue
+        }
 
-      try {
-        const oldTotal = Number(pekerjaan.totalBiaya)
-        const snapshot = await snapshotAHSP(masterAnalisaId, Number(pekerjaan.volume))
+        try {
+          const oldTotal = Number(pekerjaan.totalBiaya)
+          const snapshot = await snapshotAHSP(masterAnalisaId, Number(pekerjaan.volume))
 
-        // Delete old snapshot
-        await prisma.detailAnalisa.deleteMany({
-          where: { pekerjaanId: pekerjaan.id }
-        })
+          // Delete old snapshot
+          await tx.detailAnalisa.deleteMany({
+            where: { pekerjaanId: pekerjaan.id }
+          })
 
-        // Create new snapshot
-        await prisma.pekerjaan.update({
-          where: { id: pekerjaan.id },
-          data: {
-            hargaSatuan: snapshot.hargaSatuan,
-            totalBiaya: snapshot.totalBiaya,
-            detailAnalisa: {
-              create: snapshot.components
+          // Create new snapshot
+          await tx.pekerjaan.update({
+            where: { id: pekerjaan.id },
+            data: {
+              hargaSatuan: snapshot.hargaSatuan,
+              totalBiaya: snapshot.totalBiaya,
+              detailAnalisa: {
+                create: snapshot.components
+              }
             }
-          }
-        })
+          })
 
-        const newTotal = snapshot.totalBiaya
-        const diff = newTotal - oldTotal
+          const newTotal = snapshot.totalBiaya
+          const diff = newTotal - oldTotal
 
-        totalOldCost += oldTotal
-        totalNewCost += newTotal
+          totalOldCost += oldTotal
+          totalNewCost += newTotal
 
-        // ✅ Create audit log for each recalculated pekerjaan
-        await createAuditLog({
-          proyekId,
-          pekerjaanId: pekerjaan.id,
-          userId: session.userId,
-          action: 'bulk_recalculate',
-          entityType: 'pekerjaan',
-          entityId: pekerjaan.id,
-          oldValue: { totalBiaya: oldTotal },
-          newValue: { totalBiaya: newTotal },
-          description: `Bulk recalculated pekerjaan "${pekerjaan.uraianPekerjaan}"`,
-        })
+          // Create audit log for each recalculated pekerjaan
+          await tx.auditLog.create({
+            data: {
+              proyekId,
+              pekerjaanId: pekerjaan.id,
+              userId: session.userId,
+              action: 'bulk_recalculate',
+              entityType: 'pekerjaan',
+              entityId: pekerjaan.id,
+              oldValue: { totalBiaya: oldTotal },
+              newValue: { totalBiaya: newTotal },
+              description: `Bulk recalculated pekerjaan "${pekerjaan.uraianPekerjaan}"`,
+            }
+          })
 
-        results.push({
-          id: pekerjaan.id,
-          uraian: pekerjaan.uraianPekerjaan,
-          oldTotal,
-          newTotal,
-          diff,
-          percentChange: oldTotal > 0 ? (diff / oldTotal) * 100 : 0
-        })
-      } catch (error: any) {
-        console.error(`Failed to recalculate pekerjaan ${pekerjaan.id}:`, error)
-        skippedCount++
+          results.push({
+            id: pekerjaan.id,
+            uraian: pekerjaan.uraianPekerjaan,
+            oldTotal,
+            newTotal,
+            diff,
+            percentChange: oldTotal > 0 ? (diff / oldTotal) * 100 : 0
+          })
+        } catch (error: any) {
+          console.error(`Failed to recalculate pekerjaan ${pekerjaan.id}:`, error)
+          throw error // rollback entire transaction
+        }
       }
-    }
+    })
 
     const totalDiff = totalNewCost - totalOldCost
     const percentChange = totalOldCost > 0 ? (totalDiff / totalOldCost) * 100 : 0

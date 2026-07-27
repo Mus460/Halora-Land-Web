@@ -8,15 +8,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import toast from "react-hot-toast";
+import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
 
 export default function MonitoringPage() {
+  const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
+  
+  if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
+  if (proyekList.length === 0) {
+    return (
+      <EmptyProyekState
+        title="Belum Ada Data Progress"
+        description="Buat proyek untuk memantau progress pekerjaan konstruksi"
+      />
+    );
+  }
+  
   const [monitoring, setMonitoring] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { currentProyekId: proyekId } = useProject();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (proyekId) {
+      fetchData();
+    }
+  }, [proyekId]);
 
   const fetchData = async () => {
     try {

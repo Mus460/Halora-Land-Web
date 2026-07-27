@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { handleError, getJsonBody } from '@/lib/api-utils'
+import { feedbackSchema } from '@/lib/schemas'
 
 /**
  * GET /api/feedback
@@ -31,11 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ feedback })
   } catch (error) {
-    console.error('Get feedback error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -50,31 +48,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { subject, message, kategori } = body
-
-    if (!subject || !message) {
-      return NextResponse.json(
-        { error: 'Subject dan message wajib diisi' },
-        { status: 400 }
-      )
-    }
+    const body = await getJsonBody(request)
+    const validated = feedbackSchema.parse(body)
 
     const feedback = await prisma.feedback.create({
       data: {
         userId: session.userId,
-        subject,
-        message,
+        subject: validated.category,
+        message: validated.message,
         status: 'open',
       }
     })
 
     return NextResponse.json({ feedback }, { status: 201 })
   } catch (error) {
-    console.error('Create feedback error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

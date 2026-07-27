@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createInvoiceSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check access
     const proyek = await prisma.proyek.findUnique({
@@ -41,8 +43,7 @@ export async function GET(
 
     return NextResponse.json({ invoices })
   } catch (error) {
-    console.error('Get invoices error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -57,7 +58,7 @@ export async function POST(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check edit access
     const proyek = await prisma.proyek.findUnique({
@@ -78,12 +79,8 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { tanggal, total, status } = body
-
-    if (!tanggal || !total) {
-      return NextResponse.json({ error: 'tanggal and total are required' }, { status: 400 })
-    }
+    const body = await getJsonBody(request)
+    const validated = createInvoiceSchema.parse(body)
 
     // Generate nomor invoice
     const count = await prisma.invoice.count({ where: { proyekId } })
@@ -93,15 +90,14 @@ export async function POST(
       data: {
         proyekId,
         nomor,
-        tanggal: new Date(tanggal),
-        total,
-        status: status || 'draft',
+        tanggal: new Date(validated.tanggal),
+        total: validated.total,
+        status: validated.status,
       }
     })
 
     return NextResponse.json({ invoice }, { status: 201 })
   } catch (error) {
-    console.error('Create invoice error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
+    return handleError(error)
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 /**
  * GET /api/audit-log
@@ -20,21 +21,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const proyekId = searchParams.get('proyekId')
+    const proyekIdRaw = searchParams.get('proyekId')
     const entityType = searchParams.get('entityType')
     const action = searchParams.get('action')
-    const userId = searchParams.get('userId')
+    const userIdRaw = searchParams.get('userId')
     const limit = parseInt(searchParams.get('limit') || '50')
 
     const where: any = {}
 
     // Filter by project
-    if (proyekId) {
-      const proyekIdInt = parseInt(proyekId)
+    if (proyekIdRaw) {
+      const proyekId = parseId(proyekIdRaw, 'proyekId')
       
       // Check access to project
       const proyek = await prisma.proyek.findUnique({
-        where: { id: proyekIdInt },
+        where: { id: proyekId },
         include: { timProyek: true }
       })
 
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      where.proyekId = proyekIdInt
+      where.proyekId = proyekId
     } else {
       // Non-admin can only see logs from their own projects
       if (session.role !== 'ADMIN') {
@@ -81,8 +82,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by user
-    if (userId) {
-      where.userId = parseInt(userId)
+    if (userIdRaw) {
+      where.userId = parseId(userIdRaw, 'userId')
     }
 
     const auditLogs = await prisma.auditLog.findMany({
@@ -122,11 +123,7 @@ export async function GET(request: NextRequest) {
       limit,
       logs: auditLogs
     })
-  } catch (error: any) {
-    console.error('[audit-log GET]', error)
-    return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleError(error)
   }
 }

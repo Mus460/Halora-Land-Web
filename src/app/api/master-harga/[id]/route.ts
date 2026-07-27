@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError, getJsonBody } from '@/lib/api-utils'
+import { createMasterHargaSchema } from '@/lib/schemas'
 
 export async function GET(
   request: NextRequest,
@@ -13,11 +15,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const masterHargaId = parseInt(id)
-
-    if (isNaN(masterHargaId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const masterHargaId = parseId(id, 'masterHargaId')
 
     const masterHarga = await prisma.masterHarga.findUnique({
       where: { id: masterHargaId },
@@ -48,11 +46,7 @@ export async function GET(
 
     return NextResponse.json({ masterHarga })
   } catch (error) {
-    console.error('Get master harga detail error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -67,11 +61,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const masterHargaId = parseInt(id)
-
-    if (isNaN(masterHargaId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const masterHargaId = parseId(id, 'masterHargaId')
 
     const existing = await prisma.masterHarga.findUnique({
       where: { id: masterHargaId }
@@ -90,16 +80,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { nama, satuan, harga, kategori } = body
+    const body = await getJsonBody(request)
+    const validated = createMasterHargaSchema.partial().parse(body)
 
     const masterHarga = await prisma.masterHarga.update({
       where: { id: masterHargaId },
       data: {
-        nama: nama !== undefined ? nama : existing.nama,
-        satuan: satuan !== undefined ? satuan : existing.satuan,
-        harga: harga !== undefined ? parseFloat(harga) : existing.harga,
-        kategori: kategori !== undefined ? kategori : existing.kategori,
+        nama: validated.nama ?? existing.nama,
+        satuan: validated.satuan ?? existing.satuan,
+        harga: validated.harga ?? existing.harga,
+        kategori: validated.kategori ?? existing.kategori,
       },
       include: {
         user: {
@@ -114,11 +104,7 @@ export async function PUT(
 
     return NextResponse.json({ masterHarga })
   } catch (error) {
-    console.error('Update master harga error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -133,11 +119,7 @@ export async function DELETE(
     }
 
     const { id } = await params
-    const masterHargaId = parseInt(id)
-
-    if (isNaN(masterHargaId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const masterHargaId = parseId(id, 'masterHargaId')
 
     const existing = await prisma.masterHarga.findUnique({
       where: { id: masterHargaId }
@@ -162,10 +144,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Master harga berhasil dihapus' })
   } catch (error) {
-    console.error('Delete master harga error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

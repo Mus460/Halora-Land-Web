@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { parseId, handleError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +14,7 @@ export async function GET(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check access
     const proyek = await prisma.proyek.findUnique({
@@ -106,11 +107,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Get rekap error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
 
@@ -125,7 +122,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const proyekId = parseInt(id)
+    const proyekId = parseId(id, 'proyekId')
 
     // Check access
     const proyek = await prisma.proyek.findUnique({
@@ -186,10 +183,6 @@ export async function PUT(
       rekap 
     })
   } catch (error) {
-    console.error('Update rekap settings error:', error)
-    return NextResponse.json(
-      { error: 'Terjadi kesalahan server' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
