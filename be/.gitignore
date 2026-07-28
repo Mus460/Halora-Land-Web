@@ -1,0 +1,5 @@
+# env
+.env*
+
+# compiled binary
+/halora-be
