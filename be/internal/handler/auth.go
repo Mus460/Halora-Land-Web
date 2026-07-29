@@ -35,6 +35,40 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+
+	// Demo mode: local DB auth — verify email/password, issue session JWT.
+	if h.verifier.DemoMode() {
+		if in.Email == "" || in.Password == "" {
+			writeError(w, http.StatusBadRequest, "email dan password wajib diisi")
+			return
+		}
+		u, err := h.verifier.LocalLogin(r.Context(), in.Email, in.Password)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		token, err := auth.IssueSessionToken(u.UserID, h.cfg.JWTSecret)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Gagal membuat sesi")
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: h.cfg.CookieName, Value: token, Path: "/",
+			MaxAge: 86400, HttpOnly: true, Secure: h.cfg.IsProd,
+			SameSite: http.SameSiteStrictMode,
+		})
+		if h.audit != nil {
+			p := audit.Params{Action: audit.ActionLogin, EntityType: "USER", EntityID: &u.UserID, UserID: u.UserID}
+			p.FromRequest(r)
+			h.audit.Log(p)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"user": map[string]any{
+			"id": u.UserID, "namaLengkap": u.NamaLengkap, "email": u.Email,
+			"role": u.Role, "accountType": u.AccountType, "isDemo": u.IsDemo,
+		}})
+		return
+	}
+
 	if in.Email == "" || in.Password == "" {
 		writeError(w, http.StatusBadRequest, "email dan password wajib diisi")
 		return
@@ -107,6 +141,34 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+
+	// Demo mode: insert directly into local DB with hashed password.
+	if h.verifier.DemoMode() {
+		if in.Email == "" || in.Password == "" || in.NamaLengkap == "" {
+			writeError(w, http.StatusBadRequest, "namaLengkap, email, dan password wajib diisi")
+			return
+		}
+		if len(in.Password) < 6 {
+			writeError(w, http.StatusBadRequest, "Password minimal 6 karakter")
+			return
+		}
+		u, err := h.verifier.LocalRegister(r.Context(), in.NamaLengkap, in.Email, in.Password)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if h.audit != nil {
+			p := audit.Params{Action: audit.ActionRegister, EntityType: "USER", EntityID: &u.UserID, UserID: u.UserID}
+			p.FromRequest(r)
+			h.audit.Log(p)
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"user": map[string]any{
+			"id": u.UserID, "namaLengkap": u.NamaLengkap, "email": u.Email,
+			"role": u.Role, "accountType": u.AccountType, "isDemo": u.IsDemo,
+		}})
+		return
+	}
+
 	body, _ := json.Marshal(map[string]any{
 		"email": in.Email, "password": in.Password,
 		"data":  map[string]any{"namaLengkap": in.NamaLengkap},
@@ -132,22 +194,45 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	if r.Method == http.MethodPut {
+		var in struct {
+			NamaLengkap string `json:"namaLengkap"`
+			Email       string `json:"email"`
+		}
+		if !decodeJSON(w, r, &in) {
+			return
+		}
+		if in.NamaLengkap == "" || in.Email == "" {
+			writeError(w, http.StatusBadRequest, "namaLengkap dan email wajib diisi")
+			return
+		}
+		if h.verifier.DemoMode() {
+			updated, err := h.verifier.LocalUpdateProfile(r.Context(), u.UserID, in.NamaLengkap, in.Email)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			u = updated
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": map[string]any{
 		"id": u.UserID, "namaLengkap": u.NamaLengkap, "email": u.Email,
 		"role": u.Role, "accountType": u.AccountType, "isDemo": u.IsDemo,
-	})
+	}})
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	if u != nil {
-		if token := bearer(r); token != "" {
-			body, _ := json.Marshal(map[string]any{})
-			req, _ := http.NewRequest(http.MethodPost, h.cfg.SupabaseURL+"/auth/v1/logout", bytes.NewReader(body))
-			req.Header.Set("apikey", h.cfg.SupabaseAnonKey)
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set("Content-Type", "application/json")
-			_, _ = h.http.Do(req)
+		if !h.verifier.DemoMode() {
+			if token := bearer(r); token != "" {
+				body, _ := json.Marshal(map[string]any{})
+				req, _ := http.NewRequest(http.MethodPost, h.cfg.SupabaseURL+"/auth/v1/logout", bytes.NewReader(body))
+				req.Header.Set("apikey", h.cfg.SupabaseAnonKey)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				_, _ = h.http.Do(req)
+			}
 		}
 		if h.audit != nil {
 			p := audit.Params{Action: audit.ActionLogout, EntityType: "USER", EntityID: &u.UserID, UserID: u.UserID}
@@ -168,6 +253,26 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+
+	// Demo mode: update password hash directly in local DB.
+	if h.verifier.DemoMode() {
+		u := auth.FromContext(r.Context())
+		if u == nil {
+			writeError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		if len(in.Password) < 6 {
+			writeError(w, http.StatusBadRequest, "Password minimal 6 karakter")
+			return
+		}
+		if err := h.verifier.LocalUpdatePassword(r.Context(), u.UserID, in.Password); err != nil {
+			writeError(w, http.StatusInternalServerError, "Gagal mengubah password")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"success": true})
+		return
+	}
+
 	token := bearer(r)
 	if token == "" {
 		writeError(w, http.StatusUnauthorized, "Unauthorized")
@@ -189,6 +294,13 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+
+	// Demo mode: no email verification — just return success.
+	if h.verifier.DemoMode() {
+		writeJSON(w, http.StatusOK, map[string]any{"success": true})
+		return
+	}
+
 	body, _ := json.Marshal(map[string]any{"type": "signup", "email": in.Email})
 	resp, err := h.supabase("/auth/v1/resend", body, r)
 	if err != nil {

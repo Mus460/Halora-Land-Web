@@ -89,13 +89,13 @@ export default function LoginPage() {
   };
 
   const handleDemoLogin = async () => {
-    setEmail("demo@haloraland.id");
-    setPassword("password123");
+    setEmail("admin@haloraland.id");
+    setPassword("admin123");
     setIsLoading(true);
 
     try {
-      await apiClient.post("/auth/login", { email: "demo@haloraland.id", password: "password123" });
-      toast.success("Login sebagai demo berhasil!");
+      await apiClient.post("/auth/login", { email: "admin@haloraland.id", password: "admin123" });
+      toast.success("Login sebagai admin berhasil!");
       router.push("/dashboard");
       router.refresh();
     } catch (error: any) {

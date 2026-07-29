@@ -1038,7 +1038,7 @@ A checklist of things to fix (or consciously carry forward) in the rewrite.
 | 11 | `src/lib/auth.ts` + `src/proxy.ts` dead; `JWT_SECRET` still required at load | §3.3 | Delete |
 | 12 | Logout cookie-clear may not work (attribute mismatch) | §7.2 | Fix in Go cookie handling |
 | 13 | `secure:true` on cookie blocks local dev HTTP | §7.2 | Env-conditional |
-| 14 | In-memory rate limiting (not multi-instance) | §3.8 | Redis |
+| 14 | In-memory rate limiting (not multi-instance) | §3.8 | Acceptable for small single-instance deploy (≈15 users); revisit if multi-instance |
 | 15 | No forgot-password endpoint; "Lupa password?" is `href="#"` | §7.2 | Implement |
 | 16 | `users.password` vestigial (Supabase owns creds) | §3.3 | Drop column |
 | 17 | Two parallel audit modules, one table, inconsistent fields | §3.6 | One Go package |
@@ -1059,7 +1059,7 @@ A checklist of things to fix (or consciously carry forward) in the rewrite.
 4. **Port business logic** — `from-ahsp` (snapshot copy), `recalculate`/`recalculate-all` (txn), `validate-snapshot` (drift), `rekap` (rollup with configurable rates), `dashboard/stats`.
 5. **AHSP import** — Go CLI (`excelize`) + optional HTTP endpoint; idempotent via `ahsp_kode` + `is_system`.
 6. **Audit** — one `internal/audit` package, background worker, wire into all mutations.
-7. **Rate limiting** — Redis-backed; apply to auth + writes.
+7. **Rate limiting** — in-memory fixed-window (single-instance, small user base); apply to auth + writes.
 8. **Split FE** — introduce `NEXT_PUBLIC_API_URL` + `apiClient`; delete `src/app/api/**` and the BE-coupled `lib` files; simplify `middleware.ts` to route-guarding only.
 9. **Migrate data** — `pg_dump` the existing Supabase DB, restore into the new Postgres, verify row counts. Run `import-ahsp` if `master_analisa` is empty.
 10. **Fix the gaps** from §10 (kurva-s, monitoring, progress, forgot-password, etc.).

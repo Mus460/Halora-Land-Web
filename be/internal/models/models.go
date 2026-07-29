@@ -174,6 +174,7 @@ type MasterAnalisa struct {
 	BiayaUmum   decimal.Decimal   `json:"biayaUmum"`
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
+	Children    []MasterAnalisa   `json:"children,omitempty"`
 }
 
 type RincianAnalisa struct {

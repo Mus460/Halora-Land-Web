@@ -161,10 +161,10 @@ func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int
 }
 
 type CreateRincianInput struct {
-	MasterAnalisaID int32
-	KomponenID      *int32
-	Koef            decimal.Decimal
-	Tipe            models.TipeKomponen
+	MasterAnalisaID int32                  `json:"masterAnalisaId"`
+	KomponenID      *int32                 `json:"komponenId"`
+	Koef            decimal.Decimal        `json:"koef"`
+	Tipe            models.TipeKomponen    `json:"tipe"`
 }
 
 func (r *MasterAnalisaRepo) CreateRincian(ctx context.Context, in CreateRincianInput) error {
@@ -177,6 +177,37 @@ func (r *MasterAnalisaRepo) CreateRincian(ctx context.Context, in CreateRincianI
 func (r *MasterAnalisaRepo) DeleteRincian(ctx context.Context, masterAnalisaID, rincianID int32) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM rincian_analisa WHERE id = $1 AND "masterAnalisaId" = $2`, rincianID, masterAnalisaID)
 	return err
+}
+
+// ListTree fetches all accessible nodes and builds a tree from the root level.
+func (r *MasterAnalisaRepo) ListTree(ctx context.Context, f ListMasterAnalisaFilter) ([]models.MasterAnalisa, error) {
+	treeFilter := f
+	treeFilter.Level = nil
+	treeFilter.ParentID = nil
+	all, err := r.List(ctx, treeFilter)
+	if err != nil {
+		return nil, err
+	}
+	return buildMasterAnalisaTree(all), nil
+}
+
+func buildMasterAnalisaTree(all []models.MasterAnalisa) []models.MasterAnalisa {
+	byID := make(map[int32]*models.MasterAnalisa, len(all))
+	roots := make([]models.MasterAnalisa, 0)
+	for i := range all {
+		byID[all[i].ID] = &all[i]
+	}
+	for i := range all {
+		node := &all[i]
+		if node.ParentID != nil {
+			if parent, ok := byID[*node.ParentID]; ok {
+				parent.Children = append(parent.Children, *node)
+				continue
+			}
+		}
+		roots = append(roots, *node)
+	}
+	return roots
 }
 
 // SearchAHSP searches system AHSP items by nama/ahspKode ILIKE (§6.6 search).

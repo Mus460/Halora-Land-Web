@@ -24,12 +24,16 @@ const (
 )
 
 // Verifier validates Supabase access tokens via JWKS (ARCHITECTURE.md §3.3/§7).
+// When demoMode is true, Authenticate injects a fixed admin user without
+// verifying any token, so the app can be demoed without Supabase auth.
 type Verifier struct {
 	jwksURL     string
 	anonKey     string
 	projectRef  string
 	pool        *pgxpool.Pool
 	httpClient  *http.Client
+	demoMode    bool
+	jwtSecret   string
 
 	mu       sync.RWMutex
 	keyset   jwt.Keyfunc
@@ -37,18 +41,23 @@ type Verifier struct {
 	ttl      time.Duration
 }
 
-func NewVerifier(pool *pgxpool.Pool, jwksURL, anonKey, projectRef string) *Verifier {
+func NewVerifier(pool *pgxpool.Pool, jwksURL, anonKey, projectRef string, demoMode bool, jwtSecret string) *Verifier {
 	v := &Verifier{
 		jwksURL:    jwksURL,
 		anonKey:    anonKey,
 		projectRef: projectRef,
 		pool:       pool,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
+		demoMode:   demoMode,
+		jwtSecret:  jwtSecret,
 		ttl:        15 * time.Minute,
 	}
 	v.keyset = v.fetchKeyset
 	return v
 }
+
+// DemoMode returns whether the verifier is running in demo (auth-bypass) mode.
+func (v *Verifier) DemoMode() bool { return v.demoMode }
 
 // AuthUser is the authenticated principal placed into the request context.
 type AuthUser struct {
@@ -76,8 +85,20 @@ func WithUser(ctx context.Context, u *AuthUser) context.Context {
 // user row, auto-links supabaseAuthId when null (ARCHITECTURE.md §2.2 step 4),
 // and stores *AuthUser in the context. Calls next with no user on failure so
 // downstream handlers/middleware can decide (401 vs public).
+// In demo mode, verifies a locally-issued session JWT from the cookie.
 func (v *Verifier) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v.demoMode {
+			cookie, err := r.Cookie(v.cookieName())
+			if err == nil && cookie.Value != "" {
+				if u, err := v.loadUserBySession(r.Context(), cookie.Value); err == nil {
+					next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u)))
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		token := extractToken(r, v.projectRef)
 		if token == "" {
 			next.ServeHTTP(w, r)
@@ -95,6 +116,35 @@ func (v *Verifier) Authenticate(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u)))
 	})
+}
+
+// cookieName returns the session cookie name (same as Supabase SSR cookie).
+func (v *Verifier) cookieName() string {
+	return fmt.Sprintf("sb-%s-auth-token", v.projectRef)
+}
+
+// loadUserBySession verifies a locally-issued JWT and loads the user from DB.
+func (v *Verifier) loadUserBySession(ctx context.Context, tokenStr string) (*AuthUser, error) {
+	userID, err := VerifySessionToken(tokenStr, v.jwtSecret)
+	if err != nil {
+		return nil, err
+	}
+	var u models.User
+	err = v.pool.QueryRow(ctx, `
+		SELECT id, "namaLengkap", email, role, "accountType", "isDemo"
+		FROM users WHERE id = $1`, userID).
+		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
+	if err != nil {
+		return nil, err
+	}
+	return &AuthUser{
+		UserID:      u.ID,
+		Email:       u.Email,
+		Role:        u.Role,
+		NamaLengkap: u.NamaLengkap,
+		AccountType: u.AccountType,
+		IsDemo:      u.IsDemo,
+	}, nil
 }
 
 func (v *Verifier) verifyToken(ctx context.Context, token string) (sub, email string, err error) {
@@ -182,6 +232,24 @@ func (v *Verifier) LoadOrCreate(ctx context.Context, sub, email string) (*AuthUs
 		IsDemo:      u.IsDemo,
 		SupabaseSub: sub,
 	}, nil
+}
+
+// loadDemoUser finds or creates the fixed demo admin user used in demo mode.
+const demoEmail = "admin@haloraland.id"
+
+// EnsureDemoAdmin ensures the demo admin user exists with a known password.
+// Called on startup when demo mode is enabled.
+func (v *Verifier) EnsureDemoAdmin(ctx context.Context) error {
+	hash, err := HashPassword("admin123")
+	if err != nil {
+		return err
+	}
+	_, err = v.pool.Exec(ctx, `
+		INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
+		VALUES ('Admin Demo', $1, 'ADMIN', 'free', true, $2)
+		ON CONFLICT (email) DO UPDATE SET "passwordHash" = EXCLUDED."passwordHash"`,
+		demoEmail, hash)
+	return err
 }
 
 func extractToken(r *http.Request, projectRef string) string {

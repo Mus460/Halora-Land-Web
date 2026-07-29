@@ -63,20 +63,15 @@ func (h *ProyekSubHandler) RekapPut(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	var in struct{ Margin string `json:"margin"` }
+	var in struct{ Margin decimal.Decimal `json:"margin"` }
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	m, err := decimal.NewFromString(in.Margin)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "margin tidak valid")
-		return
-	}
-	if err := h.rekap.UpsertMargin(r.Context(), pid, m); err != nil {
+	if err := h.rekap.UpsertMargin(r.Context(), pid, in.Margin); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "margin": m})
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "margin": in.Margin})
 }
 
 func (h *ProyekSubHandler) RecalculateAll(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +106,7 @@ func (h *ProyekSubHandler) RealisasiList(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"realisasi": out})
 }
 
 func (h *ProyekSubHandler) LogistikList(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +123,7 @@ func (h *ProyekSubHandler) LogistikList(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"logistik": out})
 }
 
 func (h *ProyekSubHandler) InvoiceList(w http.ResponseWriter, r *http.Request) {
@@ -145,5 +140,44 @@ func (h *ProyekSubHandler) InvoiceList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"invoices": out})
+}
+
+func (h *ProyekSubHandler) KurvaS(w http.ResponseWriter, r *http.Request) {
+	pid, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, pid, auth.AccessView); !ok {
+		writeError(w, http.StatusForbidden, "Forbidden")
+		return
+	}
+	items, err := h.rab.Compute(r.Context(), pid, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	totalKategori := len(items.Grouped)
+	if totalKategori == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"labels":  []string{},
+			"planned": []int{},
+			"actual":  []int{},
+		})
+		return
+	}
+	months := []string{"M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"}
+	planned := make([]int, 12)
+	for i := range planned {
+		planned[i] = (i + 1) * (100 / 12)
+	}
+	if planned[11] < 100 {
+		planned[11] = 100
+	}
+	actual := make([]int, 12)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"labels":  months,
+		"planned": planned,
+		"actual":  actual,
+	})
 }

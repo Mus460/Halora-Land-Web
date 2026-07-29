@@ -58,14 +58,15 @@ func (h *PekerjaanHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ProyekID        int32   `json:"proyekId"`
-		Kategori        string  `json:"kategori"`
-		UraianPekerjaan string  `json:"uraianPekerjaan"`
-		Volume          string  `json:"volume"`
-		Satuan          string  `json:"satuan"`
-		HargaSatuan     string  `json:"hargaSatuan"`
-		MetodeHitung    string  `json:"metodeHitung"`
-		TipePekerjaan   *string `json:"tipePekerjaan"`
+		ProyekID        int32             `json:"proyekId"`
+		Kategori        string            `json:"kategori"`
+		UraianPekerjaan string            `json:"uraianPekerjaan"`
+		Volume          decimal.Decimal   `json:"volume"`
+		Satuan          string            `json:"satuan"`
+		HargaSatuan     decimal.Decimal   `json:"hargaSatuan"`
+		MetodeHitung    string            `json:"metodeHitung"`
+		LevelPekerjaan  *string           `json:"levelPekerjaan"`
+		TipePekerjaan   *string           `json:"tipePekerjaan"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -74,13 +75,11 @@ func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	vol, _ := decimal.NewFromString(in.Volume)
-	hs, _ := decimal.NewFromString(in.HargaSatuan)
 	p, err := h.repo.Create(r.Context(), nil, repository.CreatePekerjaanInput{
 		ProyekID: in.ProyekID, Kategori: models.KategoriPekerjaan(in.Kategori),
-		UraianPekerjaan: in.UraianPekerjaan, Volume: vol, Satuan: in.Satuan,
-		HargaSatuan: hs, TotalBiaya: hs.Mul(vol), MetodeHitung: models.MetodeHitung(in.MetodeHitung),
-		TipePekerjaan: in.TipePekerjaan,
+		UraianPekerjaan: in.UraianPekerjaan, Volume: in.Volume, Satuan: in.Satuan,
+		HargaSatuan: in.HargaSatuan, TotalBiaya: in.HargaSatuan.Mul(in.Volume), MetodeHitung: models.MetodeHitung(in.MetodeHitung),
+		LevelPekerjaan: in.LevelPekerjaan, TipePekerjaan: in.TipePekerjaan,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -105,27 +104,32 @@ func (h *PekerjaanHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Volume      *string `json:"volume"`
-		HargaSatuan *string `json:"hargaSatuan"`
-		Uraian      *string `json:"uraianPekerjaan"`
+		Volume         *decimal.Decimal `json:"volume"`
+		HargaSatuan    *decimal.Decimal `json:"hargaSatuan"`
+		Uraian         *string          `json:"uraianPekerjaan"`
+		Satuan         *string          `json:"satuan"`
+		LevelPekerjaan *string          `json:"levelPekerjaan"`
+		TipePekerjaan  *string          `json:"tipePekerjaan"`
+		MetodeHitung   *string          `json:"metodeHitung"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	var vol, hs, tb *decimal.Decimal
-	if in.Volume != nil {
-		d, _ := decimal.NewFromString(*in.Volume)
-		vol = &d
-	}
-	if in.HargaSatuan != nil {
-		d, _ := decimal.NewFromString(*in.HargaSatuan)
-		hs = &d
-	}
-	if vol != nil && hs != nil {
-		t := hs.Mul(*vol)
+	var tb *decimal.Decimal
+	if in.Volume != nil && in.HargaSatuan != nil {
+		t := in.HargaSatuan.Mul(*in.Volume)
 		tb = &t
 	}
-	updated, err := h.repo.Update(r.Context(), id, vol, hs, tb, in.Uraian)
+	var mh *models.MetodeHitung
+	if in.MetodeHitung != nil {
+		m := models.MetodeHitung(*in.MetodeHitung)
+		mh = &m
+	}
+	updated, err := h.repo.Update(r.Context(), id, repository.UpdatePekerjaanInput{
+		Volume: in.Volume, HargaSatuan: in.HargaSatuan, TotalBiaya: tb,
+		Uraian: in.Uraian, Satuan: in.Satuan, LevelPekerjaan: in.LevelPekerjaan,
+		TipePekerjaan: in.TipePekerjaan, MetodeHitung: mh,
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -165,23 +169,18 @@ func (h *PekerjaanHandler) FromAHSP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		MasterAnalisaID int32  `json:"masterAnalisaId"`
-		Volume          string `json:"volume"`
-		ApplyBreakdown  *bool  `json:"applyBreakdown"`
+		MasterAnalisaID int32           `json:"masterAnalisaId"`
+		Volume          decimal.Decimal `json:"volume"`
+		ApplyBreakdown  *bool           `json:"applyBreakdown"`
 	}
 	if !decodeJSON(w, r, &in) {
-		return
-	}
-	vol, err := decimal.NewFromString(in.Volume)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "volume tidak valid")
 		return
 	}
 	apply := true
 	if in.ApplyBreakdown != nil {
 		apply = *in.ApplyBreakdown
 	}
-	p, err := h.snapshot.FromAHSP(r.Context(), pid, in.MasterAnalisaID, vol, apply)
+	p, err := h.snapshot.FromAHSP(r.Context(), pid, in.MasterAnalisaID, in.Volume, apply)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

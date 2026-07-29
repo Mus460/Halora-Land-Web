@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/ahsp"
 	"github.com/halora-land/halora-be/internal/audit"
@@ -28,6 +28,8 @@ const defaultAHSPPath = "./data/ahsp-2026.xlsx"
 
 func main() {
 	_ = godotenv.Load() // best-effort: ignore error if no .env
+
+	decimal.MarshalJSONWithoutQuotes = true // serialize decimal.Decimal as JSON numbers, not strings
 
 	if len(os.Args) < 2 {
 		fmt.Println("usage: halora-be <serve|migrate|import-ahsp|seed> [flags]")
@@ -68,10 +70,21 @@ func serve(cfg *config.Config) {
 		log.Fatal("migrate: ", err)
 	}
 
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr(cfg.RedisURL)})
-	limiter := ratelimit.New(rdb)
+	limiter := ratelimit.New()
 
-	verifier := auth.NewVerifier(pool, cfg.SupabaseJWKSURL, cfg.SupabaseAnonKey, cfg.SupabaseProjectRef)
+	if cfg.DemoMode {
+		log.Println("WARNING: DEMO MODE enabled — using local DB auth (no Supabase)")
+	}
+
+	verifier := auth.NewVerifier(pool, cfg.SupabaseJWKSURL, cfg.SupabaseAnonKey, cfg.SupabaseProjectRef, cfg.DemoMode, cfg.JWTSecret)
+
+	if cfg.DemoMode {
+		if err := verifier.EnsureDemoAdmin(ctx); err != nil {
+			log.Printf("WARNING: ensure demo admin: %v", err)
+		} else {
+			log.Println("demo admin ready: admin@haloraland.id / admin123")
+		}
+	}
 	auditLog := audit.New(pool, 1024)
 	defer auditLog.Close()
 
@@ -166,12 +179,4 @@ func seed(cfg *config.Config) {
 		log.Fatal(err)
 	}
 	log.Println("seed complete")
-}
-
-func redisAddr(url string) string {
-	const prefix = "redis://"
-	if len(url) > len(prefix) && url[:len(prefix)] == prefix {
-		return url[len(prefix):]
-	}
-	return url
 }

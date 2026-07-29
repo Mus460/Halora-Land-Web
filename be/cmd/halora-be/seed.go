@@ -7,6 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xuri/excelize/v2"
+
+	"github.com/halora-land/halora-be/internal/auth"
 )
 
 // openFile opens an xlsx file for the import-ahsp CLI.
@@ -25,21 +27,25 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	defer tx.Rollback(ctx)
 
 	users := []struct {
-		nama, email, role string
-		isDemo             bool
+		nama, email, role, pwd string
+		isDemo                  bool
 	}{
-		{"Admin Halora", "admin@haloraland.id", "ADMIN", false},
-		{"Budi Santoso", "budi@example.com", "USER", false},
-		{"Demo User", "demo@haloraland.id", "DEMO", true},
+		{"Admin Halora", "admin@haloraland.id", "ADMIN", "admin123", false},
+		{"Budi Santoso", "budi@example.com", "USER", "password123", false},
+		{"Demo User", "demo@haloraland.id", "DEMO", "demo123", true},
 	}
 	var budiID int32
 	for i, u := range users {
+		hash, err := auth.HashPassword(u.pwd)
+		if err != nil {
+			return fmt.Errorf("seed hash pwd: %w", err)
+		}
 		var id int32
-		err := tx.QueryRow(ctx, `
-			INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo")
-			VALUES ($1,$2,$3,'free',$4)
-			ON CONFLICT (email) DO UPDATE SET "namaLengkap" = EXCLUDED."namaLengkap"
-			RETURNING id`, u.nama, u.email, u.role, u.isDemo).Scan(&id)
+		err = tx.QueryRow(ctx, `
+			INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
+			VALUES ($1,$2,$3,'free',$4,$5)
+			ON CONFLICT (email) DO UPDATE SET "namaLengkap" = EXCLUDED."namaLengkap", "passwordHash" = EXCLUDED."passwordHash"
+			RETURNING id`, u.nama, u.email, u.role, u.isDemo, string(hash)).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("seed user %s: %w", u.email, err)
 		}

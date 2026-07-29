@@ -53,6 +53,9 @@ export default function RekapPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setData(result);
+      if (result?.summary?.margin) {
+        setMargin(Number(result.summary.margin));
+      }
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Gagal memuat data');
@@ -65,18 +68,38 @@ export default function RekapPage() {
     return <div className="p-8 text-center">Memuat data...</div>;
   }
 
-  const rekapItems = data.breakdown || [];
-  const subtotal = data.totalRAB || 0;
-  const overhead = subtotal * 0.1;
-  const profit = (subtotal + overhead) * (margin / 100);
-  const ppn = (subtotal + overhead + profit) * 0.11;
-  const total = subtotal + overhead + profit + ppn;
+  const grouped = data.grouped || {};
+  const summary = data.summary || {};
+  const subtotal = Number(summary.subtotal || 0);
+  const overhead = Number(summary.overhead || 0);
+  const ppn = Number(summary.totalPPN || 0);
+  const total = Number(summary.totalAkhir || 0);
+  const rekapItemCount = Object.values(grouped).reduce(
+    (sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0),
+    0
+  );
 
-  const grouped = rekapItems.reduce((acc: any, item: any) => {
-    if (!acc[item.kategori]) acc[item.kategori] = [];
-    acc[item.kategori].push(item);
-    return acc;
-  }, {} as Record<string, typeof rekapItems>);
+  const handleSaveMargin = async () => {
+    try {
+      const response = await fetch(`/api/proyek/${proyekId}/rekap`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ margin }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Gagal menyimpan margin');
+      }
+      setShowMargin(false);
+      await fetchData();
+      toast.success('Margin berhasil disimpan');
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal menyimpan margin');
+    }
+  };
+
+  const previewMarginAmount = subtotal * margin / 100;
+  const previewTotal = subtotal * (1 + margin / 100) * 1.10 * 1.11;
 
   return (
     <div className="space-y-6">
@@ -103,7 +126,7 @@ export default function RekapPage() {
           {Object.entries(grouped).map(([kategori, items]) => {
             const itemsArray = items as any[];
             const kategoriTotal = itemsArray.reduce(
-              (sum, item) => sum + item.totalBiaya,
+              (sum, item) => sum + Number(item.totalBiaya),
               0
             );
             return (
@@ -149,10 +172,10 @@ export default function RekapPage() {
                             {item.volume} {item.satuan}
                           </td>
                           <td className="text-right px-4 py-2 text-gray-600">
-                            {formatCurrency(item.hargaSatuan)}
+                            {formatCurrency(Number(item.hargaSatuan))}
                           </td>
                           <td className="text-right px-4 py-2 font-semibold">
-                            {formatCurrency(item.totalBiaya)}
+                            {formatCurrency(Number(item.totalBiaya))}
                           </td>
                         </tr>
                       ))}
@@ -163,7 +186,7 @@ export default function RekapPage() {
             );
           })}
 
-          {rekapItems.length === 0 && (
+          {rekapItemCount === 0 && (
             <Card>
               <CardContent className="py-12 text-center text-gray-500">
                 <Calculator className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -185,15 +208,15 @@ export default function RekapPage() {
                 <span className="font-semibold">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Overhead (10%)</span>
+                <span className="text-gray-600">Overhead</span>
                 <span>{formatCurrency(overhead)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Profit ({margin}%)</span>
-                <span>{formatCurrency(profit)}</span>
+                <span className="text-gray-600">Profit (Margin {margin}%)</span>
+                <span>{formatCurrency(Number(summary.subtotalWithMargin || 0) - subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">PPN (11%)</span>
+                <span className="text-gray-600">PPN</span>
                 <span>{formatCurrency(ppn)}</span>
               </div>
               <div className="border-t pt-3 flex justify-between">
@@ -210,7 +233,7 @@ export default function RekapPage() {
               <div className="text-center">
                 <p className="text-sm text-gray-500">Total Item</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {rekapItems.length}
+                  {rekapItemCount}
                 </p>
               </div>
             </CardContent>
@@ -237,21 +260,22 @@ export default function RekapPage() {
             </div>
             <div className="p-3 bg-gray-50 rounded-lg text-sm">
               <div className="flex justify-between mb-1">
-                <span>Profit</span>
+                <span>Profit (Margin)</span>
                 <span className="font-semibold">
-                  {formatCurrency(profit)}
+                  {formatCurrency(previewMarginAmount)}
                 </span>
               </div>
               <div className="flex justify-between font-bold">
                 <span>Grand Total</span>
                 <span className="text-amber-600">
-                  {formatCurrency(total)}
+                  {formatCurrency(previewTotal)}
                 </span>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowMargin(false)}>Simpan</Button>
+            <Button variant="outline" onClick={() => setShowMargin(false)}>Batal</Button>
+            <Button onClick={handleSaveMargin}>Simpan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,7 +1,9 @@
 -- =====================================================================
 -- Halora Land — consolidated schema (clean baseline + AHSP delta merged)
--- Target: PostgreSQL >= 14.  Runnable on a fresh DB.
+-- Target: PostgreSQL >= 14.  Runnable on a fresh OR existing DB.
 -- Per ARCHITECTURE.md §5.2 + §3.3 (users.password dropped in rework).
+-- Idempotent: safe to re-run (CREATE TYPE via DO blocks, CREATE TABLE
+-- IF NOT EXISTS, CREATE INDEX IF NOT EXISTS, ADD CONSTRAINT via DO blocks).
 -- =====================================================================
 
 BEGIN;
@@ -9,27 +11,50 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ---------------------------------------------------------------------
--- Enums
+-- Enums (PostgreSQL has no CREATE TYPE IF NOT EXISTS — use DO blocks)
 -- ---------------------------------------------------------------------
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'OWNER', 'USER', 'DEMO');
-CREATE TYPE "TipeProyek" AS ENUM ('gedung', 'infra');
-CREATE TYPE "RoleTimProyek" AS ENUM ('owner', 'editor', 'viewer');
-CREATE TYPE "KategoriPekerjaan" AS ENUM (
-  'persiapan','pondasi','beton','kanopi','baja','tangga','atap',
-  'dinding','plesteran','acian','keramik','paving','pengecatan',
-  'pintu','interior','toilet','mep','custom'
-);
-CREATE TYPE "MetodeHitung" AS ENUM (
-  'ahsp','manual','harga_borong','harga_manual','harga_custom'
-);
-CREATE TYPE "TipeKomponen" AS ENUM ('material', 'upah', 'alat');
-CREATE TYPE "StatusInvoice" AS ENUM ('draft', 'sent', 'paid');
-CREATE TYPE "StatusFeedback" AS ENUM ('open', 'in_progress', 'resolved', 'closed');
+DO $$ BEGIN
+  CREATE TYPE "Role" AS ENUM ('ADMIN', 'OWNER', 'USER', 'DEMO');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "TipeProyek" AS ENUM ('gedung', 'infra');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "RoleTimProyek" AS ENUM ('owner', 'editor', 'viewer');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "KategoriPekerjaan" AS ENUM (
+    'persiapan','pondasi','beton','kanopi','baja','tangga','atap',
+    'dinding','plesteran','acian','keramik','paving','pengecatan',
+    'pintu','interior','toilet','mep','custom'
+  );
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "MetodeHitung" AS ENUM (
+    'ahsp','manual','harga_borong','harga_manual','harga_custom'
+  );
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "TipeKomponen" AS ENUM ('material', 'upah', 'alat');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "StatusInvoice" AS ENUM ('draft', 'sent', 'paid');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "StatusFeedback" AS ENUM ('open', 'in_progress', 'resolved', 'closed');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- ---------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
     "id"              SERIAL NOT NULL,
     "namaLengkap"     TEXT    NOT NULL,
     "email"           TEXT    NOT NULL,
@@ -42,7 +67,7 @@ CREATE TABLE "users" (
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "proyek" (
+CREATE TABLE IF NOT EXISTS "proyek" (
     "id"           SERIAL NOT NULL,
     "userId"       INTEGER NOT NULL,
     "namaProyek"   TEXT    NOT NULL,
@@ -55,7 +80,7 @@ CREATE TABLE "proyek" (
     CONSTRAINT "proyek_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "tim_proyek" (
+CREATE TABLE IF NOT EXISTS "tim_proyek" (
     "id"        SERIAL NOT NULL,
     "proyekId"  INTEGER NOT NULL,
     "userId"    INTEGER NOT NULL,
@@ -65,7 +90,7 @@ CREATE TABLE "tim_proyek" (
     CONSTRAINT "tim_proyek_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "pekerjaan" (
+CREATE TABLE IF NOT EXISTS "pekerjaan" (
     "id"              SERIAL NOT NULL,
     "proyekId"        INTEGER NOT NULL,
     "kategori"        "KategoriPekerjaan" NOT NULL,
@@ -82,7 +107,7 @@ CREATE TABLE "pekerjaan" (
     CONSTRAINT "pekerjaan_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "detail_analisa" (
+CREATE TABLE IF NOT EXISTS "detail_analisa" (
     "id"              SERIAL NOT NULL,
     "pekerjaanId"     INTEGER NOT NULL,
     "masterHargaId"   INTEGER,
@@ -98,7 +123,7 @@ CREATE TABLE "detail_analisa" (
     CONSTRAINT "detail_analisa_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "master_analisa" (
+CREATE TABLE IF NOT EXISTS "master_analisa" (
     "id"          SERIAL NOT NULL,
     "kode"        TEXT    NOT NULL,
     "nama"        TEXT    NOT NULL,
@@ -118,7 +143,7 @@ CREATE TABLE "master_analisa" (
     CONSTRAINT "master_analisa_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "rincian_analisa" (
+CREATE TABLE IF NOT EXISTS "rincian_analisa" (
     "id"             SERIAL NOT NULL,
     "masterAnalisaId" INTEGER NOT NULL,
     "komponenId"     INTEGER,
@@ -135,7 +160,7 @@ CREATE TABLE "rincian_analisa" (
     CONSTRAINT "rincian_analisa_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "master_harga" (
+CREATE TABLE IF NOT EXISTS "master_harga" (
     "id"        SERIAL NOT NULL,
     "nama"      TEXT    NOT NULL,
     "satuan"    TEXT    NOT NULL,
@@ -150,7 +175,7 @@ CREATE TABLE "master_harga" (
     CONSTRAINT "master_harga_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "rekap" (
+CREATE TABLE IF NOT EXISTS "rekap" (
     "id"        SERIAL NOT NULL,
     "proyekId"  INTEGER NOT NULL,
     "kategori"  TEXT    NOT NULL,
@@ -162,7 +187,7 @@ CREATE TABLE "rekap" (
     CONSTRAINT "rekap_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "invoice" (
+CREATE TABLE IF NOT EXISTS "invoice" (
     "id"        SERIAL NOT NULL,
     "proyekId"  INTEGER NOT NULL,
     "nomor"     TEXT    NOT NULL,
@@ -174,7 +199,7 @@ CREATE TABLE "invoice" (
     CONSTRAINT "invoice_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "logistik" (
+CREATE TABLE IF NOT EXISTS "logistik" (
     "id"           SERIAL NOT NULL,
     "proyekId"     INTEGER NOT NULL,
     "namaMaterial" TEXT    NOT NULL,
@@ -189,7 +214,7 @@ CREATE TABLE "logistik" (
     CONSTRAINT "logistik_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "realisasi" (
+CREATE TABLE IF NOT EXISTS "realisasi" (
     "id"         SERIAL NOT NULL,
     "proyekId"   INTEGER NOT NULL,
     "tanggal"    TIMESTAMP(3) NOT NULL,
@@ -201,7 +226,7 @@ CREATE TABLE "realisasi" (
     CONSTRAINT "realisasi_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "feedback" (
+CREATE TABLE IF NOT EXISTS "feedback" (
     "id"        SERIAL NOT NULL,
     "userId"    INTEGER NOT NULL,
     "subject"   TEXT    NOT NULL,
@@ -212,7 +237,7 @@ CREATE TABLE "feedback" (
     CONSTRAINT "feedback_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "feedback_reply" (
+CREATE TABLE IF NOT EXISTS "feedback_reply" (
     "id"         SERIAL NOT NULL,
     "feedbackId" INTEGER NOT NULL,
     "userId"     INTEGER NOT NULL,
@@ -223,7 +248,7 @@ CREATE TABLE "feedback_reply" (
     CONSTRAINT "feedback_reply_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "news" (
+CREATE TABLE IF NOT EXISTS "news" (
     "id"        SERIAL NOT NULL,
     "title"     TEXT    NOT NULL,
     "content"   TEXT    NOT NULL,
@@ -233,7 +258,7 @@ CREATE TABLE "news" (
     CONSTRAINT "news_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "audit_log" (
+CREATE TABLE IF NOT EXISTS "audit_log" (
     "id"          SERIAL NOT NULL,
     "proyekId"    INTEGER,
     "pekerjaanId" INTEGER,
@@ -253,141 +278,144 @@ CREATE TABLE "audit_log" (
 -- ---------------------------------------------------------------------
 -- Indexes (unique)
 -- ---------------------------------------------------------------------
-CREATE UNIQUE INDEX "users_email_key"                       ON "users"("email");
-CREATE UNIQUE INDEX "users_supabaseAuthId_key"              ON "users"("supabaseAuthId");
-CREATE UNIQUE INDEX "tim_proyek_proyekId_userId_key"        ON "tim_proyek"("proyekId","userId");
-CREATE UNIQUE INDEX "master_analisa_kode_userId_key"        ON "master_analisa"("kode","userId");
-CREATE UNIQUE INDEX "master_harga_nama_userId_kategori_key" ON "master_harga"("nama","userId","kategori");
-CREATE UNIQUE INDEX "invoice_nomor_key"                     ON "invoice"("nomor");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key"                       ON "users"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_supabaseAuthId_key"              ON "users"("supabaseAuthId");
+CREATE UNIQUE INDEX IF NOT EXISTS "tim_proyek_proyekId_userId_key"        ON "tim_proyek"("proyekId","userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "master_analisa_kode_userId_key"        ON "master_analisa"("kode","userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "master_harga_nama_userId_kategori_key" ON "master_harga"("nama","userId","kategori");
+CREATE UNIQUE INDEX IF NOT EXISTS "invoice_nomor_key"                     ON "invoice"("nomor");
 
 -- ---------------------------------------------------------------------
 -- Indexes (non-unique)
 -- ---------------------------------------------------------------------
-CREATE INDEX "tim_proyek_userId_idx"                ON "tim_proyek"("userId");
-CREATE INDEX "tim_proyek_proyekId_idx"              ON "tim_proyek"("proyekId");
-CREATE INDEX "pekerjaan_proyekId_idx"               ON "pekerjaan"("proyekId");
-CREATE INDEX "pekerjaan_kategori_idx"               ON "pekerjaan"("kategori");
-CREATE INDEX "detail_analisa_pekerjaanId_idx"       ON "detail_analisa"("pekerjaanId");
-CREATE INDEX "detail_analisa_masterHargaId_idx"     ON "detail_analisa"("masterHargaId");
-CREATE INDEX "detail_analisa_masterAnalisaId_idx"   ON "detail_analisa"("masterAnalisaId");
-CREATE INDEX "master_analisa_userId_idx"            ON "master_analisa"("userId");
-CREATE INDEX "master_analisa_parentId_idx"          ON "master_analisa"("parentId");
-CREATE INDEX "rincian_analisa_masterAnalisaId_idx"  ON "rincian_analisa"("masterAnalisaId");
-CREATE INDEX "rincian_analisa_komponenId_idx"       ON "rincian_analisa"("komponenId");
-CREATE INDEX "master_harga_userId_idx"              ON "master_harga"("userId");
-CREATE INDEX "rekap_proyekId_idx"                   ON "rekap"("proyekId");
-CREATE INDEX "invoice_proyekId_idx"                 ON "invoice"("proyekId");
-CREATE INDEX "logistik_proyekId_idx"                ON "logistik"("proyekId");
-CREATE INDEX "realisasi_proyekId_idx"               ON "realisasi"("proyekId");
-CREATE INDEX "feedback_userId_idx"                  ON "feedback"("userId");
-CREATE INDEX "feedback_reply_feedbackId_idx"        ON "feedback_reply"("feedbackId");
-CREATE INDEX "feedback_reply_userId_idx"            ON "feedback_reply"("userId");
-CREATE INDEX "audit_log_proyekId_idx"               ON "audit_log"("proyekId");
-CREATE INDEX "audit_log_userId_idx"                 ON "audit_log"("userId");
-CREATE INDEX "audit_log_action_idx"                 ON "audit_log"("action");
-CREATE INDEX "audit_log_createdAt_idx"              ON "audit_log"("createdAt");
+CREATE INDEX IF NOT EXISTS "tim_proyek_userId_idx"                ON "tim_proyek"("userId");
+CREATE INDEX IF NOT EXISTS "tim_proyek_proyekId_idx"              ON "tim_proyek"("proyekId");
+CREATE INDEX IF NOT EXISTS "pekerjaan_proyekId_idx"               ON "pekerjaan"("proyekId");
+CREATE INDEX IF NOT EXISTS "pekerjaan_kategori_idx"               ON "pekerjaan"("kategori");
+CREATE INDEX IF NOT EXISTS "detail_analisa_pekerjaanId_idx"       ON "detail_analisa"("pekerjaanId");
+CREATE INDEX IF NOT EXISTS "detail_analisa_masterHargaId_idx"     ON "detail_analisa"("masterHargaId");
+CREATE INDEX IF NOT EXISTS "detail_analisa_masterAnalisaId_idx"   ON "detail_analisa"("masterAnalisaId");
+CREATE INDEX IF NOT EXISTS "master_analisa_userId_idx"            ON "master_analisa"("userId");
+CREATE INDEX IF NOT EXISTS "master_analisa_parentId_idx"          ON "master_analisa"("parentId");
+CREATE INDEX IF NOT EXISTS "rincian_analisa_masterAnalisaId_idx"  ON "rincian_analisa"("masterAnalisaId");
+CREATE INDEX IF NOT EXISTS "rincian_analisa_komponenId_idx"       ON "rincian_analisa"("komponenId");
+CREATE INDEX IF NOT EXISTS "master_harga_userId_idx"              ON "master_harga"("userId");
+CREATE INDEX IF NOT EXISTS "rekap_proyekId_idx"                   ON "rekap"("proyekId");
+CREATE INDEX IF NOT EXISTS "invoice_proyekId_idx"                 ON "invoice"("proyekId");
+CREATE INDEX IF NOT EXISTS "logistik_proyekId_idx"                ON "logistik"("proyekId");
+CREATE INDEX IF NOT EXISTS "realisasi_proyekId_idx"               ON "realisasi"("proyekId");
+CREATE INDEX IF NOT EXISTS "feedback_userId_idx"                  ON "feedback"("userId");
+CREATE INDEX IF NOT EXISTS "feedback_reply_feedbackId_idx"        ON "feedback_reply"("feedbackId");
+CREATE INDEX IF NOT EXISTS "feedback_reply_userId_idx"            ON "feedback_reply"("userId");
+CREATE INDEX IF NOT EXISTS "audit_log_proyekId_idx"               ON "audit_log"("proyekId");
+CREATE INDEX IF NOT EXISTS "audit_log_userId_idx"                 ON "audit_log"("userId");
+CREATE INDEX IF NOT EXISTS "audit_log_action_idx"                 ON "audit_log"("action");
+CREATE INDEX IF NOT EXISTS "audit_log_createdAt_idx"              ON "audit_log"("createdAt");
 
-CREATE INDEX "idx_master_analisa_kategori_is_system" ON "master_analisa"("kategori","isSystem");
-CREATE INDEX "idx_master_analisa_ahsp_kode"          ON "master_analisa"("ahspKode");
-CREATE INDEX "idx_master_analisa_ahsp_sheet"         ON "master_analisa"("ahspSheet");
-CREATE INDEX "idx_master_harga_kode_ahsp"            ON "master_harga"("kodeAHSP");
-CREATE INDEX "idx_master_analisa_nama_trgm"          ON "master_analisa" USING gin ("nama" gin_trgm_ops);
-CREATE INDEX "idx_master_analisa_ahsp_kode_trgm"     ON "master_analisa" USING gin ("ahspKode" gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS "idx_master_analisa_kategori_is_system" ON "master_analisa"("kategori","isSystem");
+CREATE INDEX IF NOT EXISTS "idx_master_analisa_ahsp_kode"          ON "master_analisa"("ahspKode");
+CREATE INDEX IF NOT EXISTS "idx_master_analisa_ahsp_sheet"         ON "master_analisa"("ahspSheet");
+CREATE INDEX IF NOT EXISTS "idx_master_harga_kode_ahsp"            ON "master_harga"("kodeAHSP");
+CREATE INDEX IF NOT EXISTS "idx_master_analisa_nama_trgm"          ON "master_analisa" USING gin ("nama" gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS "idx_master_analisa_ahsp_kode_trgm"     ON "master_analisa" USING gin ("ahspKode" gin_trgm_ops);
 
 -- ---------------------------------------------------------------------
--- Foreign keys
+-- Foreign keys (PG has no ADD CONSTRAINT IF NOT EXISTS — use DO blocks)
 -- ---------------------------------------------------------------------
-ALTER TABLE "proyek"
-  ADD CONSTRAINT "proyek_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "proyek" ADD CONSTRAINT "proyek_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "tim_proyek"
-  ADD CONSTRAINT "tim_proyek_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tim_proyek" ADD CONSTRAINT "tim_proyek_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "tim_proyek"
-  ADD CONSTRAINT "tim_proyek_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tim_proyek" ADD CONSTRAINT "tim_proyek_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "pekerjaan"
-  ADD CONSTRAINT "pekerjaan_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "pekerjaan" ADD CONSTRAINT "pekerjaan_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "detail_analisa"
-  ADD CONSTRAINT "detail_analisa_pekerjaanId_fkey"
-  FOREIGN KEY ("pekerjaanId") REFERENCES "pekerjaan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "detail_analisa" ADD CONSTRAINT "detail_analisa_pekerjaanId_fkey" FOREIGN KEY ("pekerjaanId") REFERENCES "pekerjaan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "detail_analisa"
-  ADD CONSTRAINT "detail_analisa_masterHargaId_fkey"
-  FOREIGN KEY ("masterHargaId") REFERENCES "master_harga"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "detail_analisa" ADD CONSTRAINT "detail_analisa_masterHargaId_fkey" FOREIGN KEY ("masterHargaId") REFERENCES "master_harga"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "detail_analisa"
-  ADD CONSTRAINT "detail_analisa_masterAnalisaId_fkey"
-  FOREIGN KEY ("masterAnalisaId") REFERENCES "master_analisa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "detail_analisa" ADD CONSTRAINT "detail_analisa_masterAnalisaId_fkey" FOREIGN KEY ("masterAnalisaId") REFERENCES "master_analisa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "master_analisa"
-  ADD CONSTRAINT "master_analisa_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "master_analisa" ADD CONSTRAINT "master_analisa_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "master_analisa"
-  ADD CONSTRAINT "master_analisa_parentId_fkey"
-  FOREIGN KEY ("parentId") REFERENCES "master_analisa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "master_analisa" ADD CONSTRAINT "master_analisa_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "master_analisa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "rincian_analisa"
-  ADD CONSTRAINT "rincian_analisa_masterAnalisaId_fkey"
-  FOREIGN KEY ("masterAnalisaId") REFERENCES "master_analisa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rincian_analisa" ADD CONSTRAINT "rincian_analisa_masterAnalisaId_fkey" FOREIGN KEY ("masterAnalisaId") REFERENCES "master_analisa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "rincian_analisa"
-  ADD CONSTRAINT "rincian_analisa_komponenId_fkey"
-  FOREIGN KEY ("komponenId") REFERENCES "master_harga"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rincian_analisa" ADD CONSTRAINT "rincian_analisa_komponenId_fkey" FOREIGN KEY ("komponenId") REFERENCES "master_harga"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "master_harga"
-  ADD CONSTRAINT "master_harga_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "master_harga" ADD CONSTRAINT "master_harga_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "rekap"
-  ADD CONSTRAINT "rekap_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rekap" ADD CONSTRAINT "rekap_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "invoice"
-  ADD CONSTRAINT "invoice_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "invoice" ADD CONSTRAINT "invoice_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "logistik"
-  ADD CONSTRAINT "logistik_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "logistik" ADD CONSTRAINT "logistik_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "realisasi"
-  ADD CONSTRAINT "realisasi_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "realisasi" ADD CONSTRAINT "realisasi_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "feedback"
-  ADD CONSTRAINT "feedback_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "feedback" ADD CONSTRAINT "feedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "feedback_reply"
-  ADD CONSTRAINT "feedback_reply_feedbackId_fkey"
-  FOREIGN KEY ("feedbackId") REFERENCES "feedback"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "feedback_reply" ADD CONSTRAINT "feedback_reply_feedbackId_fkey" FOREIGN KEY ("feedbackId") REFERENCES "feedback"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "feedback_reply"
-  ADD CONSTRAINT "feedback_reply_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "feedback_reply" ADD CONSTRAINT "feedback_reply_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "audit_log"
-  ADD CONSTRAINT "audit_log_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "audit_log"
-  ADD CONSTRAINT "audit_log_proyekId_fkey"
-  FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_proyekId_fkey" FOREIGN KEY ("proyekId") REFERENCES "proyek"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "audit_log"
-  ADD CONSTRAINT "audit_log_pekerjaanId_fkey"
-  FOREIGN KEY ("pekerjaanId") REFERENCES "pekerjaan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_pekerjaanId_fkey" FOREIGN KEY ("pekerjaanId") REFERENCES "pekerjaan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 COMMENT ON COLUMN "master_analisa"."isSystem"  IS 'true = from AHSP 2026, false = user custom';
 COMMENT ON COLUMN "master_analisa"."ahspKode"  IS 'Original AHSP code e.g. 2.2.1.1.1';
 COMMENT ON COLUMN "master_analisa"."ahspSheet" IS 'Source Excel sheet name e.g. Beton';
 COMMENT ON COLUMN "master_analisa"."biayaUmum" IS 'Overhead percentage e.g. 0.10 = 10%';
+
+-- Demo/local auth: add passwordHash column (nullable — Supabase users don't have one)
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
 
 COMMIT;

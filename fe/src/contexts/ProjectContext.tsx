@@ -62,8 +62,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const fetchProyekList = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.get<Proyek[]>('/proyek');
-      const list = Array.isArray(data) ? data : [];
+      const data = await apiClient.get<{ proyek: Proyek[] }>('/proyek');
+      const list = Array.isArray(data?.proyek) ? data.proyek : [];
       setProyekList(list);
 
       if (!currentProyekId && list.length > 0) {
@@ -80,8 +80,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const fetchProyek = async (id: number) => {
     try {
-      const data = await apiClient.get<Proyek>(`/proyek/${id}`);
-      setProyek(data);
+      const data = await apiClient.get<{ proyek: Proyek }>(`/proyek/${id}`);
+      setProyek(data?.proyek || null);
     } catch (error) {
       console.error('Fetch proyek error:', error);
     }

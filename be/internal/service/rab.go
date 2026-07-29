@@ -32,11 +32,13 @@ type RekapGroup struct {
 
 type rekapItem struct {
 	ID              int32           `json:"id"`
+	Kategori        string          `json:"kategori"`
 	UraianPekerjaan string          `json:"uraianPekerjaan"`
 	Volume          decimal.Decimal `json:"volume"`
 	Satuan          string          `json:"satuan"`
 	HargaSatuan     decimal.Decimal `json:"hargaSatuan"`
 	TotalBiaya      decimal.Decimal `json:"totalBiaya"`
+	LevelPekerjaan  *string         `json:"levelPekerjaan"`
 }
 
 type RekapResult struct {
@@ -88,8 +90,8 @@ func (s *RABService) Compute(ctx context.Context, proyekID int32, proyek *reposi
 	grandTotal := decimal.Zero
 	for _, p := range items {
 		it := rekapItem{
-			ID: p.ID, UraianPekerjaan: p.UraianPekerjaan, Volume: p.Volume,
-			Satuan: p.Satuan, HargaSatuan: p.HargaSatuan, TotalBiaya: p.TotalBiaya,
+			ID: p.ID, Kategori: string(p.Kategori), UraianPekerjaan: p.UraianPekerjaan, Volume: p.Volume,
+			Satuan: p.Satuan, HargaSatuan: p.HargaSatuan, TotalBiaya: p.TotalBiaya, LevelPekerjaan: p.LevelPekerjaan,
 		}
 		grouped[string(p.Kategori)] = append(grouped[string(p.Kategori)], it)
 		subtotals[string(p.Kategori)] = subtotals[string(p.Kategori)].Add(p.TotalBiaya)

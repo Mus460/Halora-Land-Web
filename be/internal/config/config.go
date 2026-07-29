@@ -13,7 +13,6 @@ import (
 type Config struct {
 	Port           string
 	DatabaseURL    string
-	RedisURL       string
 	AllowedOrigins []string
 
 	// Supabase Auth (JWT verification via JWKS)
@@ -28,7 +27,13 @@ type Config struct {
 	OverheadRate decimal.Decimal
 	PPNRate      decimal.Decimal
 
-	IsProd bool
+	// DemoMode skips JWT verification and injects a fixed admin user so the
+	// app can be demoed without Supabase auth. Enable via DEMO_MODE=true.
+	DemoMode  bool
+	IsProd    bool
+
+	// JWTSecret signs session tokens in demo (local auth) mode.
+	JWTSecret string
 }
 
 // Load reads configuration from environment variables, applying sensible defaults.
@@ -36,14 +41,15 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Port:            envOr("PORT", "8080"),
 		DatabaseURL:     mustEnv("DATABASE_URL"),
-		RedisURL:        envOr("REDIS_URL", "redis://localhost:6379/0"),
 		AllowedOrigins:  strings.Split(envOr("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
 		SupabaseURL:     mustEnv("NEXT_PUBLIC_SUPABASE_URL"),
 		SupabaseAnonKey: mustEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
 		SupabaseServiceKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 		OverheadRate:    decEnvOr("OVERHEAD_RATE", "0.10"),
 		PPNRate:         decEnvOr("PPN_RATE", "0.11"),
+		DemoMode:        envOr("DEMO_MODE", "") == "true",
 		IsProd:          envOr("NODE_ENV", "development") == "production",
+		JWTSecret:       envOr("JWT_SECRET", ""),
 	}
 
 	ref := supabaseProjectRef(cfg.SupabaseURL)

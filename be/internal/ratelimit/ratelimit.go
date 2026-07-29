@@ -6,19 +6,27 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
-// Limiter is a Redis fixed-window rate limiter (ARCHITECTURE.md §3.8).
-// Falls back to allow-all if Redis is unavailable, so dev is never blocked.
+// Limiter is an in-memory fixed-window rate limiter (ARCHITECTURE.md §3.8).
+// Suitable for single-instance deployments (e.g. a small number of clients).
+// Safe for concurrent use.
 type Limiter struct {
-	rdb redis.Cmdable
+	mu      sync.Mutex
+	entries map[string]*entry
 }
 
-func New(rdb redis.Cmdable) *Limiter {
-	return &Limiter{rdb: rdb}
+type entry struct {
+	count   int
+	resetAt time.Time
+}
+
+func New() *Limiter {
+	l := &Limiter{entries: make(map[string]*entry)}
+	go l.sweep()
+	return l
 }
 
 // Result of a limit check.
@@ -32,22 +40,41 @@ type Result struct {
 // Check increments the counter for key and returns whether it's under limit.
 // window is the fixed-window duration.
 func (l *Limiter) Check(ctx context.Context, key string, limit int, window time.Duration) Result {
+	_ = ctx
 	now := time.Now()
 	reset := now.Add(window).Unix()
-	if l.rdb == nil {
-		return Result{Allowed: true, Limit: limit, Remaining: limit, Reset: reset}
-	}
-	pipe := l.rdb.Pipeline()
-	incr := pipe.Incr(ctx, key)
-	pipe.Expire(ctx, key, window)
-	_, _ = pipe.Exec(ctx)
 
-	count, _ := incr.Result()
-	remaining := limit - int(count)
+	l.mu.Lock()
+	e, ok := l.entries[key]
+	if !ok || now.After(e.resetAt) {
+		e = &entry{count: 0, resetAt: now.Add(window)}
+		l.entries[key] = e
+	}
+	e.count++
+	count := e.count
+	l.mu.Unlock()
+
+	remaining := limit - count
 	if remaining < 0 {
 		remaining = 0
 	}
-	return Result{Allowed: int(count) <= limit, Limit: limit, Remaining: remaining, Reset: reset}
+	return Result{Allowed: count <= limit, Limit: limit, Remaining: remaining, Reset: reset}
+}
+
+// sweep periodically removes expired entries to bound memory.
+func (l *Limiter) sweep() {
+	t := time.NewTicker(time.Minute)
+	defer t.Stop()
+	for range t.C {
+		now := time.Now()
+		l.mu.Lock()
+		for k, e := range l.entries {
+			if now.After(e.resetAt) {
+				delete(l.entries, k)
+			}
+		}
+		l.mu.Unlock()
+	}
 }
 
 // Middleware rate-limits a request by the given keyFn and limit/window. On 429

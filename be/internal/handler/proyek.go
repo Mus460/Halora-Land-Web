@@ -31,7 +31,7 @@ func (h *ProyekHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"proyek": out})
 }
 
 func (h *ProyekHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -39,27 +39,27 @@ func (h *ProyekHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	p, err := h.repo.Get(r.Context(), id)
+	p, err := h.repo.GetDetail(r.Context(), id)
 	if err != nil {
 		st, msg := mapPgErr(err)
 		writeError(w, st, msg)
 		return
 	}
-	if !h.canView(r, p) {
+	if !h.canView(r, &models.Proyek{ID: p.ID, UserID: p.UserID}) {
 		writeError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, map[string]any{"proyek": p})
 }
 
 func (h *ProyekHandler) Create(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	var in struct {
-		NamaProyek   string  `json:"namaProyek"`
-		Lokasi       *string `json:"lokasi"`
-		Tipe         string  `json:"tipe"`
-		NilaiKontrak *string `json:"nilaiKontrak"`
-		Timeline     *string `json:"timeline"`
+		NamaProyek   string           `json:"namaProyek"`
+		Lokasi       *string          `json:"lokasi"`
+		Tipe         string           `json:"tipe"`
+		NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
+		Timeline     *string          `json:"timeline"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -73,11 +73,8 @@ func (h *ProyekHandler) Create(w http.ResponseWriter, r *http.Request) {
 		tipe = models.TipeProyekInfra
 	}
 	var nk *decimal.Decimal
-	if in.NilaiKontrak != nil && *in.NilaiKontrak != "" {
-		d, err := decimal.NewFromString(*in.NilaiKontrak)
-		if err == nil {
-			nk = &d
-		}
+	if in.NilaiKontrak != nil && !in.NilaiKontrak.IsZero() {
+		nk = in.NilaiKontrak
 	}
 	p, err := h.repo.Create(r.Context(), repository.CreateProyekInput{
 		UserID: u.UserID, NamaProyek: in.NamaProyek, Lokasi: in.Lokasi, Tipe: tipe,
@@ -87,7 +84,7 @@ func (h *ProyekHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, p)
+	writeJSON(w, http.StatusCreated, map[string]any{"proyek": p})
 }
 
 func (h *ProyekHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +105,7 @@ func (h *ProyekHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	writeJSON(w, http.StatusOK, map[string]any{"proyek": updated})
 }
 
 func (h *ProyekHandler) Delete(w http.ResponseWriter, r *http.Request) {

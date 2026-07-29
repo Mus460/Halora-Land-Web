@@ -38,12 +38,25 @@ func (h *MasterAnalisaHandler) List(w http.ResponseWriter, r *http.Request) {
 		b := true
 		f.IsGlobal = &b
 	}
+
+	// When fetching root nodes (level=0, no parentId), build a full tree
+	// with nested children so the FE tree component works without N+1 requests.
+	if f.Level != nil && *f.Level == 0 && f.ParentID == nil && f.Search == "" {
+		tree, err := h.repo.ListTree(r.Context(), f)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": tree})
+		return
+	}
+
 	out, err := h.repo.List(r.Context(), f)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
 func (h *MasterAnalisaHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -161,12 +174,17 @@ func (h *MasterAnalisaHandler) Search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	kategori := r.URL.Query().Get("kategori")
 	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := atoi32(l); err == nil && v > 0 {
+			limit = int(v)
+		}
+	}
 	out, err := h.repo.SearchAHSP(r.Context(), q, kategori, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"results": out})
 }
 
 type MasterHargaHandler struct {
@@ -190,7 +208,7 @@ func (h *MasterHargaHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{"masterHarga": out})
 }
 
 func (h *MasterHargaHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -210,11 +228,11 @@ func (h *MasterHargaHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *MasterHargaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	var in struct {
-		Nama     string  `json:"nama"`
-		Satuan   string  `json:"satuan"`
-		Harga    string  `json:"harga"`
-		Kategori string  `json:"kategori"`
-		IsGlobal bool    `json:"isGlobal"`
+		Nama     string          `json:"nama"`
+		Satuan   string          `json:"satuan"`
+		Harga    decimal.Decimal `json:"harga"`
+		Kategori string          `json:"kategori"`
+		IsGlobal bool            `json:"isGlobal"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -222,14 +240,9 @@ func (h *MasterHargaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if in.IsGlobal && u.Role != models.RoleAdmin {
 		in.IsGlobal = false
 	}
-	harga, err := decimal.NewFromString(in.Harga)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "harga tidak valid")
-		return
-	}
 	uid := u.UserID
 	m, err := h.repo.Create(r.Context(), repository.CreateMasterHargaInput{
-		Nama: in.Nama, Satuan: in.Satuan, Harga: harga,
+		Nama: in.Nama, Satuan: in.Satuan, Harga: in.Harga,
 		Kategori: models.TipeKomponen(in.Kategori), IsGlobal: in.IsGlobal, UserID: &uid,
 	})
 	if err != nil {
@@ -249,4 +262,34 @@ func (h *MasterHargaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+func (h *MasterHargaHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Nama     *string          `json:"nama"`
+		Satuan   *string          `json:"satuan"`
+		Harga    *decimal.Decimal `json:"harga"`
+		Kategori *string          `json:"kategori"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	var kat *models.TipeKomponen
+	if in.Kategori != nil {
+		k := models.TipeKomponen(*in.Kategori)
+		kat = &k
+	}
+	m, err := h.repo.Update(r.Context(), id, repository.UpdateMasterHargaInput{
+		Nama: in.Nama, Satuan: in.Satuan, Harga: in.Harga, Kategori: kat,
+	})
+	if err != nil {
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
 }

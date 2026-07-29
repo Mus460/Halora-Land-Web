@@ -128,18 +128,34 @@ func (r *PekerjaanRepo) Create(ctx context.Context, tx pgx.Tx, in CreatePekerjaa
 	return scanPekerjaan(row)
 }
 
-func (r *PekerjaanRepo) Update(ctx context.Context, id int32, vol, hs, tb *decimal.Decimal, uraian *string) (*models.Pekerjaan, error) {
+type UpdatePekerjaanInput struct {
+	Volume         *decimal.Decimal
+	HargaSatuan    *decimal.Decimal
+	TotalBiaya     *decimal.Decimal
+	Uraian         *string
+	Satuan         *string
+	LevelPekerjaan *string
+	TipePekerjaan  *string
+	MetodeHitung   *models.MetodeHitung
+}
+
+func (r *PekerjaanRepo) Update(ctx context.Context, id int32, in UpdatePekerjaanInput) (*models.Pekerjaan, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE pekerjaan SET
 			volume = COALESCE($2, volume),
 			"hargaSatuan" = COALESCE($3, "hargaSatuan"),
 			"totalBiaya" = COALESCE($4, "totalBiaya"),
 			"uraianPekerjaan" = COALESCE($5, "uraianPekerjaan"),
+			satuan = COALESCE($6, satuan),
+			"levelPekerjaan" = COALESCE($7, "levelPekerjaan"),
+			"tipePekerjaan" = COALESCE($8, "tipePekerjaan"),
+			"metodeHitung" = COALESCE($9, "metodeHitung"),
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
 			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"`,
-		id, decPtrArg(vol), decPtrArg(hs), decPtrArg(tb), uraian)
+		id, decPtrArg(in.Volume), decPtrArg(in.HargaSatuan), decPtrArg(in.TotalBiaya),
+		in.Uraian, in.Satuan, in.LevelPekerjaan, in.TipePekerjaan, in.MetodeHitung)
 	return scanPekerjaan(row)
 }
 

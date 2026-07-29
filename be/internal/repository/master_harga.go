@@ -99,6 +99,27 @@ func (r *MasterHargaRepo) Delete(ctx context.Context, id int32) error {
 	return err
 }
 
+type UpdateMasterHargaInput struct {
+	Nama     *string
+	Satuan   *string
+	Harga    *decimal.Decimal
+	Kategori *models.TipeKomponen
+}
+
+func (r *MasterHargaRepo) Update(ctx context.Context, id int32, in UpdateMasterHargaInput) (*models.MasterHarga, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE master_harga SET
+			nama = COALESCE($2, nama),
+			satuan = COALESCE($3, satuan),
+			harga = COALESCE($4, harga),
+			kategori = COALESCE($5, kategori),
+			"updatedAt" = NOW()
+		WHERE id = $1
+		RETURNING id, nama, satuan, harga, kategori, "isGlobal", "userId", "kodeAHSP", "isSystem", "createdAt", "updatedAt"`,
+		id, in.Nama, in.Satuan, decPtrArg(in.Harga), in.Kategori)
+	return scanMasterHarga(row)
+}
+
 // GetMany loads a set of master_harga rows by ID (used by drift detection).
 func (r *MasterHargaRepo) GetMany(ctx context.Context, ids []int32) (map[int32]decimal.Decimal, error) {
 	if len(ids) == 0 {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
@@ -95,9 +96,11 @@ type DashboardStats struct {
 }
 
 type RecentProject struct {
-	ID         int32           `json:"id"`
-	NamaProyek string          `json:"namaProyek"`
-	RAB        decimal.Decimal `json:"rab"`
+	ID         int32            `json:"id"`
+	Nama       string           `json:"nama"`
+	Lokasi     *string          `json:"lokasi"`
+	TotalRAB   decimal.Decimal  `json:"totalRAB"`
+	CreatedAt  time.Time        `json:"createdAt"`
 }
 
 type DashboardRepo struct{ pool *pgxpool.Pool }
@@ -130,10 +133,10 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 		TotalPekerjaan: totalPekerjaan,
 	}
 
-	rq := `SELECT p.id, p."namaProyek", COALESCE(SUM(pk."totalBiaya"), 0)::text
+	rq := `SELECT p.id, p."namaProyek", p.lokasi, COALESCE(SUM(pk."totalBiaya"), 0)::text, p."createdAt"
 		FROM proyek p LEFT JOIN pekerjaan pk ON pk."proyekId" = p.id
 		WHERE 1=1` + scope + `
-		GROUP BY p.id, p."namaProyek" ORDER BY p."createdAt" DESC LIMIT 5`
+		GROUP BY p.id, p."namaProyek", p.lokasi, p."createdAt" ORDER BY p."createdAt" DESC LIMIT 5`
 	rrows, err := r.pool.Query(ctx, rq, args...)
 	if err != nil {
 		return nil, err
@@ -142,10 +145,12 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 	for rrows.Next() {
 		var rp RecentProject
 		var rab sql.NullString
-		if err := rrows.Scan(&rp.ID, &rp.NamaProyek, &rab); err != nil {
+		var lokasi sql.NullString
+		if err := rrows.Scan(&rp.ID, &rp.Nama, &lokasi, &rab, &rp.CreatedAt); err != nil {
 			return nil, err
 		}
-		rp.RAB = scanDec(rab.String)
+		rp.TotalRAB = scanDec(rab.String)
+		rp.Lokasi = strPtr(lokasi)
 		stats.RecentProjects = append(stats.RecentProjects, rp)
 	}
 	if err := rrows.Err(); err != nil {

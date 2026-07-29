@@ -43,7 +43,7 @@ export default function RegisterPage() {
 
     try {
       await apiClient.post("/auth/register", { namaLengkap, email, password });
-      toast.success("Akun berhasil dibuat! Cek email untuk verifikasi.");
+      toast.success("Akun berhasil dibuat! Silakan login.");
       router.push("/login?registered=true");
       router.refresh();
     } catch (error: any) {
