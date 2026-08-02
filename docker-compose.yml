@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: halora
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d halora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  be:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/halora"
+      ALLOWED_ORIGINS: "http://localhost:3000"
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      OVERHEAD_RATE: "0.10"
+      PPN_RATE: "0.11"
+      DEMO_MODE: ${DEMO_MODE:-false}
+      JWT_SECRET: ${JWT_SECRET}
+      AHSP_XLSX_PATH: "/app/data/ahsp-2026.xlsx"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./be/data:/app/data:ro
+
+  fe:
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        API_PROXY_URL: "http://be:8080"
+    depends_on:
+      - be
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
