@@ -89,12 +89,21 @@ func (h *AdminAHSPHandler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+	prices, err := ahsp.ParsePriceList(f)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if _, err := h.importer.ImportPriceList(r.Context(), prices, in.ForceReimport); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	items, err := ahsp.ParseSheet(f, in.SheetName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	res, err := h.importer.ImportSheet(r.Context(), items, in.ForceReimport)
+	res, err := h.importer.ImportSheet(r.Context(), items, prices, in.ForceReimport)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

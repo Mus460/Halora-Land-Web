@@ -31,21 +31,24 @@ type RekapGroup struct {
 }
 
 type rekapItem struct {
-	ID              int32           `json:"id"`
-	Kategori        string          `json:"kategori"`
-	UraianPekerjaan string          `json:"uraianPekerjaan"`
-	Volume          decimal.Decimal `json:"volume"`
-	Satuan          string          `json:"satuan"`
-	HargaSatuan     decimal.Decimal `json:"hargaSatuan"`
-	TotalBiaya      decimal.Decimal `json:"totalBiaya"`
-	LevelPekerjaan  *string         `json:"levelPekerjaan"`
+	ID              int32            `json:"id"`
+	Kategori        string           `json:"kategori"`
+	UraianPekerjaan string           `json:"uraianPekerjaan"`
+	Volume          decimal.Decimal  `json:"volume"`
+	Satuan          string           `json:"satuan"`
+	HargaSatuan     decimal.Decimal  `json:"hargaSatuan"`
+	TotalBiaya      decimal.Decimal  `json:"totalBiaya"`
+	LevelPekerjaan  *string          `json:"levelPekerjaan"`
+	TotalWaktu      *decimal.Decimal `json:"totalWaktu"`
+	Waktu           *decimal.Decimal `json:"waktu"`
 }
 
 type RekapResult struct {
-	Proyek proyekSummary `json:"proyek"`
-	Grouped map[string][]rekapItem `json:"grouped"`
-	Subtotals map[string]decimal.Decimal `json:"subtotals"`
-	Summary  rabSummary    `json:"summary"`
+	Proyek        proyekSummary              `json:"proyek"`
+	Grouped       map[string][]rekapItem     `json:"grouped"`
+	Subtotals     map[string]decimal.Decimal `json:"subtotals"`
+	SubtotalWaktu map[string]decimal.Decimal `json:"subtotalWaktu"`
+	Summary       rabSummary                 `json:"summary"`
 }
 
 type proyekSummary struct {
@@ -56,15 +59,16 @@ type proyekSummary struct {
 }
 
 type rabSummary struct {
-	Subtotal          decimal.Decimal `json:"subtotal"`
-	Margin            decimal.Decimal `json:"margin"`
+	Subtotal           decimal.Decimal `json:"subtotal"`
+	Margin             decimal.Decimal `json:"margin"`
 	SubtotalWithMargin decimal.Decimal `json:"subtotalWithMargin"`
-	Overhead          decimal.Decimal `json:"overhead"`
-	Profit            decimal.Decimal `json:"profit"`
-	SubtotalBeforeTax decimal.Decimal `json:"subtotalBeforeTax"`
-	PPNPct            decimal.Decimal `json:"ppn"`
-	TotalPPN          decimal.Decimal `json:"totalPPN"`
-	TotalAkhir        decimal.Decimal `json:"totalAkhir"`
+	Overhead           decimal.Decimal `json:"overhead"`
+	Profit             decimal.Decimal `json:"profit"`
+	SubtotalBeforeTax  decimal.Decimal `json:"subtotalBeforeTax"`
+	PPNPct             decimal.Decimal `json:"ppn"`
+	TotalPPN           decimal.Decimal `json:"totalPPN"`
+	TotalAkhir         decimal.Decimal `json:"totalAkhir"`
+	TotalWaktu         decimal.Decimal `json:"totalWaktu"`
 }
 
 // Compute builds the full rekap for a project. Formula (§8.3):
@@ -87,15 +91,22 @@ func (s *RABService) Compute(ctx context.Context, proyekID int32, proyek *reposi
 
 	grouped := map[string][]rekapItem{}
 	subtotals := map[string]decimal.Decimal{}
+	subtotalWaktu := map[string]decimal.Decimal{}
 	grandTotal := decimal.Zero
+	totalWaktu := decimal.Zero
 	for _, p := range items {
 		it := rekapItem{
 			ID: p.ID, Kategori: string(p.Kategori), UraianPekerjaan: p.UraianPekerjaan, Volume: p.Volume,
 			Satuan: p.Satuan, HargaSatuan: p.HargaSatuan, TotalBiaya: p.TotalBiaya, LevelPekerjaan: p.LevelPekerjaan,
+			TotalWaktu: p.TotalWaktu, Waktu: p.Waktu,
 		}
 		grouped[string(p.Kategori)] = append(grouped[string(p.Kategori)], it)
 		subtotals[string(p.Kategori)] = subtotals[string(p.Kategori)].Add(p.TotalBiaya)
 		grandTotal = grandTotal.Add(p.TotalBiaya)
+		if p.TotalWaktu != nil {
+			subtotalWaktu[string(p.Kategori)] = subtotalWaktu[string(p.Kategori)].Add(*p.TotalWaktu)
+			totalWaktu = totalWaktu.Add(*p.TotalWaktu)
+		}
 	}
 
 	marginFactor := decimal.NewFromInt(1).Add(margin.Div(decimal.NewFromInt(100)))
@@ -107,8 +118,9 @@ func (s *RABService) Compute(ctx context.Context, proyekID int32, proyek *reposi
 	totalAkhir := subtotalBeforeTax.Add(totalPPN)
 
 	res := &RekapResult{
-		Grouped: grouped,
-		Subtotals: subtotals,
+		Grouped:        grouped,
+		Subtotals:      subtotals,
+		SubtotalWaktu:  subtotalWaktu,
 		Summary: rabSummary{
 			Subtotal:           grandTotal,
 			Margin:             margin,
@@ -119,6 +131,7 @@ func (s *RABService) Compute(ctx context.Context, proyekID int32, proyek *reposi
 			PPNPct:             s.ppnRate.Mul(decimal.NewFromInt(100)),
 			TotalPPN:           totalPPN,
 			TotalAkhir:         totalAkhir,
+			TotalWaktu:         totalWaktu,
 		},
 	}
 	if proyek != nil {

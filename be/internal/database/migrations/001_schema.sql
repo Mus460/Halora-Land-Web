@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS "users" (
     "role"            "Role"  NOT NULL DEFAULT 'USER',
     "accountType"     TEXT    NOT NULL DEFAULT 'free',
     "isDemo"          BOOLEAN NOT NULL DEFAULT false,
-    "supabaseAuthId"  TEXT,
     "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
@@ -279,7 +278,6 @@ CREATE TABLE IF NOT EXISTS "audit_log" (
 -- Indexes (unique)
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key"                       ON "users"("email");
-CREATE UNIQUE INDEX IF NOT EXISTS "users_supabaseAuthId_key"              ON "users"("supabaseAuthId");
 CREATE UNIQUE INDEX IF NOT EXISTS "tim_proyek_proyekId_userId_key"        ON "tim_proyek"("proyekId","userId");
 CREATE UNIQUE INDEX IF NOT EXISTS "master_analisa_kode_userId_key"        ON "master_analisa"("kode","userId");
 CREATE UNIQUE INDEX IF NOT EXISTS "master_harga_nama_userId_kategori_key" ON "master_harga"("nama","userId","kategori");

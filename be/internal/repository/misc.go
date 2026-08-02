@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,28 +20,22 @@ func NewRekapRepo(pool *pgxpool.Pool) *RekapRepo { return &RekapRepo{pool: pool}
 func (r *RekapRepo) GetMargin(ctx context.Context, proyekID int32) (decimal.Decimal, error) {
 	var m sql.NullString
 	err := r.pool.QueryRow(ctx, `SELECT margin::text FROM rekap WHERE "proyekId" = $1 AND kategori = 'settings'`, proyekID).Scan(&m)
-	if err == sql.ErrNoRows || !m.Valid {
-		return decimal.Zero, nil
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return decimal.Zero, err
+	}
+	if !m.Valid {
+		return decimal.Zero, nil
 	}
 	return scanDec(m.String), nil
 }
 
 func (r *RekapRepo) UpsertMargin(ctx context.Context, proyekID int32, margin decimal.Decimal) error {
-	var id int32
-	err := r.pool.QueryRow(ctx, `SELECT id FROM rekap WHERE "proyekId" = $1 AND kategori = 'settings'`, proyekID).Scan(&id)
-	if err == sql.ErrNoRows {
-		_, err = r.pool.Exec(ctx, `
-			INSERT INTO rekap ("proyekId", kategori, uraian, urutan, margin)
-			VALUES ($1, 'settings', 'Margin & Overhead Settings', 0, $2)`, proyekID, decArg(margin))
-		return err
-	}
-	if err != nil {
-		return err
-	}
-	_, err = r.pool.Exec(ctx, `UPDATE rekap SET margin = $2, "updatedAt" = NOW() WHERE id = $1`, id, decArg(margin))
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO rekap ("proyekId", kategori, uraian, urutan, margin)
+		VALUES ($1, 'settings', 'Margin & Overhead Settings', 0, $2)
+		ON CONFLICT ("proyekId", kategori)
+		DO UPDATE SET margin = EXCLUDED.margin, "updatedAt" = CURRENT_TIMESTAMP`,
+		proyekID, decArg(margin))
 	return err
 }
 

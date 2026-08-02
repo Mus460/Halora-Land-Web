@@ -1,5 +1,3 @@
-import { createClient } from '@/lib/supabase'
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 const API_PREFIX = '/api/v1'
 
@@ -7,31 +5,11 @@ type FetchOptions = RequestInit & {
   auth?: boolean
 }
 
-function isServer() {
-  return typeof window === 'undefined'
-}
-
-async function getAuthHeader(): Promise<Record<string, string>> {
-  if (isServer()) {
-    return {}
-  }
-  try {
-    const supabase = createClient()
-    const { data } = await supabase.auth.getSession()
-    if (data.session?.access_token) {
-      return { Authorization: `Bearer ${data.session.access_token}` }
-    }
-  } catch {
-    // browser client not available; fall back to cookie-based credentials
-  }
-  return {}
-}
-
 async function buildHeaders(custom: HeadersInit = {}): Promise<HeadersInit> {
-  const auth = await getAuthHeader()
+  // Auth is cookie-based: the backend reads the `halora_session` HttpOnly
+  // cookie set at login (credentials: 'include' below).
   return {
     'Content-Type': 'application/json',
-    ...auth,
     ...custom,
   }
 }

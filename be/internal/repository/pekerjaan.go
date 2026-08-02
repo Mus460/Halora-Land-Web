@@ -25,7 +25,8 @@ type ListPekerjaanFilter struct {
 
 func (r *PekerjaanRepo) List(ctx context.Context, f ListPekerjaanFilter) ([]models.Pekerjaan, error) {
 	q := `SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"
+		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
+		"createdAt", "updatedAt"
 		FROM pekerjaan WHERE 1=1`
 	var args []any
 	if f.ProyekID != nil {
@@ -62,9 +63,10 @@ func argPlaceholder(i int) string { return strconv.Itoa(i) }
 func scanPekerjaan(s rowScanner) (*models.Pekerjaan, error) {
 	var p models.Pekerjaan
 	var vol, hs, tb string
-	var level, tipe sql.NullString
+	var level, tipe, waktu, totalWaktu sql.NullString
+	var maID sql.NullInt32
 	if err := s.Scan(&p.ID, &p.ProyekID, &p.Kategori, &p.UraianPekerjaan, &vol, &p.Satuan, &hs, &tb,
-		&p.MetodeHitung, &level, &tipe, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		&p.MetodeHitung, &level, &tipe, &maID, &waktu, &totalWaktu, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, err
 	}
 	p.Volume = scanDec(vol)
@@ -72,13 +74,17 @@ func scanPekerjaan(s rowScanner) (*models.Pekerjaan, error) {
 	p.TotalBiaya = scanDec(tb)
 	p.LevelPekerjaan = strPtr(level)
 	p.TipePekerjaan = strPtr(tipe)
+	p.MasterAnalisaID = i32Ptr(maID)
+	p.Waktu = scanDecPtr(waktu)
+	p.TotalWaktu = scanDecPtr(totalWaktu)
 	return &p, nil
 }
 
 func (r *PekerjaanRepo) Get(ctx context.Context, id int32) (*models.Pekerjaan, error) {
 	p, err := scanPekerjaan(r.pool.QueryRow(ctx, `
 		SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"
+		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
+		"createdAt", "updatedAt"
 		FROM pekerjaan WHERE id = $1`, id))
 	if err != nil {
 		return nil, err
@@ -94,12 +100,25 @@ func (r *PekerjaanRepo) Get(ctx context.Context, id int32) (*models.Pekerjaan, e
 func (r *PekerjaanRepo) GetByID(ctx context.Context, id int32) (*models.Pekerjaan, error) {
 	p, err := scanPekerjaan(r.pool.QueryRow(ctx, `
 		SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"
+		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
+		"createdAt", "updatedAt"
 		FROM pekerjaan WHERE id = $1`, id))
 	if err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+// WaktuKoef returns the time coefficient (jam per satuan) for a master analisa
+// item, computed as the sum of waktu over its rincian rows. Nil when absent.
+func (r *PekerjaanRepo) WaktuKoef(ctx context.Context, masterAnalisaID int32) (*decimal.Decimal, error) {
+	var s sql.NullString
+	err := r.pool.QueryRow(ctx, `
+		SELECT SUM(waktu) FROM rincian_analisa WHERE "masterAnalisaId" = $1`, masterAnalisaID).Scan(&s)
+	if err != nil {
+		return nil, err
+	}
+	return scanDecPtr(s), nil
 }
 
 type CreatePekerjaanInput struct {
@@ -113,18 +132,21 @@ type CreatePekerjaanInput struct {
 	MetodeHitung    models.MetodeHitung
 	LevelPekerjaan  *string
 	TipePekerjaan   *string
+	MasterAnalisaID *int32
+	Waktu           *decimal.Decimal
 }
 
 func (r *PekerjaanRepo) Create(ctx context.Context, tx pgx.Tx, in CreatePekerjaanInput) (*models.Pekerjaan, error) {
 	exec := r.execer(tx)
 	row := exec.QueryRow(ctx, `
 		INSERT INTO pekerjaan ("proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-			"metodeHitung", "levelPekerjaan", "tipePekerjaan")
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"`,
+			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
+			"createdAt", "updatedAt"`,
 		in.ProyekID, in.Kategori, in.UraianPekerjaan, decArg(in.Volume), in.Satuan, decArg(in.HargaSatuan), decArg(in.TotalBiaya),
-		in.MetodeHitung, in.LevelPekerjaan, in.TipePekerjaan)
+		in.MetodeHitung, in.LevelPekerjaan, in.TipePekerjaan, in.MasterAnalisaID, decPtrArg(in.Waktu))
 	return scanPekerjaan(row)
 }
 
@@ -153,7 +175,8 @@ func (r *PekerjaanRepo) Update(ctx context.Context, id int32, in UpdatePekerjaan
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
-			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "createdAt", "updatedAt"`,
+			"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
+			"createdAt", "updatedAt"`,
 		id, decPtrArg(in.Volume), decPtrArg(in.HargaSatuan), decPtrArg(in.TotalBiaya),
 		in.Uraian, in.Satuan, in.LevelPekerjaan, in.TipePekerjaan, in.MetodeHitung)
 	return scanPekerjaan(row)

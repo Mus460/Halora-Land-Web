@@ -3,22 +3,37 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/xuri/excelize/v2"
 
 	"github.com/halora-land/halora-be/internal/auth"
+	"github.com/halora-land/halora-be/internal/database"
+	"github.com/halora-land/halora-be/internal/env"
 )
 
-// openFile opens an xlsx file for the import-ahsp CLI.
-func openFile(path string) (*excelize.File, error) {
-	return excelize.OpenFile(path)
+func seed(cfg *env.Config) error {
+	ctx := context.Background()
+	pool, err := database.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	if err := database.Migrate(ctx, pool); err != nil {
+		return err
+	}
+	if err := seedDB(ctx, pool); err != nil {
+		return err
+	}
+	log.Println("seed complete")
+	return nil
 }
 
 // seedDB inserts the baseline seed users + a sample project + master_harga
-// (port of prisma/seed.ts minus bcrypt/password, ARCHITECTURE.md §5.3).
-// The demo Supabase user must be provisioned in Supabase separately.
+// (port of prisma/seed.ts, ARCHITECTURE.md §5.3). All auth is local DB auth
+// (bcrypt password hashes) — no external provider required.
 func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

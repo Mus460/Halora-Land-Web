@@ -52,7 +52,7 @@ func (r *ProyekRepo) scanList(ctx context.Context, q string, args ...any) ([]mod
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.Proyek
+	out := []models.Proyek{}
 	for rows.Next() {
 		p, err := scanProyekRow(rows)
 		if err != nil {

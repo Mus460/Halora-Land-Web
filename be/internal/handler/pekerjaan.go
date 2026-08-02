@@ -10,7 +10,7 @@ import (
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/models"
 	"github.com/halora-land/halora-be/internal/repository"
-	"github.com/halora-land/halora-be/internal/service"
+	"github.com/halora-land/halora-be/service"
 )
 
 type PekerjaanHandler struct {
@@ -67,6 +67,7 @@ func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MetodeHitung    string            `json:"metodeHitung"`
 		LevelPekerjaan  *string           `json:"levelPekerjaan"`
 		TipePekerjaan   *string           `json:"tipePekerjaan"`
+		MasterAnalisaID *int32            `json:"masterAnalisaId"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -75,11 +76,21 @@ func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
+	var waktu *decimal.Decimal
+	if in.MasterAnalisaID != nil {
+		wk, err := h.repo.WaktuKoef(r.Context(), *in.MasterAnalisaID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		waktu = wk
+	}
 	p, err := h.repo.Create(r.Context(), nil, repository.CreatePekerjaanInput{
 		ProyekID: in.ProyekID, Kategori: models.KategoriPekerjaan(in.Kategori),
 		UraianPekerjaan: in.UraianPekerjaan, Volume: in.Volume, Satuan: in.Satuan,
 		HargaSatuan: in.HargaSatuan, TotalBiaya: in.HargaSatuan.Mul(in.Volume), MetodeHitung: models.MetodeHitung(in.MetodeHitung),
 		LevelPekerjaan: in.LevelPekerjaan, TipePekerjaan: in.TipePekerjaan,
+		MasterAnalisaID: in.MasterAnalisaID, Waktu: waktu,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

@@ -17,8 +17,6 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@sentry/nextjs": "^10.68.0",
-    "@supabase/ssr": "^0.12.3",
-    "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/analytics": "^2.0.1",
     "chart.js": "^4.5.1",
@@ -60,4 +58,3 @@
     "vitest": "^4.1.10"
   }
 }
-

@@ -30,7 +30,13 @@ interface PekerjaanItem {
   satuan: string
   hargaSatuan: number
   totalBiaya: number
+  totalWaktu: number | null
 }
+
+const formatWaktu = (v: number | null | undefined) =>
+  v == null
+    ? "—"
+    : `${v.toLocaleString("id-ID", { maximumFractionDigits: 1 })} jam`
 
 export default function RABPage() {
   const { currentProyekId: proyekId } = useProject()
@@ -151,6 +157,7 @@ export default function RABPage() {
 
   // Calculate totals
   const subtotal = pekerjaan.reduce((sum, p) => sum + Number(p.totalBiaya), 0)
+  const totalWaktu = pekerjaan.reduce((sum, p) => sum + (p.totalWaktu || 0), 0)
   const overhead = subtotal * 0.10
   const profit = (subtotal + overhead) * 0.10
   const ppn = (subtotal + overhead + profit) * 0.11
@@ -258,6 +265,7 @@ export default function RABPage() {
             <div className="space-y-6">
               {Object.entries(grouped).map(([kategori, items]) => {
                 const subtotalKategori = items.reduce((sum, p) => sum + Number(p.totalBiaya), 0)
+                const waktuKategori = items.reduce((sum, p) => sum + (p.totalWaktu || 0), 0)
                 
                 return (
                   <div key={kategori}>
@@ -267,6 +275,9 @@ export default function RABPage() {
                       </h3>
                       <div className="text-sm text-gray-600">
                         Subtotal: {formatCurrency(subtotalKategori)}
+                        <span className="ml-3 text-gray-400">
+                          · {formatWaktu(waktuKategori)}
+                        </span>
                       </div>
                     </div>
                     
@@ -277,6 +288,9 @@ export default function RABPage() {
                             <div className="font-medium text-sm">{item.uraianPekerjaan}</div>
                             <div className="text-xs text-gray-500 mt-1">
                               {item.volume} {item.satuan} × {formatCurrency(item.hargaSatuan)}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              Estimasi waktu: {formatWaktu(item.totalWaktu)}
                             </div>
                           </div>
                           <div className="text-right">
@@ -294,6 +308,10 @@ export default function RABPage() {
                 <div className="flex justify-between text-sm">
                   <span>Subtotal Pekerjaan:</span>
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Estimasi Waktu:</span>
+                  <span className="font-medium">{formatWaktu(totalWaktu)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Overhead (10%):</span>

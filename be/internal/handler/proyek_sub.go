@@ -8,7 +8,7 @@ import (
 
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/repository"
-	"github.com/halora-land/halora-be/internal/service"
+	"github.com/halora-land/halora-be/service"
 )
 
 type ProyekSubHandler struct {

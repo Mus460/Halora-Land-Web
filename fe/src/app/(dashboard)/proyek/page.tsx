@@ -30,7 +30,7 @@ export default function ProyekPage() {
         throw new Error(data.error || 'Failed to fetch projects');
       }
       
-      setProjects(data.proyek);
+      setProjects(data.proyek || []);
     } catch (error) {
       toast.error('Gagal memuat data proyek');
       console.error(error);

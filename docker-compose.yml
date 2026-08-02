@@ -27,12 +27,8 @@ services:
       PORT: "8080"
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/halora"
       ALLOWED_ORIGINS: "http://localhost:3000"
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       OVERHEAD_RATE: "0.10"
       PPN_RATE: "0.11"
-      DEMO_MODE: ${DEMO_MODE:-false}
       JWT_SECRET: ${JWT_SECRET}
       AHSP_XLSX_PATH: "/app/data/ahsp-2026.xlsx"
     ports:
@@ -46,15 +42,11 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: "http://localhost:8080"
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         API_PROXY_URL: "http://be:8080"
     depends_on:
       - be
     environment:
       NEXT_PUBLIC_API_URL: "http://localhost:8080"
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       NODE_ENV: production
     ports:
       - "3000:3000"
