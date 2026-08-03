@@ -6,6 +6,7 @@ import (
 	"github.com/halora-land/halora-be/internal/audit"
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/env"
+	"github.com/halora-land/halora-be/internal/models"
 )
 
 // AuthHandler implements local DB auth (bcrypt password hashing + signed
@@ -58,6 +59,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	// Registration is admin-only: only an authenticated ADMIN may create users.
+	actor := auth.FromContext(r.Context())
+	if actor == nil || actor.Role != models.RoleAdmin {
+		writeError(w, http.StatusForbidden, "Forbidden")
+		return
+	}
 	var in struct {
 		Email       string `json:"email"`
 		Password    string `json:"password"`

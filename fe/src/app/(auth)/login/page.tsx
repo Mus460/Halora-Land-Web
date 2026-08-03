@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -33,11 +32,6 @@ export default function LoginPage() {
     // Show success message for verified email
     if (params.get('verified') === 'true') {
       toast.success('Email berhasil diverifikasi! Silakan login.');
-    }
-    
-    // Show success message for new registration
-    if (params.get('registered') === 'true') {
-      toast.success('Akun berhasil dibuat! Cek email untuk verifikasi.');
     }
     
     // Show error if any
@@ -193,17 +187,6 @@ export default function LoginPage() {
             </Button>
           </CardContent>
         </form>
-        <CardFooter className="justify-center">
-          <p className="text-sm text-gray-600">
-            Belum punya akun?{" "}
-            <Link
-              href="/register"
-              className="text-amber-600 hover:text-amber-700 font-medium"
-            >
-              Daftar sekarang
-            </Link>
-          </p>
-        </CardFooter>
       </Card>
     </div>
   );

@@ -69,8 +69,6 @@ func (app *App) routes() http.Handler {
 		// Public auth (rate-limited, ARCHITECTURE.md §3.8)
 		r.With(rateLimit(app.limiter, "login", 10, ratelimit.ByIP("login"))).
 			Post("/auth/login", authH.Login)
-		r.With(rateLimit(app.limiter, "register", 5, ratelimit.ByIP("register"))).
-			Post("/auth/register", authH.Register)
 		r.With(rateLimit(app.limiter, "resend", 3, ratelimit.ByIP("resend"))).
 			Post("/auth/resend-verification", authH.ResendVerification)
 
@@ -131,6 +129,7 @@ func (app *App) routes() http.Handler {
 			// Admin-only (ARCHITECTURE.md §3.9 — protect at middleware layer)
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireRole(models.RoleAdmin))
+				r.Post("/auth/register", authH.Register)
 				r.Get("/admin/ahsp/import", adminH.ImportStatus)
 				r.Post("/admin/ahsp/import", adminH.Import)
 				r.Post("/news", newsH.Create)

@@ -5,6 +5,7 @@ import {
   Building2,
   Calculator,
   ClipboardCheck,
+  Handshake,
   Plus,
   TrendingUp,
 } from "lucide-react";
@@ -81,7 +82,7 @@ export default function DashboardPage() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard
           title="Total Proyek"
           value={stats.totalProyek || 0}
@@ -93,6 +94,12 @@ export default function DashboardPage() {
           value={stats.proyekAktif || 0}
           icon={<ClipboardCheck className="w-6 h-6" />}
           description="sedang dikerjakan"
+        />
+        <StatCard
+          title="Proyek Pitching"
+          value={stats.proyekPitching || 0}
+          icon={<Handshake className="w-6 h-6" />}
+          description="dalam penawaran"
         />
         <StatCard
           title="Total RAB"

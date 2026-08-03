@@ -5,6 +5,7 @@
     "namaProyek": "Rumah Tinggal 2 Lantai - Bpk. Surya",
     "lokasi": "Jl. Merdeka No. 123, Bandung",
     "tipe": "gedung",
+    "isPitching": true,
     "nilaiKontrak": 450000000,
     "timeline": "6 bulan",
     "createdAt": "2026-02-01T00:00:00Z",

@@ -109,6 +109,7 @@ type Proyek struct {
 	NamaProyek  string           `json:"namaProyek"`
 	Lokasi      *string          `json:"lokasi"`
 	Tipe        TipeProyek       `json:"tipe"`
+	IsPitching  bool             `json:"isPitching"`
 	NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
 	Timeline    *string          `json:"timeline"`
 	CreatedAt   time.Time        `json:"createdAt"`

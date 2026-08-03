@@ -96,6 +96,33 @@ export default function ProyekPage() {
     }
   };
 
+  const handleSetPitching = async (id: number, isPitching: boolean) => {
+    try {
+      const response = await fetch(`/api/proyek/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPitching }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update project status');
+      }
+
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? result.proyek : p))
+      );
+      toast.success(
+        isPitching
+          ? `"${result.proyek.namaProyek}" dijadikan proyek pitching`
+          : `"${result.proyek.namaProyek}" dijadikan proyek aktif`
+      );
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal mengubah status proyek');
+    }
+  };
+
   const handleSubmit = async (data: Partial<Proyek>) => {
     try {
       if (editProyek) {
@@ -192,6 +219,7 @@ export default function ProyekPage() {
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
               onSetActive={handleSetActive}
+              onSetPitching={handleSetPitching}
               isActive={activeProject?.id === proyek.id}
             />
           ))}

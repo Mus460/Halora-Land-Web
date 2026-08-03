@@ -17,6 +17,7 @@ export interface Proyek {
   namaProyek: string;
   lokasi: string | null;
   tipe: "gedung" | "infra";
+  isPitching: boolean;
   nilaiKontrak: number | null;
   timeline: string | null;
   createdAt: string;

@@ -38,6 +38,7 @@ export function ProyekForm({
     namaProyek: proyek?.namaProyek || "",
     lokasi: proyek?.lokasi || "",
     tipe: proyek?.tipe || "gedung",
+    isPitching: proyek?.isPitching || false,
     nilaiKontrak: proyek?.nilaiKontrak || 0,
     timeline: proyek?.timeline || "",
   });
@@ -50,6 +51,7 @@ export function ProyekForm({
       namaProyek: "",
       lokasi: "",
       tipe: "gedung",
+      isPitching: false,
       nilaiKontrak: 0,
       timeline: "",
     });
@@ -99,6 +101,23 @@ export function ProyekForm({
               <SelectContent>
                 <SelectItem value="gedung">Gedung</SelectItem>
                 <SelectItem value="infra">Infrastruktur</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Status Proyek</Label>
+            <Select
+              value={form.isPitching ? "pitching" : "aktif"}
+              onValueChange={(value) =>
+                setForm({ ...form, isPitching: value === "pitching" })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aktif">Aktif</SelectItem>
+                <SelectItem value="pitching">Pitching</SelectItem>
               </SelectContent>
             </Select>
           </div>
