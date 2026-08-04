@@ -2,16 +2,9 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/halora-land/halora-be/internal/models"
@@ -23,41 +16,19 @@ const (
 	ctxUser ctxKey = "user"
 )
 
-// Verifier validates Supabase access tokens via JWKS (ARCHITECTURE.md §3.3/§7).
-// When demoMode is true, Authenticate injects a fixed admin user without
-// verifying any token, so the app can be demoed without Supabase auth.
+// Verifier authenticates users against the local DB using a signed session
+// JWT issued at login (HS256, golang-jwt). No external auth provider is used:
+// the token is verified with the shared JWT secret and the user row is loaded
+// from Postgres on every request.
 type Verifier struct {
-	jwksURL     string
-	anonKey     string
-	projectRef  string
-	pool        *pgxpool.Pool
-	httpClient  *http.Client
-	demoMode    bool
-	jwtSecret   string
-
-	mu       sync.RWMutex
-	keyset   jwt.Keyfunc
-	fetchedAt time.Time
-	ttl      time.Duration
+	pool      *pgxpool.Pool
+	jwtSecret string
 }
 
-func NewVerifier(pool *pgxpool.Pool, jwksURL, anonKey, projectRef string, demoMode bool, jwtSecret string) *Verifier {
-	v := &Verifier{
-		jwksURL:    jwksURL,
-		anonKey:    anonKey,
-		projectRef: projectRef,
-		pool:       pool,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		demoMode:   demoMode,
-		jwtSecret:  jwtSecret,
-		ttl:        15 * time.Minute,
-	}
-	v.keyset = v.fetchKeyset
-	return v
+// NewVerifier builds a local-auth verifier.
+func NewVerifier(pool *pgxpool.Pool, jwtSecret string) *Verifier {
+	return &Verifier{pool: pool, jwtSecret: jwtSecret}
 }
-
-// DemoMode returns whether the verifier is running in demo (auth-bypass) mode.
-func (v *Verifier) DemoMode() bool { return v.demoMode }
 
 // AuthUser is the authenticated principal placed into the request context.
 type AuthUser struct {
@@ -67,7 +38,6 @@ type AuthUser struct {
 	NamaLengkap string
 	AccountType string
 	IsDemo      bool
-	SupabaseSub string
 }
 
 // FromContext extracts the authenticated user from the context, or nil.
@@ -81,35 +51,23 @@ func WithUser(ctx context.Context, u *AuthUser) context.Context {
 	return context.WithValue(ctx, ctxUser, u)
 }
 
-// Authenticate middleware: verifies the bearer/cookie token, loads the local
-// user row, auto-links supabaseAuthId when null (ARCHITECTURE.md §2.2 step 4),
-// and stores *AuthUser in the context. Calls next with no user on failure so
-// downstream handlers/middleware can decide (401 vs public).
-// In demo mode, verifies a locally-issued session JWT from the cookie.
+// Authenticate middleware: verifies the session token from the Authorization
+// header or the session cookie, loads the local user row, and stores *AuthUser
+// in the context. Calls next with no user on failure so downstream
+// handlers/middleware can decide (401 vs public).
 func (v *Verifier) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if v.demoMode {
-			cookie, err := r.Cookie(v.cookieName())
-			if err == nil && cookie.Value != "" {
-				if u, err := v.loadUserBySession(r.Context(), cookie.Value); err == nil {
-					next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u)))
-					return
-				}
-			}
-			next.ServeHTTP(w, r)
-			return
-		}
-		token := extractToken(r, v.projectRef)
+		token := extractToken(r)
 		if token == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		sub, email, err := v.verifyToken(r.Context(), token)
+		userID, err := VerifySessionToken(token, v.jwtSecret)
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
 		}
-		u, err := v.loadOrCreateUser(r.Context(), sub, email)
+		u, err := v.loadUser(r.Context(), userID)
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
@@ -118,19 +76,10 @@ func (v *Verifier) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// cookieName returns the session cookie name (same as Supabase SSR cookie).
-func (v *Verifier) cookieName() string {
-	return fmt.Sprintf("sb-%s-auth-token", v.projectRef)
-}
-
-// loadUserBySession verifies a locally-issued JWT and loads the user from DB.
-func (v *Verifier) loadUserBySession(ctx context.Context, tokenStr string) (*AuthUser, error) {
-	userID, err := VerifySessionToken(tokenStr, v.jwtSecret)
-	if err != nil {
-		return nil, err
-	}
+// loadUser loads the user row for the given ID.
+func (v *Verifier) loadUser(ctx context.Context, userID int32) (*AuthUser, error) {
 	var u models.User
-	err = v.pool.QueryRow(ctx, `
+	err := v.pool.QueryRow(ctx, `
 		SELECT id, "namaLengkap", email, role, "accountType", "isDemo"
 		FROM users WHERE id = $1`, userID).
 		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
@@ -147,179 +96,41 @@ func (v *Verifier) loadUserBySession(ctx context.Context, tokenStr string) (*Aut
 	}, nil
 }
 
-func (v *Verifier) verifyToken(ctx context.Context, token string) (sub, email string, err error) {
-	parsed, err := jwt.Parse(token, v.keyset)
-	if err != nil {
-		return "", "", fmt.Errorf("parse jwt: %w", err)
-	}
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", "", fmt.Errorf("invalid claims")
-	}
-	if !parsed.Valid {
-		return "", "", fmt.Errorf("invalid token")
-	}
-	if s, ok := claims["sub"].(string); ok {
-		sub = s
-	}
-	if e, ok := claims["email"].(string); ok {
-		email = e
-	}
-	if sub == "" {
-		return "", "", fmt.Errorf("missing sub")
-	}
-	return sub, email, nil
-}
+// DefaultAdminEmail is the bootstrap admin created when the users table is empty.
+const DefaultAdminEmail = "admin@haloraland.id"
 
-// loadOrCreateUser mirrors getCurrentSupabaseUser + login find-or-create
-// (ARCHITECTURE.md §2.2 step 4, login/route.ts find-or-create).
-func (v *Verifier) loadOrCreateUser(ctx context.Context, sub, email string) (*AuthUser, error) {
-	return v.LoadOrCreate(ctx, sub, email)
-}
-
-// LoadOrCreate finds or creates the local user row for a Supabase sub/email.
-// Exposed so the login handler (which has no cookie yet) can run the same
-// find-or-create + auto-link path as the middleware.
-func (v *Verifier) LoadOrCreate(ctx context.Context, sub, email string) (*AuthUser, error) {
-	tx, err := v.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, err
+// EnsureDefaultAdmin creates the bootstrap admin account (admin@haloraland.id /
+// admin123) only when the users table is empty, so a fresh database has a way
+// in. Existing databases are never touched. Returns true when a new admin was
+// created.
+func (v *Verifier) EnsureDefaultAdmin(ctx context.Context) (bool, error) {
+	var count int
+	if err := v.pool.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&count); err != nil {
+		return false, err
 	}
-	defer tx.Rollback(ctx)
-
-	var (
-		u           models.User
-		supabaseID  *string
-	)
-	row := tx.QueryRow(ctx, `
-		SELECT id, "namaLengkap", email, role, "accountType", "isDemo", "supabaseAuthId"
-		FROM users WHERE "supabaseAuthId" = $1 OR email = $2
-		LIMIT 1`, sub, email)
-	err = row.Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &supabaseID)
-	if err == pgx.ErrNoRows {
-		name := email
-		if name == "" {
-			name = "User"
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "supabaseAuthId")
-			VALUES ($1, $2, 'USER', 'free', false, $3)`,
-			name, email, sub); err != nil {
-			return nil, err
-		}
-		if err := tx.QueryRow(ctx, `
-			SELECT id, "namaLengkap", email, role, "accountType", "isDemo", "supabaseAuthId"
-			FROM users WHERE "supabaseAuthId" = $1`, sub).
-			Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &supabaseID); err != nil {
-			return nil, err
-		}
-	} else if err != nil {
-		return nil, err
-	} else if supabaseID == nil {
-		if _, err := tx.Exec(ctx, `UPDATE users SET "supabaseAuthId" = $1 WHERE id = $2`, sub, u.ID); err != nil {
-			return nil, err
-		}
+	if count > 0 {
+		return false, nil
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-	return &AuthUser{
-		UserID:      u.ID,
-		Email:       u.Email,
-		Role:        u.Role,
-		NamaLengkap: u.NamaLengkap,
-		AccountType: u.AccountType,
-		IsDemo:      u.IsDemo,
-		SupabaseSub: sub,
-	}, nil
-}
-
-// loadDemoUser finds or creates the fixed demo admin user used in demo mode.
-const demoEmail = "admin@haloraland.id"
-
-// EnsureDemoAdmin ensures the demo admin user exists with a known password.
-// Called on startup when demo mode is enabled.
-func (v *Verifier) EnsureDemoAdmin(ctx context.Context) error {
 	hash, err := HashPassword("admin123")
 	if err != nil {
-		return err
+		return false, err
 	}
 	_, err = v.pool.Exec(ctx, `
 		INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
-		VALUES ('Admin Demo', $1, 'ADMIN', 'free', true, $2)
-		ON CONFLICT (email) DO UPDATE SET "passwordHash" = EXCLUDED."passwordHash"`,
-		demoEmail, hash)
-	return err
+		VALUES ('Admin Halora', $1, 'ADMIN', 'free', false, $2)`,
+		DefaultAdminEmail, hash)
+	return err == nil, err
 }
 
-func extractToken(r *http.Request, projectRef string) string {
+// CookieName is the HTTP-only session cookie set at login.
+const CookieName = "halora_session"
+
+func extractToken(r *http.Request) string {
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimPrefix(h, "Bearer ")
 	}
-	if c, err := r.Cookie(fmt.Sprintf("sb-%s-auth-token", projectRef)); err == nil && c.Value != "" {
-		return tokenFromCookieValue(c.Value)
+	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
+		return c.Value
 	}
 	return ""
-}
-
-// tokenFromCookieValue supports both the raw JWT and the Supabase SSR
-// JSON-encoded cookie shape ({access_token: ...}) used by the current FE.
-func tokenFromCookieValue(v string) string {
-	if strings.HasPrefix(v, "eyJ") {
-		return v
-	}
-	var m map[string]any
-	if err := json.Unmarshal([]byte(v), &m); err == nil {
-		if at, ok := m["access_token"].(string); ok {
-			return at
-		}
-	}
-	return ""
-}
-
-func (v *Verifier) fetchKeyset(t *jwt.Token) (interface{}, error) {
-	if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-		return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-	}
-	v.mu.RLock()
-	if v.fetchedAt.IsZero() || time.Since(v.fetchedAt) > v.ttl {
-		v.mu.RUnlock()
-		v.mu.Lock()
-		defer v.mu.Unlock()
-		if v.fetchedAt.IsZero() || time.Since(v.fetchedAt) > v.ttl {
-			set, err := v.fetchJWKS()
-			if err != nil {
-				return nil, err
-			}
-			v.fetchedAt = time.Now()
-			v.keyset = set
-		}
-		ks := v.keyset
-		v.mu.RUnlock()
-		return ks(t)
-	}
-	ks := v.keyset
-	v.mu.RUnlock()
-	return ks(t)
-}
-
-func (v *Verifier) fetchJWKS() (jwt.Keyfunc, error) {
-	req, _ := http.NewRequest(http.MethodGet, v.jwksURL, nil)
-	resp, err := v.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch jwks: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("jwks status %d", resp.StatusCode)
-	}
-	set, err := jwt.ParseRSAPublicKeyFromPEM(body)
-	if err != nil {
-		return nil, fmt.Errorf("parse jwks: %w", err)
-	}
-	return func(t *jwt.Token) (interface{}, error) { return set, nil }, nil
 }

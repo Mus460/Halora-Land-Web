@@ -52,6 +52,11 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, proyekID, masterAnalisaI
 	}
 	levelStr := fmt.Sprintf("%d", ma.Level)
 
+	waktu, err := s.pekerjaan.WaktuKoef(ctx, masterAnalisaID)
+	if err != nil {
+		return nil, fmt.Errorf("load waktu koefisien: %w", err)
+	}
+
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, err
@@ -68,6 +73,8 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, proyekID, masterAnalisaI
 		TotalBiaya:      totalBiaya,
 		MetodeHitung:    models.MetodeAHSP,
 		LevelPekerjaan:  &levelStr,
+		MasterAnalisaID: &masterAnalisaID,
+		Waktu:           waktu,
 	})
 	if err != nil {
 		return nil, err

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Building2,
   Copy,
+  Handshake,
   MoreVertical,
   Pencil,
   Trash2,
@@ -31,6 +32,7 @@ interface ProyekCardProps {
   onDelete: (id: number) => void;
   onDuplicate: (id: number) => void;
   onSetActive: (id: number) => void;
+  onSetPitching: (id: number, isPitching: boolean) => void;
   isActive?: boolean;
 }
 
@@ -39,6 +41,7 @@ export function ProyekCard({
   onDelete,
   onDuplicate,
   onSetActive,
+  onSetPitching,
   isActive,
 }: ProyekCardProps) {
   const [showDelete, setShowDelete] = useState(false);
@@ -61,9 +64,16 @@ export function ProyekCard({
                   <h3 className="font-semibold text-gray-900 truncate">
                     {proyek.namaProyek}
                   </h3>
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    {proyek.tipe === "gedung" ? "Gedung" : "Infrastruktur"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {proyek.tipe === "gedung" ? "Gedung" : "Infrastruktur"}
+                    </Badge>
+                    {proyek.isPitching && (
+                      <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
+                        Pitching
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </Link>
@@ -75,6 +85,12 @@ export function ProyekCard({
                 <DropdownMenuItem onClick={() => onSetActive(proyek.id)}>
                   <Building2 className="w-4 h-4 mr-2" />
                   {isActive ? "Proyek Aktif" : "Jadikan Aktif"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onSetPitching(proyek.id, !proyek.isPitching)}
+                >
+                  <Handshake className="w-4 h-4 mr-2" />
+                  {proyek.isPitching ? "Jadikan Aktif" : "Jadikan Pitching"}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Pencil className="w-4 h-4 mr-2" />

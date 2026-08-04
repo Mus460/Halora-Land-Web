@@ -17,6 +17,7 @@ export interface Proyek {
   namaProyek: string;
   lokasi: string | null;
   tipe: "gedung" | "infra";
+  isPitching: boolean;
   nilaiKontrak: number | null;
   timeline: string | null;
   createdAt: string;
@@ -80,6 +81,9 @@ export interface Pekerjaan {
   metodeHitung: MetodeHitung;
   levelPekerjaan: string | null;
   tipePekerjaan: string | null;
+  masterAnalisaId: number | null;
+  waktu: number | null;
+  totalWaktu: number | null;
   createdAt: string;
   updatedAt: string;
   detailAnalisa?: DetailAnalisa[];
@@ -104,6 +108,7 @@ export interface MasterAnalisa {
   level: number;
   parentId: number | null;
   satuan: string | null;
+  hargaSatuan?: number | null;
   isGlobal: boolean;
   userId: number | null;
   createdAt: string;
@@ -114,9 +119,16 @@ export interface MasterAnalisa {
 export interface RincianAnalisa {
   id: number;
   masterAnalisaId: number;
-  komponenId: number;
+  komponenId: number | null;
   koef: number;
   tipe: TipeKomponen;
+  nama: string | null;
+  satuan: string | null;
+  hargaSatuan: number | null;
+  jumlahHarga: number | null;
+  kodeReferensi: string | null;
+  waktu: number | null;
+  urutan: number;
   komponen?: MasterHarga;
 }
 

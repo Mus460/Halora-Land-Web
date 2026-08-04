@@ -58,6 +58,7 @@ func (h *ProyekHandler) Create(w http.ResponseWriter, r *http.Request) {
 		NamaProyek   string           `json:"namaProyek"`
 		Lokasi       *string          `json:"lokasi"`
 		Tipe         string           `json:"tipe"`
+		IsPitching   bool             `json:"isPitching"`
 		NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
 		Timeline     *string          `json:"timeline"`
 	}
@@ -78,7 +79,7 @@ func (h *ProyekHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.repo.Create(r.Context(), repository.CreateProyekInput{
 		UserID: u.UserID, NamaProyek: in.NamaProyek, Lokasi: in.Lokasi, Tipe: tipe,
-		NilaiKontrak: nk, Timeline: in.Timeline,
+		IsPitching: in.IsPitching, NilaiKontrak: nk, Timeline: in.Timeline,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

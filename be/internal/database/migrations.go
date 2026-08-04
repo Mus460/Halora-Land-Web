@@ -1,4 +1,4 @@
-package migration
+package database
 
 import (
 	"context"
@@ -10,15 +10,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-//go:embed sql/*.sql
-var fs embed.FS
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
-// Run applies all embedded SQL migrations in lexical order. Idempotency is
+// Migrate applies all embedded SQL migrations in lexical order. Idempotency is
 // delegated to the SQL itself (CREATE EXTENSION IF NOT EXISTS, etc.). For a
 // greenfield DB this is a single schema file; the runner is forward-compatible
 // with a golang-migrate-style sequence of numbered files.
-func Run(ctx context.Context, pool *pgxpool.Pool) error {
-	entries, err := fs.ReadDir("sql")
+func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations: %w", err)
 	}
@@ -31,7 +31,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 	sort.Strings(names)
 
 	for _, name := range names {
-		b, err := fs.ReadFile("sql/" + name)
+		b, err := migrationsFS.ReadFile("migrations/" + name)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}

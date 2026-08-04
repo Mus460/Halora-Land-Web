@@ -27,7 +27,7 @@ func (r *ProyekRepo) List(ctx context.Context, f ListProyekFilter) ([]models.Pro
 	var q string
 	var args []any
 	if f.IsAdmin {
-		q = `SELECT id, "userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline, "createdAt", "updatedAt" FROM proyek WHERE 1=1`
+		q = `SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt" FROM proyek WHERE 1=1`
 	} else {
 		q = `SELECT DISTINCT p.id, p."userId", p."namaProyek", p.lokasi, p.tipe, p."nilaiKontrak", p.timeline, p."createdAt", p."updatedAt"
 			FROM proyek p LEFT JOIN tim_proyek tp ON tp."proyekId" = p.id
@@ -52,7 +52,7 @@ func (r *ProyekRepo) scanList(ctx context.Context, q string, args ...any) ([]mod
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.Proyek
+	out := []models.Proyek{}
 	for rows.Next() {
 		p, err := scanProyekRow(rows)
 		if err != nil {
@@ -70,7 +70,7 @@ type rowScanner interface {
 func scanProyekRow(s rowScanner) (*models.Proyek, error) {
 	var p models.Proyek
 	var lokasi, timeline, nilaiKontrak sql.NullString
-	if err := s.Scan(&p.ID, &p.UserID, &p.NamaProyek, &lokasi, &p.Tipe, &nilaiKontrak, &timeline, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := s.Scan(&p.ID, &p.UserID, &p.NamaProyek, &lokasi, &p.Tipe, &p.IsPitching, &nilaiKontrak, &timeline, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, err
 	}
 	p.Lokasi = strPtr(lokasi)
@@ -81,7 +81,7 @@ func scanProyekRow(s rowScanner) (*models.Proyek, error) {
 
 func (r *ProyekRepo) Get(ctx context.Context, id int32) (*models.Proyek, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, "userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline, "createdAt", "updatedAt"
+		SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"
 		FROM proyek WHERE id = $1`, id)
 	p, err := scanProyekRow(row)
 	if err != nil {
@@ -187,25 +187,27 @@ type CreateProyekInput struct {
 	NamaProyek   string
 	Lokasi       *string
 	Tipe         models.TipeProyek
+	IsPitching   bool
 	NilaiKontrak *decimal.Decimal
 	Timeline     *string
 }
 
 func (r *ProyekRepo) Create(ctx context.Context, in CreateProyekInput) (*models.Proyek, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO proyek ("userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline)
-		VALUES ($1,$2,$3,$4,$5,$6)
-		RETURNING id, "userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
-		in.UserID, in.NamaProyek, in.Lokasi, in.Tipe, decPtrArg(in.NilaiKontrak), in.Timeline)
+		INSERT INTO proyek ("userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		RETURNING id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
+		in.UserID, in.NamaProyek, in.Lokasi, in.Tipe, in.IsPitching, decPtrArg(in.NilaiKontrak), in.Timeline)
 	return scanProyekRow(row)
 }
 
 type UpdateProyekInput struct {
-	NamaProyek   *string          `json:"namaProyek"`
-	Lokasi       *string          `json:"lokasi"`
-	Tipe         *models.TipeProyek `json:"tipe"`
-	NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
-	Timeline     *string          `json:"timeline"`
+	NamaProyek   *string             `json:"namaProyek"`
+	Lokasi       *string             `json:"lokasi"`
+	Tipe         *models.TipeProyek  `json:"tipe"`
+	IsPitching   *bool               `json:"isPitching"`
+	NilaiKontrak *decimal.Decimal    `json:"nilaiKontrak"`
+	Timeline     *string             `json:"timeline"`
 }
 
 func (r *ProyekRepo) Update(ctx context.Context, id int32, in UpdateProyekInput) (*models.Proyek, error) {
@@ -214,12 +216,13 @@ func (r *ProyekRepo) Update(ctx context.Context, id int32, in UpdateProyekInput)
 			"namaProyek" = COALESCE($2, "namaProyek"),
 			lokasi = COALESCE($3, lokasi),
 			tipe = COALESCE($4, tipe),
-			"nilaiKontrak" = COALESCE($5, "nilaiKontrak"),
-			timeline = COALESCE($6, timeline),
+			"isPitching" = COALESCE($5, "isPitching"),
+			"nilaiKontrak" = COALESCE($6, "nilaiKontrak"),
+			timeline = COALESCE($7, timeline),
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
-		RETURNING id, "userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
-		id, in.NamaProyek, in.Lokasi, in.Tipe, decPtrArg(in.NilaiKontrak), in.Timeline)
+		RETURNING id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
+		id, in.NamaProyek, in.Lokasi, in.Tipe, in.IsPitching, decPtrArg(in.NilaiKontrak), in.Timeline)
 	return scanProyekRow(row)
 }
 

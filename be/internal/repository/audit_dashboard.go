@@ -89,6 +89,7 @@ func (r *AuditLogRepo) List(ctx context.Context, f ListAuditFilter) ([]models.Au
 type DashboardStats struct {
 	TotalProyek      int32           `json:"totalProyek"`
 	ProyekAktif      int32           `json:"proyekAktif"`
+	ProyekPitching   int32           `json:"proyekPitching"`
 	TotalRAB         decimal.Decimal `json:"totalRAB"`
 	TotalPekerjaan   int32           `json:"totalPekerjaan"`
 	RecentProjects   []RecentProject `json:"recentProjects"`
@@ -116,19 +117,21 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 	}
 	q := `SELECT
 		(SELECT count(*) FROM proyek p WHERE 1=1` + scope + `),
-		(SELECT count(*) FROM proyek p WHERE 1=1` + scope + `),
+		(SELECT count(*) FROM proyek p WHERE p."isPitching" = false` + scope + `),
+		(SELECT count(*) FROM proyek p WHERE p."isPitching" = true` + scope + `),
 		(SELECT COALESCE(SUM(pk."totalBiaya"), 0)::text FROM pekerjaan pk
 			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `),
 		(SELECT count(*) FROM pekerjaan pk
 			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `)`
-	var totalProyek, proyekAktif, totalPekerjaan int32
+	var totalProyek, proyekAktif, proyekPitching, totalPekerjaan int32
 	var rabStr sql.NullString
-	if err := r.pool.QueryRow(ctx, q, args...).Scan(&totalProyek, &proyekAktif, &rabStr, &totalPekerjaan); err != nil {
+	if err := r.pool.QueryRow(ctx, q, args...).Scan(&totalProyek, &proyekAktif, &proyekPitching, &rabStr, &totalPekerjaan); err != nil {
 		return nil, err
 	}
 	stats := &DashboardStats{
 		TotalProyek:    totalProyek,
 		ProyekAktif:    proyekAktif,
+		ProyekPitching: proyekPitching,
 		TotalRAB:       scanDec(rabStr.String),
 		TotalPekerjaan: totalPekerjaan,
 	}

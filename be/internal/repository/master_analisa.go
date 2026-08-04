@@ -133,7 +133,7 @@ func (r *MasterAnalisaRepo) HasChildren(ctx context.Context, id int32) (bool, er
 func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int32) ([]models.RincianAnalisa, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, "masterAnalisaId", "komponenId", koef, tipe, nama, satuan, "hargaSatuan", "jumlahHarga",
-		"kodeReferensi", urutan, "createdAt", "updatedAt"
+		"kodeReferensi", waktu, urutan, "createdAt", "updatedAt"
 		FROM rincian_analisa WHERE "masterAnalisaId" = $1 ORDER BY urutan ASC, id ASC`, masterAnalisaID)
 	if err != nil {
 		return nil, err
@@ -144,8 +144,8 @@ func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int
 		var rin models.RincianAnalisa
 		var komponenID sql.NullInt32
 		var koef string
-		var nama, satuan, hs, jh, kodeRef sql.NullString
-		if err := rows.Scan(&rin.ID, &rin.MasterAnalisaID, &komponenID, &koef, &rin.Tipe, &nama, &satuan, &hs, &jh, &kodeRef, &rin.Urutan, &rin.CreatedAt, &rin.UpdatedAt); err != nil {
+		var nama, satuan, hs, jh, kodeRef, waktu sql.NullString
+		if err := rows.Scan(&rin.ID, &rin.MasterAnalisaID, &komponenID, &koef, &rin.Tipe, &nama, &satuan, &hs, &jh, &kodeRef, &waktu, &rin.Urutan, &rin.CreatedAt, &rin.UpdatedAt); err != nil {
 			return nil, err
 		}
 		rin.KomponenID = i32Ptr(komponenID)
@@ -155,6 +155,7 @@ func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int
 		rin.HargaSatuan = scanDecPtr(hs)
 		rin.JumlahHarga = scanDecPtr(jh)
 		rin.KodeReferensi = strPtr(kodeRef)
+		rin.Waktu = scanDecPtr(waktu)
 		out = append(out, rin)
 	}
 	return out, rows.Err()

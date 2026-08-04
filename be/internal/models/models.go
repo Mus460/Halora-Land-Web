@@ -93,15 +93,14 @@ const (
 // Tables
 
 type User struct {
-	ID             int32           `json:"id"`
-	NamaLengkap    string          `json:"namaLengkap"`
-	Email          string          `json:"email"`
-	Role           Role            `json:"role"`
-	AccountType    string          `json:"accountType"`
-	IsDemo         bool            `json:"isDemo"`
-	SupabaseAuthID *string         `json:"supabaseAuthId,omitempty"`
-	CreatedAt      time.Time       `json:"createdAt"`
-	UpdatedAt      time.Time       `json:"updatedAt"`
+	ID          int32     `json:"id"`
+	NamaLengkap string    `json:"namaLengkap"`
+	Email       string    `json:"email"`
+	Role        Role      `json:"role"`
+	AccountType string    `json:"accountType"`
+	IsDemo      bool      `json:"isDemo"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Proyek struct {
@@ -110,6 +109,7 @@ type Proyek struct {
 	NamaProyek  string           `json:"namaProyek"`
 	Lokasi      *string          `json:"lokasi"`
 	Tipe        TipeProyek       `json:"tipe"`
+	IsPitching  bool             `json:"isPitching"`
 	NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
 	Timeline    *string          `json:"timeline"`
 	CreatedAt   time.Time        `json:"createdAt"`
@@ -137,6 +137,9 @@ type Pekerjaan struct {
 	MetodeHitung    MetodeHitung     `json:"metodeHitung"`
 	LevelPekerjaan  *string          `json:"levelPekerjaan"`
 	TipePekerjaan   *string          `json:"tipePekerjaan"`
+	MasterAnalisaID *int32           `json:"masterAnalisaId"`
+	Waktu           *decimal.Decimal `json:"waktu"`
+	TotalWaktu      *decimal.Decimal `json:"totalWaktu"`
 	CreatedAt       time.Time        `json:"createdAt"`
 	UpdatedAt       time.Time        `json:"updatedAt"`
 	DetailAnalisa   []DetailAnalisa  `json:"detailAnalisa,omitempty"`
@@ -188,6 +191,7 @@ type RincianAnalisa struct {
 	HargaSatuan    *decimal.Decimal `json:"hargaSatuan"`
 	JumlahHarga    *decimal.Decimal `json:"jumlahHarga"`
 	KodeReferensi  *string          `json:"kodeReferensi"`
+	Waktu          *decimal.Decimal `json:"waktu"`
 	Urutan         int32            `json:"urutan"`
 	CreatedAt      time.Time        `json:"createdAt"`
 	UpdatedAt      time.Time        `json:"updatedAt"`
