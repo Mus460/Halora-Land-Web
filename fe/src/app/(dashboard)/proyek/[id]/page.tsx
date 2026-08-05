@@ -267,8 +267,7 @@ export default function ProyekDetailPage() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Tim</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {proyek.timProyek.length + 1}
-                </p>
+                  {(proyek.timProyek?.length || 0) + 1}                </p>
               </div>
               <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-amber-600" />
@@ -325,7 +324,7 @@ export default function ProyekDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {proyek.pekerjaan.length === 0 ? (
+              {(proyek.pekerjaan || []).length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-500">Belum ada pekerjaan</p>
@@ -391,7 +390,7 @@ export default function ProyekDetailPage() {
               <CardTitle>Tim Proyek</CardTitle>
             </CardHeader>
             <CardContent>
-              {proyek.timProyek.length === 0 ? (
+              {(proyek.timProyek || []).length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
                   Belum ada anggota tim
                 </p>

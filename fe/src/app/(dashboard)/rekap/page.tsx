@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProject } from "@/contexts/ProjectContext";
 import { EmptyProyekState } from "@/components/shared/empty-proyek-state";
+import { exportRekapPDF } from "@/lib/export-rekap-pdf";
 
 export default function RekapPage() {
   const { currentProyekId: proyekId, proyekList, loading: proyekLoading } = useProject();
@@ -35,6 +36,7 @@ export default function RekapPage() {
   
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [showMargin, setShowMargin] = useState(false);
   const [margin, setMargin] = useState(10);
 
@@ -98,6 +100,19 @@ export default function RekapPage() {
     }
   };
 
+  const handleExportPDF = () => {
+    try {
+      setExporting(true);
+      exportRekapPDF(data);
+      toast.success('PDF berhasil diunduh');
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      toast.error('Gagal membuat PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const previewMarginAmount = subtotal * margin / 100;
   const previewTotal = subtotal * (1 + margin / 100) * 1.10 * 1.11;
 
@@ -112,9 +127,13 @@ export default function RekapPage() {
               <Settings className="w-4 h-4 mr-2" />
               Margin ({margin}%)
             </Button>
-            <Button className="bg-amber-500 hover:bg-amber-600">
+            <Button
+              className="bg-amber-500 hover:bg-amber-600"
+              onClick={handleExportPDF}
+              disabled={exporting}
+            >
               <FileDown className="w-4 h-4 mr-2" />
-              Export PDF
+              {exporting ? "Menyiapkan..." : "Export PDF"}
             </Button>
           </div>
         }
