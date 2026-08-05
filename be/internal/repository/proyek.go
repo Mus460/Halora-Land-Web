@@ -132,7 +132,11 @@ func (r *ProyekRepo) GetDetail(ctx context.Context, id int32) (*ProyekDetail, er
 		return nil, err
 	}
 
-	detail := &ProyekDetail{Proyek: *p}
+	detail := &ProyekDetail{
+		Proyek:     *p,
+		TimProyek:  []ProyekDetailTim{},
+		Pekerjaan:  []ProyekDetailPekerjaan{},
+	}
 
 	var owner ProyekDetailUser
 	err = r.pool.QueryRow(ctx,
