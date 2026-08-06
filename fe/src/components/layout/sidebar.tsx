@@ -31,7 +31,6 @@ import {
   Bath,
   Zap,
   PenTool,
-  MessageSquare,
   Settings,
   Shield,
   X,
@@ -117,7 +116,6 @@ const SIDEBAR_SECTIONS = [
     id: "pengaturan",
     title: "Pengaturan",
     items: [
-      { href: "/feedback", label: "Feedback & Support", icon: MessageSquare, badge: 1 },
       { href: "/profile", label: "Pengaturan Usaha", icon: Settings },
       { href: "/admin", label: "Admin Center", icon: Shield, badge: 2 },
     ],

@@ -106,6 +106,7 @@ func (v *Verifier) LocalLogin(ctx context.Context, email, password string) (*Aut
 }
 
 // LocalRegister creates a new user in the local DB with a hashed password.
+// For now all users are created as ADMIN (per-product decision).
 func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, password string) (*AuthUser, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
@@ -114,7 +115,7 @@ func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, passwo
 	var u models.User
 	err = v.pool.QueryRow(ctx, `
 		INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
-		VALUES ($1, $2, 'USER', 'free', false, $3)
+		VALUES ($1, $2, 'ADMIN', 'free', false, $3)
 		RETURNING id, "namaLengkap", email, role, "accountType", "isDemo"`,
 		namaLengkap, email, hash).
 		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
@@ -132,6 +133,26 @@ func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, passwo
 		AccountType: u.AccountType,
 		IsDemo:      u.IsDemo,
 	}, nil
+}
+
+// LocalListUsers returns all users, newest first.
+func (v *Verifier) LocalListUsers(ctx context.Context) ([]models.User, error) {
+	rows, err := v.pool.Query(ctx, `
+		SELECT id, "namaLengkap", email, role, "accountType", "isDemo", "createdAt", "updatedAt"
+		FROM users ORDER BY "createdAt" DESC, id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 // LocalUpdatePassword sets a new password hash for the given user ID.

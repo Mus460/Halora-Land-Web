@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import { formatWaktu } from "./utils";
 
 export interface RekapItem {
   id: number;
@@ -49,13 +50,6 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     maximumFractionDigits: 2,
   }).format(value || 0);
-}
-
-function formatWaktu(value: number | null | undefined): string {
-  if (value == null || value === 0) return "-";
-  return `${new Intl.NumberFormat("id-ID", {
-    maximumFractionDigits: 1,
-  }).format(value)} jam`;
 }
 
 function formatDate(date: Date): string {

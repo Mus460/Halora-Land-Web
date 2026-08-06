@@ -196,7 +196,7 @@ func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT id, "uraianPekerjaan", volume::text, satuan, kategori
-		FROM pekerjaan WHERE "proyekId" = $1 ORDER BY kategori, id`, pid)
+		FROM pekerjaan WHERE "proyekId" = $1 AND "deletedAt" IS NULL ORDER BY kategori, id`, pid)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

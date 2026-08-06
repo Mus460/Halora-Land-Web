@@ -3,18 +3,24 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/halora-land/halora-be/internal/cache"
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type MasterAnalisaRepo struct{ pool *pgxpool.Pool }
+type MasterAnalisaRepo struct {
+	pool  *pgxpool.Pool
+	cache *cache.Cache
+}
 
 func NewMasterAnalisaRepo(pool *pgxpool.Pool) *MasterAnalisaRepo {
-	return &MasterAnalisaRepo{pool: pool}
+	return &MasterAnalisaRepo{pool: pool, cache: cache.New(60 * time.Second)}
 }
 
 type ListMasterAnalisaFilter struct {
@@ -25,10 +31,27 @@ type ListMasterAnalisaFilter struct {
 	UserID   int32
 }
 
+func (f ListMasterAnalisaFilter) cacheKey() string {
+	level, parentID, isGlobal := "nil", "nil", "nil"
+	if f.Level != nil {
+		level = strconv.Itoa(*f.Level)
+	}
+	if f.ParentID != nil {
+		parentID = strconv.FormatInt(int64(*f.ParentID), 10)
+	}
+	if f.IsGlobal != nil {
+		isGlobal = strconv.FormatBool(*f.IsGlobal)
+	}
+	return fmt.Sprintf("analisa|u:%d|level:%s|parent:%s|search:%s|global:%s", f.UserID, level, parentID, f.Search, isGlobal)
+}
+
 func (r *MasterAnalisaRepo) List(ctx context.Context, f ListMasterAnalisaFilter) ([]models.MasterAnalisa, error) {
+	if v, ok := r.cache.Get(f.cacheKey()); ok {
+		return v.([]models.MasterAnalisa), nil
+	}
 	q := `SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
 		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true)`
+		FROM master_analisa WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true) AND "deletedAt" IS NULL`
 	args := []any{f.UserID}
 	if f.Level != nil {
 		args = append(args, *f.Level)
@@ -65,7 +88,11 @@ func (r *MasterAnalisaRepo) List(ctx context.Context, f ListMasterAnalisaFilter)
 		}
 		out = append(out, *m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	r.cache.Set(f.cacheKey(), out)
+	return out, nil
 }
 
 func scanMasterAnalisa(s rowScanner) (*models.MasterAnalisa, error) {
@@ -92,7 +119,7 @@ func (r *MasterAnalisaRepo) Get(ctx context.Context, id int32) (*models.MasterAn
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
 		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE id = $1`, id)
+		FROM master_analisa WHERE id = $1 AND "deletedAt" IS NULL`, id)
 	return scanMasterAnalisa(row)
 }
 
@@ -114,17 +141,25 @@ func (r *MasterAnalisaRepo) Create(ctx context.Context, in CreateMasterAnalisaIn
 		RETURNING id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
 		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"`,
 		in.Kode, in.Nama, in.Level, in.ParentID, in.Satuan, in.IsGlobal, in.UserID, in.IsSystem)
-	return scanMasterAnalisa(row)
+	m, err := scanMasterAnalisa(row)
+	if err != nil {
+		return nil, err
+	}
+	r.cache.Clear()
+	return m, nil
 }
 
 func (r *MasterAnalisaRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM master_analisa WHERE id = $1`, id)
+	_, err := r.pool.Exec(ctx, `UPDATE master_analisa SET "deletedAt" = NOW() WHERE id = $1`, id)
+	if err == nil {
+		r.cache.Clear()
+	}
 	return err
 }
 
 func (r *MasterAnalisaRepo) HasChildren(ctx context.Context, id int32) (bool, error) {
 	var n int
-	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM master_analisa WHERE "parentId" = $1`, id).Scan(&n)
+	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM master_analisa WHERE "parentId" = $1 AND "deletedAt" IS NULL`, id).Scan(&n)
 	return n > 0, err
 }
 
@@ -134,7 +169,7 @@ func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, "masterAnalisaId", "komponenId", koef, tipe, nama, satuan, "hargaSatuan", "jumlahHarga",
 		"kodeReferensi", waktu, urutan, "createdAt", "updatedAt"
-		FROM rincian_analisa WHERE "masterAnalisaId" = $1 ORDER BY urutan ASC, id ASC`, masterAnalisaID)
+		FROM rincian_analisa WHERE "masterAnalisaId" = $1 AND "deletedAt" IS NULL ORDER BY urutan ASC, id ASC`, masterAnalisaID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +211,7 @@ func (r *MasterAnalisaRepo) CreateRincian(ctx context.Context, in CreateRincianI
 }
 
 func (r *MasterAnalisaRepo) DeleteRincian(ctx context.Context, masterAnalisaID, rincianID int32) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM rincian_analisa WHERE id = $1 AND "masterAnalisaId" = $2`, rincianID, masterAnalisaID)
+	_, err := r.pool.Exec(ctx, `UPDATE rincian_analisa SET "deletedAt" = NOW() WHERE id = $1 AND "masterAnalisaId" = $2`, rincianID, masterAnalisaID)
 	return err
 }
 
@@ -216,7 +251,7 @@ func (r *MasterAnalisaRepo) SearchAHSP(ctx context.Context, q, kategori string, 
 	args := []any{"%" + q + "%"}
 	query := `SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
 		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE "isSystem" = true AND (nama ILIKE $1 OR "ahspKode" ILIKE $1)`
+		FROM master_analisa WHERE "isSystem" = true AND "deletedAt" IS NULL AND (nama ILIKE $1 OR "ahspKode" ILIKE $1)`
 	if kategori != "" && kategori != "custom" {
 		args = append(args, kategori)
 		query += ` AND kategori = $` + strconv.Itoa(len(args))

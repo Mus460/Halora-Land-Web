@@ -27,7 +27,7 @@ func (r *PekerjaanRepo) List(ctx context.Context, f ListPekerjaanFilter) ([]mode
 	q := `SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
 		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
 		"createdAt", "updatedAt"
-		FROM pekerjaan WHERE 1=1`
+		FROM pekerjaan WHERE "deletedAt" IS NULL`
 	var args []any
 	if f.ProyekID != nil {
 		args = append(args, *f.ProyekID)
@@ -85,7 +85,7 @@ func (r *PekerjaanRepo) Get(ctx context.Context, id int32) (*models.Pekerjaan, e
 		SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
 		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
 		"createdAt", "updatedAt"
-		FROM pekerjaan WHERE id = $1`, id))
+		FROM pekerjaan WHERE id = $1 AND "deletedAt" IS NULL`, id))
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (r *PekerjaanRepo) GetByID(ctx context.Context, id int32) (*models.Pekerjaa
 		SELECT id, "proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya",
 		"metodeHitung", "levelPekerjaan", "tipePekerjaan", "masterAnalisaId", waktu, (waktu * volume) AS "totalWaktu",
 		"createdAt", "updatedAt"
-		FROM pekerjaan WHERE id = $1`, id))
+		FROM pekerjaan WHERE id = $1 AND "deletedAt" IS NULL`, id))
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (r *PekerjaanRepo) GetByID(ctx context.Context, id int32) (*models.Pekerjaa
 func (r *PekerjaanRepo) WaktuKoef(ctx context.Context, masterAnalisaID int32) (*decimal.Decimal, error) {
 	var s sql.NullString
 	err := r.pool.QueryRow(ctx, `
-		SELECT SUM(waktu) FROM rincian_analisa WHERE "masterAnalisaId" = $1`, masterAnalisaID).Scan(&s)
+		SELECT SUM(waktu) FROM rincian_analisa WHERE "masterAnalisaId" = $1 AND "deletedAt" IS NULL`, masterAnalisaID).Scan(&s)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (r *PekerjaanRepo) Update(ctx context.Context, id int32, in UpdatePekerjaan
 }
 
 func (r *PekerjaanRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM pekerjaan WHERE id = $1`, id)
+	_, err := r.pool.Exec(ctx, `UPDATE pekerjaan SET "deletedAt" = NOW() WHERE id = $1`, id)
 	return err
 }
 

@@ -11,6 +11,7 @@ import { SearchInput } from "@/components/shared/search-input";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatCurrency } from "@/lib/utils";
 import { TIPE_KOMPONEN } from "@/lib/constants";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import toast from "react-hot-toast";
 import type { MasterHarga, TipeKomponen } from "@/types";
 import {
@@ -35,6 +36,7 @@ export default function MasterHargaPage() {
   const [data, setData] = useState<MasterHarga[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [filterKategori, setFilterKategori] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<MasterHarga | null>(null);
@@ -64,7 +66,7 @@ export default function MasterHargaPage() {
   const filtered = data.filter((item) => {
     const matchSearch = item.nama
       .toLowerCase()
-      .includes(search.toLowerCase());
+      .includes(debouncedSearch.toLowerCase());
     const matchKategori =
       filterKategori === "all" || item.kategori === filterKategori;
     return matchSearch && matchKategori;

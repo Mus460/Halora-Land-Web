@@ -90,6 +90,21 @@ const (
 	FeedbackClosed     StatusFeedback = "closed"
 )
 
+type JenisRealisasi string
+
+const (
+	RealisasiPengeluaran JenisRealisasi = "pengeluaran"
+	RealisasiPemasukan   JenisRealisasi = "pemasukan"
+)
+
+type StatusRealisasi string
+
+const (
+	RealisasiDraft     StatusRealisasi = "draft"
+	RealisasiApproved  StatusRealisasi = "approved"
+	RealisasiReverted  StatusRealisasi = "reverted"
+)
+
 // Tables
 
 type User struct {
@@ -248,14 +263,18 @@ type Logistik struct {
 }
 
 type Realisasi struct {
-	ID         int32            `json:"id"`
-	ProyekID   int32            `json:"proyekId"`
-	Tanggal    time.Time        `json:"tanggal"`
-	Kategori   string           `json:"kategori"`
-	Jumlah     decimal.Decimal  `json:"jumlah"`
-	Keterangan *string          `json:"keterangan"`
-	CreatedAt  time.Time        `json:"createdAt"`
-	UpdatedAt  time.Time        `json:"updatedAt"`
+	ID          int32            `json:"id"`
+	ProyekID    int32            `json:"proyekId"`
+	Tanggal     time.Time        `json:"tanggal"`
+	Kategori    string           `json:"kategori"`
+	Jumlah      decimal.Decimal  `json:"jumlah"`
+	Keterangan  *string          `json:"keterangan"`
+	Jenis       JenisRealisasi   `json:"jenis"`
+	Status      StatusRealisasi  `json:"status"`
+	LogistikID  *int32           `json:"logistikId"`
+	InvoiceID   *int32           `json:"invoiceId"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
 type Feedback struct {

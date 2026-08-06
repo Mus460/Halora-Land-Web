@@ -38,6 +38,19 @@ export function formatDateShort(date: string | Date): string {
   }).format(new Date(date));
 }
 
+// formatWaktu renders an hour count as "X hari Y jam" (1 hari = 24 jam).
+// Sub-day values are shown as plain hours.
+export function formatWaktu(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  const fmt = (v: number) =>
+    new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(v);
+  const days = Math.floor(value / 24);
+  if (days > 0) {
+    return `${fmt(days)} hari ${fmt(value % 24)} jam`;
+  }
+  return `${fmt(value)} jam`;
+}
+
 export function calculateAHS(
   volume: number,
   components: { koef: number; hargaSatuan: number; tipe: string }[]

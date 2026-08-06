@@ -116,13 +116,13 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 		scope = ` AND (p."userId" = $1 OR EXISTS (SELECT 1 FROM tim_proyek tp WHERE tp."proyekId" = p.id AND tp."userId" = $1))`
 	}
 	q := `SELECT
-		(SELECT count(*) FROM proyek p WHERE 1=1` + scope + `),
-		(SELECT count(*) FROM proyek p WHERE p."isPitching" = false` + scope + `),
-		(SELECT count(*) FROM proyek p WHERE p."isPitching" = true` + scope + `),
+		(SELECT count(*) FROM proyek p WHERE p."deletedAt" IS NULL` + scope + `),
+		(SELECT count(*) FROM proyek p WHERE p."deletedAt" IS NULL AND p."isPitching" = false` + scope + `),
+		(SELECT count(*) FROM proyek p WHERE p."deletedAt" IS NULL AND p."isPitching" = true` + scope + `),
 		(SELECT COALESCE(SUM(pk."totalBiaya"), 0)::text FROM pekerjaan pk
-			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `),
+			JOIN proyek p ON p.id = pk."proyekId" WHERE pk."deletedAt" IS NULL AND p."deletedAt" IS NULL` + scope + `),
 		(SELECT count(*) FROM pekerjaan pk
-			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `)`
+			JOIN proyek p ON p.id = pk."proyekId" WHERE pk."deletedAt" IS NULL AND p."deletedAt" IS NULL` + scope + `)`
 	var totalProyek, proyekAktif, proyekPitching, totalPekerjaan int32
 	var rabStr sql.NullString
 	if err := r.pool.QueryRow(ctx, q, args...).Scan(&totalProyek, &proyekAktif, &proyekPitching, &rabStr, &totalPekerjaan); err != nil {
@@ -137,8 +137,8 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 	}
 
 	rq := `SELECT p.id, p."namaProyek", p.lokasi, COALESCE(SUM(pk."totalBiaya"), 0)::text, p."createdAt"
-		FROM proyek p LEFT JOIN pekerjaan pk ON pk."proyekId" = p.id
-		WHERE 1=1` + scope + `
+		FROM proyek p LEFT JOIN pekerjaan pk ON pk."proyekId" = p.id AND pk."deletedAt" IS NULL
+		WHERE p."deletedAt" IS NULL` + scope + `
 		GROUP BY p.id, p."namaProyek", p.lokasi, p."createdAt" ORDER BY p."createdAt" DESC LIMIT 5`
 	rrows, err := r.pool.Query(ctx, rq, args...)
 	if err != nil {

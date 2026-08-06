@@ -179,8 +179,8 @@ export default function RekapPage() {
                     <tbody>
                       {itemsArray.map((item: any) => (
                         <tr key={item.id} className="border-b last:border-0">
-                          <td className="px-4 py-2">
-                            <p className="font-medium">{item.uraianPekerjaan}</p>
+                          <td className="px-4 py-2 max-w-[320px]">
+                            <p className="font-medium truncate">{item.uraianPekerjaan}</p>
                             {item.levelPekerjaan && (
                               <p className="text-xs text-gray-500">
                                 {item.levelPekerjaan}

@@ -185,29 +185,11 @@ export interface Realisasi {
   kategori: string;
   jumlah: number;
   keterangan: string | null;
+  jenis: "pengeluaran" | "pemasukan";
+  status: "draft" | "approved" | "reverted";
+  logistikId: number | null;
+  invoiceId: number | null;
   createdAt: string;
-}
-
-export interface Feedback {
-  id: number;
-  userId: number;
-  subject: string;
-  message: string;
-  status: "open" | "in_progress" | "resolved" | "closed";
-  createdAt: string;
-  updatedAt: string;
-  user?: User;
-  replies?: FeedbackReply[];
-}
-
-export interface FeedbackReply {
-  id: number;
-  feedbackId: number;
-  userId: number;
-  message: string;
-  isAdmin: boolean;
-  createdAt: string;
-  user?: User;
 }
 
 export interface News {

@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { useProject } from '@/contexts/ProjectContext'
 import { Search, Plus, Calculator } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { useDebouncedValue } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatWaktu } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 interface SearchResult {
@@ -33,11 +34,6 @@ interface PekerjaanItem {
   totalWaktu: number | null
 }
 
-const formatWaktu = (v: number | null | undefined) =>
-  v == null
-    ? "—"
-    : `${v.toLocaleString("id-ID", { maximumFractionDigits: 1 })} jam`
-
 export default function RABPage() {
   const { currentProyekId: proyekId } = useProject()
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,17 +49,15 @@ export default function RABPage() {
     }
   }, [proyekId])
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.length >= 3) {
-        performSearch()
-      } else {
-        setSearchResults([])
-      }
-    }, 300)
+  const debouncedQuery = useDebouncedValue(searchQuery)
 
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+  useEffect(() => {
+    if (debouncedQuery.trim().length >= 3) {
+      performSearch()
+    } else {
+      setSearchResults([])
+    }
+  }, [debouncedQuery])
 
   const fetchPekerjaan = async () => {
     if (!proyekId) return
@@ -217,7 +211,7 @@ export default function RABPage() {
                       </Badge>
                       <span className="text-xs text-gray-500">{item.ahspKode}</span>
                     </div>
-                    <div className="font-medium text-sm">{item.nama}</div>
+                    <div className="font-medium text-sm truncate">{item.nama}</div>
                     <div className="text-sm text-gray-600 mt-1">
                       {formatCurrency(item.hargaSatuan)} / {item.satuan}
                     </div>
@@ -285,7 +279,7 @@ export default function RABPage() {
                       {items.map((item, idx) => (
                         <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{item.uraianPekerjaan}</div>
+                            <div className="font-medium text-sm truncate">{item.uraianPekerjaan}</div>
                             <div className="text-xs text-gray-500 mt-1">
                               {item.volume} {item.satuan} × {formatCurrency(item.hargaSatuan)}
                             </div>

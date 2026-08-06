@@ -9,9 +9,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatWaktu } from "@/lib/utils";
 import { LEVEL_PEKERJAAN } from "@/lib/constants";
 import { usePekerjaan } from "@/hooks/usePekerjaan";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import type { Pekerjaan, KategoriPekerjaan, MetodeHitung } from "@/types";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -51,11 +52,6 @@ interface AHSPResult {
   ahspKode: string | null;
   ahspSheet: string | null;
 }
-
-const formatWaktu = (v: number | null | undefined) =>
-  v == null
-    ? "—"
-    : `${v.toLocaleString("id-ID", { maximumFractionDigits: 1 })} jam`;
 
 interface PekerjaanPageProps {
   kategori: KategoriPekerjaan;
@@ -323,16 +319,15 @@ function PekerjaanFormDialog({
     }
   }, [open]);
 
+  const debouncedAhspQuery = useDebouncedValue(ahspQuery);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (ahspQuery.trim().length >= 3) {
-        searchAhsp(ahspQuery.trim());
-      } else {
-        setAhspResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [ahspQuery]);
+    if (debouncedAhspQuery.trim().length >= 3) {
+      searchAhsp(debouncedAhspQuery.trim());
+    } else {
+      setAhspResults([]);
+    }
+  }, [debouncedAhspQuery]);
 
   const searchAhsp = async (q: string) => {
     setAhspSearching(true);

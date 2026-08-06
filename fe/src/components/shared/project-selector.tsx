@@ -12,6 +12,7 @@ import { Building2 } from 'lucide-react';
 
 export function ProjectSelector() {
   const { currentProyekId, setCurrentProyekId, proyekList, loading } = useProject();
+  const selectedProyek = proyekList.find((p) => p.id === currentProyekId);
 
   if (loading && proyekList.length === 0) {
     return (
@@ -39,7 +40,9 @@ export function ProjectSelector() {
         onValueChange={(value) => value && setCurrentProyekId(parseInt(value))}
       >
         <SelectTrigger className="w-[200px] sm:w-[250px]">
-          <SelectValue placeholder="Pilih proyek" />
+          <SelectValue placeholder="Pilih proyek">
+            {selectedProyek?.namaProyek}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {proyekList.map((proyek) => (

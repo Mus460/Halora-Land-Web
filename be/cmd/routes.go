@@ -90,8 +90,14 @@ func (app *App) routes() http.Handler {
 			r.Put("/proyek/{id}/rekap", subH.RekapPut)
 			r.Post("/proyek/{id}/recalculate-all", subH.RecalculateAll)
 			r.Get("/proyek/{id}/realisasi", subH.RealisasiList)
+			r.Post("/proyek/{id}/realisasi", subH.RealisasiCreate)
+			r.Put("/proyek/{id}/realisasi/{rid}", subH.RealisasiApprove)
+			r.Delete("/proyek/{id}/realisasi/{rid}", subH.RealisasiDelete)
 			r.Get("/proyek/{id}/logistik", subH.LogistikList)
+			r.Post("/proyek/{id}/logistik", subH.LogistikCreate)
 			r.Get("/proyek/{id}/invoice", subH.InvoiceList)
+			r.Post("/proyek/{id}/invoice", subH.InvoiceCreate)
+			r.Put("/proyek/{id}/invoice/{iid}", subH.InvoiceUpdate)
 			r.Get("/proyek/{id}/kurva-s", subH.KurvaS)
 			r.Post("/proyek/{id}/pekerjaan/from-ahsp", pekerjaanH.FromAHSP)
 
@@ -130,6 +136,7 @@ func (app *App) routes() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireRole(models.RoleAdmin))
 				r.Post("/auth/register", authH.Register)
+				r.Get("/users", authH.ListUsers)
 				r.Get("/admin/ahsp/import", adminH.ImportStatus)
 				r.Post("/admin/ahsp/import", adminH.Import)
 				r.Post("/news", newsH.Create)

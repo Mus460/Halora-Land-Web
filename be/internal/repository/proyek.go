@@ -27,11 +27,11 @@ func (r *ProyekRepo) List(ctx context.Context, f ListProyekFilter) ([]models.Pro
 	var q string
 	var args []any
 	if f.IsAdmin {
-		q = `SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt" FROM proyek WHERE 1=1`
+		q = `SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt" FROM proyek WHERE "deletedAt" IS NULL`
 	} else {
 		q = `SELECT DISTINCT p.id, p."userId", p."namaProyek", p.lokasi, p.tipe, p."nilaiKontrak", p.timeline, p."createdAt", p."updatedAt"
 			FROM proyek p LEFT JOIN tim_proyek tp ON tp."proyekId" = p.id
-			WHERE (p."userId" = $1 OR tp."userId" = $1)`
+			WHERE (p."userId" = $1 OR tp."userId" = $1) AND p."deletedAt" IS NULL`
 		args = append(args, f.UserID)
 	}
 	if f.Search != "" {
@@ -82,7 +82,7 @@ func scanProyekRow(s rowScanner) (*models.Proyek, error) {
 func (r *ProyekRepo) Get(ctx context.Context, id int32) (*models.Proyek, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"
-		FROM proyek WHERE id = $1`, id)
+		FROM proyek WHERE id = $1 AND "deletedAt" IS NULL`, id)
 	p, err := scanProyekRow(row)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (r *ProyekRepo) GetDetail(ctx context.Context, id int32) (*ProyekDetail, er
 
 	pRows, err := r.pool.Query(ctx, `
 		SELECT id, "uraianPekerjaan", volume::text, satuan, "hargaSatuan"::text, "totalBiaya"::text, kategori
-		FROM pekerjaan WHERE "proyekId" = $1 ORDER BY id DESC LIMIT 10`, id)
+		FROM pekerjaan WHERE "proyekId" = $1 AND "deletedAt" IS NULL ORDER BY id DESC LIMIT 10`, id)
 	if err == nil {
 		defer pRows.Close()
 		for pRows.Next() {
@@ -178,7 +178,7 @@ func (r *ProyekRepo) GetDetail(ctx context.Context, id int32) (*ProyekDetail, er
 	}
 
 	var pekerjaanCount, rekapCount, invoiceCount int32
-	r.pool.QueryRow(ctx, `SELECT count(*) FROM pekerjaan WHERE "proyekId" = $1`, id).Scan(&pekerjaanCount)
+	r.pool.QueryRow(ctx, `SELECT count(*) FROM pekerjaan WHERE "proyekId" = $1 AND "deletedAt" IS NULL`, id).Scan(&pekerjaanCount)
 	r.pool.QueryRow(ctx, `SELECT count(*) FROM rekap WHERE "proyekId" = $1`, id).Scan(&rekapCount)
 	r.pool.QueryRow(ctx, `SELECT count(*) FROM invoice WHERE "proyekId" = $1`, id).Scan(&invoiceCount)
 	detail.Count = ProyekDetailCount{Pekerjaan: pekerjaanCount, Rekap: rekapCount, Invoice: invoiceCount}
@@ -230,9 +230,20 @@ func (r *ProyekRepo) Update(ctx context.Context, id int32, in UpdateProyekInput)
 	return scanProyekRow(row)
 }
 
+// Delete soft-deletes a proyek and its pekerjaan rows in one transaction.
 func (r *ProyekRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM proyek WHERE id = $1`, id)
-	return err
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `UPDATE proyek SET "deletedAt" = NOW() WHERE id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE pekerjaan SET "deletedAt" = NOW() WHERE "proyekId" = $1 AND "deletedAt" IS NULL`, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // SummaryProyek is a lightweight projection used by the rekap/RAB rollup.

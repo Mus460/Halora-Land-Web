@@ -9,11 +9,13 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ProyekCard } from "@/components/proyek/proyek-card";
 import { ProyekForm } from "@/components/proyek/proyek-form";
 import { useProjectStore } from "@/stores/use-project-store";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import toast from "react-hot-toast";
 import type { Proyek } from "@/types";
 
 export default function ProyekPage() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [showForm, setShowForm] = useState(false);
   const [editProyek, setEditProyek] = useState<Proyek | null>(null);
   const [projects, setProjects] = useState<Proyek[]>([]);
@@ -44,7 +46,7 @@ export default function ProyekPage() {
   }, []);
 
   const filtered = projects.filter((p) =>
-    p.namaProyek.toLowerCase().includes(search.toLowerCase())
+    p.namaProyek.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   const handleDelete = async (id: number) => {
@@ -88,12 +90,31 @@ export default function ProyekPage() {
     }
   };
 
-  const handleSetActive = (id: number) => {
+  const handleSetActive = async (id: number) => {
     const project = projects.find((p) => p.id === id);
-    if (project) {
-      setActiveProject(project);
-      toast.success(`"${project.namaProyek}" dijadikan proyek aktif`);
+    if (!project) return;
+
+    // A project cannot be active and pitching at the same time
+    if (project.isPitching) {
+      try {
+        const response = await fetch(`/api/proyek/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isPitching: false }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+          setProjects((prev) =>
+            prev.map((p) => (p.id === id ? result.proyek : p))
+          );
+        }
+      } catch (error) {
+        console.error('Gagal mengubah status proyek:', error);
+      }
     }
+
+    setActiveProject(project);
+    toast.success(`"${project.namaProyek}" dijadikan proyek aktif`);
   };
 
   const handleSetPitching = async (id: number, isPitching: boolean) => {
@@ -113,6 +134,12 @@ export default function ProyekPage() {
       setProjects((prev) =>
         prev.map((p) => (p.id === id ? result.proyek : p))
       );
+
+      // A project cannot be active and pitching at the same time
+      if (isPitching && activeProject?.id === id) {
+        setActiveProject(null);
+      }
+
       toast.success(
         isPitching
           ? `"${result.proyek.namaProyek}" dijadikan proyek pitching`

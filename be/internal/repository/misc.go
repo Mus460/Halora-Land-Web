@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
@@ -86,6 +87,21 @@ func (r *InvoiceRepo) Create(ctx context.Context, proyekID int32, tanggal string
 	return &inv, nil
 }
 
+func (r *InvoiceRepo) UpdateStatus(ctx context.Context, proyekID, id int32, status models.StatusInvoice) (*models.Invoice, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE invoice SET status = $3, "updatedAt" = NOW()
+		WHERE id = $1 AND "proyekId" = $2
+		RETURNING id, "proyekId", nomor, tanggal, total::text, status, "createdAt", "updatedAt"`,
+		id, proyekID, status)
+	var inv models.Invoice
+	var total string
+	if err := row.Scan(&inv.ID, &inv.ProyekID, &inv.Nomor, &inv.Tanggal, &total, &inv.Status, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+		return nil, err
+	}
+	inv.Total = scanDec(total)
+	return &inv, nil
+}
+
 func pad4(n int) string {
 	s := strconv.Itoa(n)
 	for len(s) < 4 {
@@ -131,16 +147,61 @@ func (r *LogistikRepo) List(ctx context.Context, proyekID int32) ([]models.Logis
 	return out, rows.Err()
 }
 
-// --- Realisasi ---
+func (r *LogistikRepo) Create(ctx context.Context, proyekID int32, namaMaterial, satuan string, volume, hargaSatuan decimal.Decimal, tanggal, keterangan *string, catatKeuangan bool) (*models.Logistik, *models.Realisasi, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback(ctx)
 
+	totalBiaya := volume.Mul(hargaSatuan)
+	var l models.Logistik
+	var vol, hs, tb string
+	var tg sql.NullTime
+	var ket sql.NullString
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO logistik ("proyekId", "namaMaterial", satuan, volume, "hargaSatuan", "totalBiaya", tanggal, keterangan)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		RETURNING id, "proyekId", "namaMaterial", satuan, volume::text, "hargaSatuan"::text, "totalBiaya"::text, tanggal, keterangan, "createdAt", "updatedAt"`,
+		proyekID, namaMaterial, satuan, decArg(volume), decArg(hargaSatuan), decArg(totalBiaya), tanggal, keterangan).Scan(&l.ID, &l.ProyekID, &l.NamaMaterial, &l.Satuan, &vol, &hs, &tb, &tg, &ket, &l.CreatedAt, &l.UpdatedAt); err != nil {
+		return nil, nil, err
+	}
+	l.Volume = scanDec(vol)
+	l.HargaSatuan = scanDec(hs)
+	l.TotalBiaya = scanDec(tb)
+	if tg.Valid {
+		t := tg.Time
+		l.Tanggal = &t
+	}
+	l.Keterangan = strPtr(ket)
+
+	var re *models.Realisasi
+	if catatKeuangan {
+		re, err = scanRealisasi(tx.QueryRow(ctx, `
+			INSERT INTO realisasi ("proyekId", tanggal, kategori, jumlah, keterangan, jenis, status, "logistikId")
+			VALUES ($1,$2,'Material',$3,$4,'pengeluaran','draft',$5)
+			RETURNING id, "proyekId", tanggal, kategori, jumlah::text, keterangan, jenis, status, "logistikId", "invoiceId", "createdAt", "updatedAt"`,
+			proyekID, tanggal, decArg(totalBiaya), keterangan, l.ID))
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+	return &l, re, nil
+}
+
+// --- Realisasi ---
 type RealisasiRepo struct{ pool *pgxpool.Pool }
 
 func NewRealisasiRepo(pool *pgxpool.Pool) *RealisasiRepo { return &RealisasiRepo{pool: pool} }
 
 func (r *RealisasiRepo) List(ctx context.Context, proyekID int32) ([]models.Realisasi, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, "proyekId", tanggal, kategori, jumlah::text, keterangan, "createdAt", "updatedAt"
-		FROM realisasi WHERE "proyekId" = $1 ORDER BY tanggal DESC`, proyekID)
+		SELECT id, "proyekId", tanggal, kategori, jumlah::text, keterangan, jenis, status, "logistikId", "invoiceId", "createdAt", "updatedAt"
+		FROM realisasi WHERE "proyekId" = $1 ORDER BY tanggal DESC, id DESC`, proyekID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +211,7 @@ func (r *RealisasiRepo) List(ctx context.Context, proyekID int32) ([]models.Real
 		var re models.Realisasi
 		var jum string
 		var ket sql.NullString
-		if err := rows.Scan(&re.ID, &re.ProyekID, &re.Tanggal, &re.Kategori, &jum, &ket, &re.CreatedAt, &re.UpdatedAt); err != nil {
+		if err := rows.Scan(&re.ID, &re.ProyekID, &re.Tanggal, &re.Kategori, &jum, &ket, &re.Jenis, &re.Status, &re.LogistikID, &re.InvoiceID, &re.CreatedAt, &re.UpdatedAt); err != nil {
 			return nil, err
 		}
 		re.Jumlah = scanDec(jum)
@@ -158,6 +219,61 @@ func (r *RealisasiRepo) List(ctx context.Context, proyekID int32) ([]models.Real
 		out = append(out, re)
 	}
 	return out, rows.Err()
+}
+
+func (r *RealisasiRepo) Create(ctx context.Context, proyekID int32, tanggal, kategori string, jumlah decimal.Decimal, keterangan *string, jenis models.JenisRealisasi, status models.StatusRealisasi, logistikID, invoiceID *int32) (*models.Realisasi, error) {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO realisasi ("proyekId", tanggal, kategori, jumlah, keterangan, jenis, status, "logistikId", "invoiceId")
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		RETURNING id, "proyekId", tanggal, kategori, jumlah::text, keterangan, jenis, status, "logistikId", "invoiceId", "createdAt", "updatedAt"`,
+		proyekID, tanggal, kategori, decArg(jumlah), keterangan, jenis, status, logistikID, invoiceID)
+	var re models.Realisasi
+	var jum string
+	var ket sql.NullString
+	if err := row.Scan(&re.ID, &re.ProyekID, &re.Tanggal, &re.Kategori, &jum, &ket, &re.Jenis, &re.Status, &re.LogistikID, &re.InvoiceID, &re.CreatedAt, &re.UpdatedAt); err != nil {
+		return nil, err
+	}
+	re.Jumlah = scanDec(jum)
+	re.Keterangan = strPtr(ket)
+	return &re, nil
+}
+
+const realisasiSelect = `SELECT id, "proyekId", tanggal, kategori, jumlah::text, keterangan, jenis, status, "logistikId", "invoiceId", "createdAt", "updatedAt" FROM realisasi`
+
+func scanRealisasi(row pgx.Row) (*models.Realisasi, error) {
+	var re models.Realisasi
+	var jum string
+	var ket sql.NullString
+	if err := row.Scan(&re.ID, &re.ProyekID, &re.Tanggal, &re.Kategori, &jum, &ket, &re.Jenis, &re.Status, &re.LogistikID, &re.InvoiceID, &re.CreatedAt, &re.UpdatedAt); err != nil {
+		return nil, err
+	}
+	re.Jumlah = scanDec(jum)
+	re.Keterangan = strPtr(ket)
+	return &re, nil
+}
+
+func (r *RealisasiRepo) Approve(ctx context.Context, proyekID, id int32) (*models.Realisasi, error) {
+	return scanRealisasi(r.pool.QueryRow(ctx, `
+		UPDATE realisasi SET status = 'approved', "updatedAt" = NOW()
+		WHERE id = $1 AND "proyekId" = $2 AND status = 'draft'
+		RETURNING id, "proyekId", tanggal, kategori, jumlah::text, keterangan, jenis, status, "logistikId", "invoiceId", "createdAt", "updatedAt"`, id, proyekID))
+}
+
+func (r *RealisasiRepo) DeleteDraft(ctx context.Context, proyekID, id int32) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM realisasi WHERE id = $1 AND "proyekId" = $2 AND status = 'draft'`, id, proyekID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func (r *RealisasiRepo) FindByInvoiceID(ctx context.Context, proyekID, invoiceID int32) (*models.Realisasi, error) {
+	return scanRealisasi(r.pool.QueryRow(ctx, realisasiSelect+` WHERE "invoiceId" = $1 AND "proyekId" = $2 LIMIT 1`, invoiceID, proyekID))
+}
+
+func (r *RealisasiRepo) TagReverted(ctx context.Context, proyekID, id int32) error {
+	_, err := r.pool.Exec(ctx, `UPDATE realisasi SET status = 'reverted', "updatedAt" = NOW() WHERE id = $1 AND "proyekId" = $2`, id, proyekID)
+	return err
 }
 
 // --- Feedback + News ---
@@ -200,7 +316,7 @@ type NewsRepo struct{ pool *pgxpool.Pool }
 func NewNewsRepo(pool *pgxpool.Pool) *NewsRepo { return &NewsRepo{pool: pool} }
 
 func (r *NewsRepo) ListActive(ctx context.Context) ([]models.News, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "isActive" = true ORDER BY id DESC`)
+	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "isActive" = true AND "deletedAt" IS NULL ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +333,7 @@ func (r *NewsRepo) ListActive(ctx context.Context) ([]models.News, error) {
 }
 
 func (r *NewsRepo) ListAll(ctx context.Context) ([]models.News, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news ORDER BY id DESC`)
+	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "deletedAt" IS NULL ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +379,6 @@ func (r *NewsRepo) Update(ctx context.Context, id int32, title, content *string)
 }
 
 func (r *NewsRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM news WHERE id = $1`, id)
+	_, err := r.pool.Exec(ctx, `UPDATE news SET "deletedAt" = NOW() WHERE id = $1`, id)
 	return err
 }

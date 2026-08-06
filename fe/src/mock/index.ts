@@ -7,7 +7,6 @@ import type {
   Invoice,
   Logistik,
   Realisasi,
-  Feedback,
   News,
   KategoriPekerjaan,
 } from "@/types";
@@ -19,7 +18,6 @@ import rekapData from "./rekap.json";
 import invoiceData from "./invoice.json";
 import logistikData from "./logistik.json";
 import realisasiData from "./realisasi.json";
-import feedbackData from "./feedback.json";
 import newsData from "./news.json";
 import dashboardData from "./dashboard.json";
 import kurvaSData from "./kurva-s.json";
@@ -144,10 +142,6 @@ export function getRealisasi(proyekId?: number): Realisasi[] {
     return items.filter((r) => r.proyekId === proyekId);
   }
   return items;
-}
-
-export function getFeedbackList(): Feedback[] {
-  return feedbackData as Feedback[];
 }
 
 export function getNewsList(): News[] {

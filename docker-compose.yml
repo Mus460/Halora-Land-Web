@@ -8,6 +8,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Named volume persists across `docker compose down`/`up`.
+      # NEVER run `docker compose down -v` or `docker volume rm halora-land-web_pgdata`
+      # — it wipes all AHSP data (would require re-import of ahsp-2026.xlsx).
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d halora"]

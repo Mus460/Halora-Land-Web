@@ -72,7 +72,7 @@ func ProjectAccess(ctx context.Context, pool *pgxpool.Pool, proyekID int32, leve
 		SELECT p."userId", tp.role
 		FROM proyek p
 		LEFT JOIN tim_proyek tp ON tp."proyekId" = p.id AND tp."userId" = $2
-		WHERE p.id = $1`, proyekID, u.UserID).Scan(&ownerID, &timRole)
+		WHERE p.id = $1 AND p."deletedAt" IS NULL`, proyekID, u.UserID).Scan(&ownerID, &timRole)
 	if err != nil {
 		return nil, nil, false
 	}

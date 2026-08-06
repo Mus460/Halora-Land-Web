@@ -66,7 +66,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const list = Array.isArray(data?.proyek) ? data.proyek : [];
       setProyekList(list);
 
-      if (!currentProyekId && list.length > 0) {
+      const stored = localStorage.getItem('currentProyekId');
+      const storedId = stored ? parseInt(stored) : NaN;
+      const storedIsValid = list.some((p) => p.id === storedId);
+      if (list.length > 0 && !storedIsValid) {
         const firstId = list[0].id;
         setCurrentProyekIdState(firstId);
         localStorage.setItem('currentProyekId', String(firstId));

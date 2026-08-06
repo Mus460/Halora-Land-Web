@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatWaktu } from "@/lib/utils";
 import type { MasterAnalisa, RincianAnalisa } from "@/types";
 import toast from "react-hot-toast";
 
@@ -110,12 +110,12 @@ export default function MasterAnalisaDetailPage() {
                 {rincian.map((r, idx) => (
                   <tr key={r.id} className="border-b last:border-0">
                     <td className="px-4 py-2.5 text-gray-500">{idx + 1}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 max-w-[280px]">
                       <span
                         className={
                           r.tipe === "upah" || r.tipe === "material" || r.tipe === "alat"
-                            ? "font-medium"
-                            : undefined
+                            ? "font-medium block truncate"
+                            : "block truncate"
                         }
                       >
                         {r.nama || "-"}
@@ -138,7 +138,7 @@ export default function MasterAnalisaDetailPage() {
                       {formatCurrency(r.jumlahHarga || 0)}
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono">
-                      {r.waktu != null ? `${r.waktu}` : "—"}
+                      {formatWaktu(r.waktu)}
                     </td>
                   </tr>
                 ))}

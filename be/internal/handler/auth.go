@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/halora-land/halora-be/internal/audit"
 	"github.com/halora-land/halora-be/internal/auth"
@@ -73,13 +74,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	if in.Email == "" || in.Password == "" || in.NamaLengkap == "" {
-		writeError(w, http.StatusBadRequest, "namaLengkap, email, dan password wajib diisi")
+	if in.Email == "" || in.Password == "" {
+		writeError(w, http.StatusBadRequest, "email dan password wajib diisi")
 		return
 	}
 	if len(in.Password) < 6 {
 		writeError(w, http.StatusBadRequest, "Password minimal 6 karakter")
 		return
+	}
+	if in.NamaLengkap == "" {
+		in.NamaLengkap = strings.SplitN(in.Email, "@", 2)[0]
 	}
 	u, err := h.verifier.LocalRegister(r.Context(), in.NamaLengkap, in.Email, in.Password)
 	if err != nil {
@@ -120,6 +124,15 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		u = updated
 	}
 	h.writeUser(w, http.StatusOK, u)
+}
+
+func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.verifier.LocalListUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
