@@ -1,25 +1,25 @@
-import type { KategoriPekerjaan, TipeKomponen } from "@/types";
+import type { WorkCategory, ComponentType } from "@/types";
 
 export const KATEGORI_LIST: {
-  value: KategoriPekerjaan;
+  value: WorkCategory;
   label: string;
   icon: string;
   section: string;
 }[] = [
-  { value: "persiapan", label: "Persiapan", icon: "ruler", section: "konstruksi" },
-  { value: "pondasi", label: "Pondasi", icon: "box", section: "konstruksi" },
-  { value: "beton", label: "Beton Struktur", icon: "pickaxe", section: "konstruksi" },
-  { value: "kanopi", label: "Kanopi", icon: "umbrella", section: "konstruksi" },
-  { value: "baja", label: "Baja Struktural", icon: "construction", section: "konstruksi" },
-  { value: "tangga", label: "Tangga", icon: "move-up-right", section: "konstruksi" },
-  { value: "atap", label: "Pek. Atap", icon: "house", section: "konstruksi" },
-  { value: "dinding", label: "Pas. Dinding", icon: "grid-3x3", section: "arsitektur" },
-  { value: "plesteran", label: "Plesteran", icon: "layers", section: "arsitektur" },
-  { value: "acian", label: "Acian", icon: "droplet", section: "arsitektur" },
-  { value: "keramik", label: "Lantai/Keramik", icon: "layout-grid", section: "arsitektur" },
+  { value: "preparation", label: "Persiapan", icon: "ruler", section: "konstruksi" },
+  { value: "foundation", label: "Pondasi", icon: "box", section: "konstruksi" },
+  { value: "concrete", label: "Beton Struktur", icon: "pickaxe", section: "konstruksi" },
+  { value: "canopy", label: "Kanopi", icon: "umbrella", section: "konstruksi" },
+  { value: "steel", label: "Baja Struktural", icon: "construction", section: "konstruksi" },
+  { value: "stairs", label: "Tangga", icon: "move-up-right", section: "konstruksi" },
+  { value: "roof", label: "Pek. Atap", icon: "house", section: "konstruksi" },
+  { value: "wall", label: "Pas. Dinding", icon: "grid-3x3", section: "arsitektur" },
+  { value: "plastering", label: "Plesteran", icon: "layers", section: "arsitektur" },
+  { value: "finishing", label: "Acian", icon: "droplet", section: "arsitektur" },
+  { value: "tiles", label: "Lantai/Keramik", icon: "layout-grid", section: "arsitektur" },
   { value: "paving", label: "Paving & Halaman", icon: "map", section: "arsitektur" },
-  { value: "pengecatan", label: "Cat & Plafon", icon: "paintbrush", section: "arsitektur" },
-  { value: "pintu", label: "Kusen/Pintu", icon: "door-open", section: "arsitektur" },
+  { value: "painting", label: "Cat & Plafon", icon: "paintbrush", section: "arsitektur" },
+  { value: "doors", label: "Kusen/Pintu", icon: "door-open", section: "arsitektur" },
   { value: "interior", label: "Interior", icon: "sofa", section: "arsitektur" },
   { value: "toilet", label: "Toilet/Sanitair", icon: "bath", section: "arsitektur" },
   { value: "mep", label: "Instalasi MEP", icon: "zap", section: "arsitektur" },
@@ -38,10 +38,10 @@ export const SATUAN_OPTIONS = [
   { value: "titik", label: "Titik" },
 ];
 
-export const TIPE_KOMPONEN: { value: TipeKomponen; label: string }[] = [
+export const TIPE_KOMPONEN: { value: ComponentType; label: string }[] = [
   { value: "material", label: "Material" },
-  { value: "upah", label: "Upah" },
-  { value: "alat", label: "Alat" },
+  { value: "labor", label: "Upah" },
+  { value: "equipment", label: "Alat" },
 ];
 
 export const TIPE_BETON = [
@@ -72,7 +72,7 @@ export const JENIS_DINDING = ["hebel", "bata merah", "batako"];
 export const TIPE_PERSIAPAN = [
   "Pembersihan Lokasi",
   "Bouwplank",
-  "Pagar Proyek",
+  "Pagar Project",
   "Bedeng/Gudang",
 ];
 

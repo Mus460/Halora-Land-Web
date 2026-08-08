@@ -1,16 +1,15 @@
 "use client";
 
 import { Bath } from "lucide-react";
-import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
+import { WorkItemPage } from "@/components/work-items/work-item-page";
 
 export default function ToiletPage() {
   return (
-    <PekerjaanPage
-      kategori="toilet"
+    <WorkItemPage
+      category="toilet"
       title="Toilet/Sanitair"
       description="Pekerjaan sanitair dan perlengkapan toilet"
       icon={Bath}
-      proyekId={1}
       formFields={[
         {
           name: "bathub",

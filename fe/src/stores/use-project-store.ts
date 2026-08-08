@@ -1,16 +1,16 @@
 import { create } from "zustand";
-import type { Proyek } from "@/types";
+import type { Project } from "@/types";
 
 interface ProjectStore {
-  activeProject: Proyek | null;
-  setActiveProject: (project: Proyek | null) => void;
-  appMode: "gedung" | "infra";
-  setAppMode: (mode: "gedung" | "infra") => void;
+  activeProject: Project | null;
+  setActiveProject: (project: Project | null) => void;
+  appMode: "building" | "infrastructure";
+  setAppMode: (mode: "building" | "infrastructure") => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
   activeProject: null,
   setActiveProject: (project) => set({ activeProject: project }),
-  appMode: "gedung",
+  appMode: "building",
   setAppMode: (mode) => set({ appMode: mode }),
 }));

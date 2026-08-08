@@ -223,7 +223,7 @@ function NewsFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{item ? "Edit Berita" : "Tambah Berita"}</DialogTitle>
         </DialogHeader>

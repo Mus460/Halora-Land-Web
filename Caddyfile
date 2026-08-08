@@ -1,0 +1,10 @@
+# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) for halora.co.id.
+# Requires: A record for halora.co.id (+ www) pointing at this server's IP,
+# and ports 80/443 open in the firewall.
+#
+# The Next.js app serves /api/* to the BE itself (next.config.js rewrites),
+# so only fe needs to be proxied here.
+
+halora.co.id, www.halora.co.id {
+	reverse_proxy fe:3000
+}

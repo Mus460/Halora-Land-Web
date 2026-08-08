@@ -35,7 +35,7 @@ type AuthUser struct {
 	UserID      int32
 	Email       string
 	Role        models.Role
-	NamaLengkap string
+	FullName    string
 	AccountType string
 	IsDemo      bool
 }
@@ -80,9 +80,9 @@ func (v *Verifier) Authenticate(next http.Handler) http.Handler {
 func (v *Verifier) loadUser(ctx context.Context, userID int32) (*AuthUser, error) {
 	var u models.User
 	err := v.pool.QueryRow(ctx, `
-		SELECT id, "namaLengkap", email, role, "accountType", "isDemo"
+		SELECT id, "fullName", email, role, "accountType", "isDemo"
 		FROM users WHERE id = $1`, userID).
-		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
+		Scan(&u.ID, &u.FullName, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (v *Verifier) loadUser(ctx context.Context, userID int32) (*AuthUser, error
 		UserID:      u.ID,
 		Email:       u.Email,
 		Role:        u.Role,
-		NamaLengkap: u.NamaLengkap,
+		FullName:    u.FullName,
 		AccountType: u.AccountType,
 		IsDemo:      u.IsDemo,
 	}, nil
@@ -116,7 +116,7 @@ func (v *Verifier) EnsureDefaultAdmin(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	_, err = v.pool.Exec(ctx, `
-		INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
+		INSERT INTO users ("fullName", email, role, "accountType", "isDemo", "passwordHash")
 		VALUES ('Admin Halora', $1, 'ADMIN', 'free', false, $2)`,
 		DefaultAdminEmail, hash)
 	return err == nil, err

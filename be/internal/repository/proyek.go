@@ -11,50 +11,50 @@ import (
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-// ProyekRepo handles proyek + tim_proyek persistence.
-type ProyekRepo struct{ pool *pgxpool.Pool }
+// ProjectRepo handles projects + project_team persistence.
+type ProjectRepo struct{ pool *pgxpool.Pool }
 
-func NewProyekRepo(pool *pgxpool.Pool) *ProyekRepo { return &ProyekRepo{pool: pool} }
+func NewProjectRepo(pool *pgxpool.Pool) *ProjectRepo { return &ProjectRepo{pool: pool} }
 
-type ListProyekFilter struct {
+type ListProjectFilter struct {
 	UserID  int32
 	Search  string
-	Tipe    string
+	Type    string
 	IsAdmin bool
 }
 
-func (r *ProyekRepo) List(ctx context.Context, f ListProyekFilter) ([]models.Proyek, error) {
+func (r *ProjectRepo) List(ctx context.Context, f ListProjectFilter) ([]models.Project, error) {
 	var q string
 	var args []any
 	if f.IsAdmin {
-		q = `SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt" FROM proyek WHERE "deletedAt" IS NULL`
+		q = `SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt" FROM projects WHERE "deletedAt" IS NULL`
 	} else {
-		q = `SELECT DISTINCT p.id, p."userId", p."namaProyek", p.lokasi, p.tipe, p."nilaiKontrak", p.timeline, p."createdAt", p."updatedAt"
-			FROM proyek p LEFT JOIN tim_proyek tp ON tp."proyekId" = p.id
+		q = `SELECT DISTINCT p.id, p."userId", p."name", p.location, p.type, p."isPitching", p."isDone", p."contractValue", p."timelineMonths", p."timelineDays", p."createdAt", p."updatedAt"
+			FROM projects p LEFT JOIN project_team tp ON tp."projectId" = p.id
 			WHERE (p."userId" = $1 OR tp."userId" = $1) AND p."deletedAt" IS NULL`
 		args = append(args, f.UserID)
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")
-		q += fmt.Sprintf(` AND "namaProyek" ILIKE $%d`, len(args))
+		q += fmt.Sprintf(` AND "name" ILIKE $%d`, len(args))
 	}
-	if f.Tipe != "" {
-		args = append(args, f.Tipe)
-		q += fmt.Sprintf(` AND tipe = $%d`, len(args))
+	if f.Type != "" {
+		args = append(args, f.Type)
+		q += fmt.Sprintf(` AND type = $%d`, len(args))
 	}
 	q += ` ORDER BY "createdAt" DESC`
 	return r.scanList(ctx, q, args...)
 }
 
-func (r *ProyekRepo) scanList(ctx context.Context, q string, args ...any) ([]models.Proyek, error) {
+func (r *ProjectRepo) scanList(ctx context.Context, q string, args ...any) ([]models.Project, error) {
 	rows, err := r.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []models.Proyek{}
+	out := []models.Project{}
 	for rows.Next() {
-		p, err := scanProyekRow(rows)
+		p, err := scanProjectRow(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -67,197 +67,267 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanProyekRow(s rowScanner) (*models.Proyek, error) {
-	var p models.Proyek
-	var lokasi, timeline, nilaiKontrak sql.NullString
-	if err := s.Scan(&p.ID, &p.UserID, &p.NamaProyek, &lokasi, &p.Tipe, &p.IsPitching, &nilaiKontrak, &timeline, &p.CreatedAt, &p.UpdatedAt); err != nil {
+func scanProjectRow(s rowScanner) (*models.Project, error) {
+	var p models.Project
+	var location, contractValue sql.NullString
+	if err := s.Scan(&p.ID, &p.UserID, &p.Name, &location, &p.Type, &p.IsPitching, &p.IsDone, &contractValue, &p.TimelineMonths, &p.TimelineDays, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, err
 	}
-	p.Lokasi = strPtr(lokasi)
-	p.Timeline = strPtr(timeline)
-	p.NilaiKontrak = scanDecPtr(nilaiKontrak)
+	p.Location = strPtr(location)
+	p.ContractValue = scanDecPtr(contractValue)
 	return &p, nil
 }
 
-func (r *ProyekRepo) Get(ctx context.Context, id int32) (*models.Proyek, error) {
+func (r *ProjectRepo) Get(ctx context.Context, id int32) (*models.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"
-		FROM proyek WHERE id = $1 AND "deletedAt" IS NULL`, id)
-	p, err := scanProyekRow(row)
+		SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"
+		FROM projects WHERE id = $1 AND "deletedAt" IS NULL`, id)
+	p, err := scanProjectRow(row)
 	if err != nil {
 		return nil, err
 	}
 	return p, nil
 }
 
-type ProyekDetailUser struct {
-	ID           int32  `json:"id"`
-	NamaLengkap  string `json:"namaLengkap"`
-	Email        string `json:"email"`
+type ProjectDetailUser struct {
+	ID       int32  `json:"id"`
+	FullName string `json:"fullName"`
+	Email    string `json:"email"`
 }
 
-type ProyekDetailTim struct {
-	ID   int32                 `json:"id"`
-	Role models.RoleTimProyek  `json:"role"`
-	User ProyekDetailUser      `json:"user"`
+type ProjectDetailTeam struct {
+	ID   int32             `json:"id"`
+	Role models.TeamRole   `json:"role"`
+	User ProjectDetailUser `json:"user"`
 }
 
-type ProyekDetailPekerjaan struct {
-	ID              int32                  `json:"id"`
-	UraianPekerjaan string                 `json:"uraianPekerjaan"`
-	Volume          decimal.Decimal        `json:"volume"`
-	Satuan          string                 `json:"satuan"`
-	HargaSatuan     decimal.Decimal        `json:"hargaSatuan"`
-	TotalBiaya      decimal.Decimal        `json:"totalBiaya"`
-	Kategori        models.KategoriPekerjaan `json:"kategori"`
+type ProjectDetailWorkItem struct {
+	ID          int32               `json:"id"`
+	Description string              `json:"description"`
+	Volume      decimal.Decimal     `json:"volume"`
+	Unit        string              `json:"unit"`
+	UnitPrice   decimal.Decimal     `json:"unitPrice"`
+	TotalCost   decimal.Decimal     `json:"totalCost"`
+	Category    models.WorkCategory `json:"category"`
 }
 
-type ProyekDetailCount struct {
-	Pekerjaan int32 `json:"pekerjaan"`
-	Rekap     int32 `json:"rekap"`
-	Invoice   int32 `json:"invoice"`
+type ProjectDetailCount struct {
+	WorkItem int32 `json:"work_items"`
+	Recap    int32 `json:"recaps"`
+	Invoice  int32 `json:"invoices"`
 }
 
-type ProyekDetail struct {
-	models.Proyek
-	User       ProyekDetailUser        `json:"user"`
-	TimProyek  []ProyekDetailTim       `json:"timProyek"`
-	Pekerjaan  []ProyekDetailPekerjaan `json:"pekerjaan"`
-	Count      ProyekDetailCount       `json:"_count"`
+type ProjectDetail struct {
+	models.Project
+	User        ProjectDetailUser       `json:"user"`
+	ProjectTeam []ProjectDetailTeam     `json:"projectTeam"`
+	WorkItem    []ProjectDetailWorkItem `json:"work_items"`
+	Count       ProjectDetailCount      `json:"_count"`
 }
 
-func (r *ProyekRepo) GetDetail(ctx context.Context, id int32) (*ProyekDetail, error) {
+func (r *ProjectRepo) GetDetail(ctx context.Context, id int32) (*ProjectDetail, error) {
 	p, err := r.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	detail := &ProyekDetail{
-		Proyek:     *p,
-		TimProyek:  []ProyekDetailTim{},
-		Pekerjaan:  []ProyekDetailPekerjaan{},
+	detail := &ProjectDetail{
+		Project:     *p,
+		ProjectTeam: []ProjectDetailTeam{},
+		WorkItem:    []ProjectDetailWorkItem{},
 	}
 
-	var owner ProyekDetailUser
+	var owner ProjectDetailUser
 	err = r.pool.QueryRow(ctx,
-		`SELECT id, "namaLengkap", email FROM users WHERE id = $1`, p.UserID).
-		Scan(&owner.ID, &owner.NamaLengkap, &owner.Email)
+		`SELECT id, "fullName", email FROM users WHERE id = $1`, p.UserID).
+		Scan(&owner.ID, &owner.FullName, &owner.Email)
 	if err == nil {
 		detail.User = owner
 	}
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT tp.id, tp.role, u.id, u."namaLengkap", u.email
-		FROM tim_proyek tp JOIN users u ON u.id = tp."userId"
-		WHERE tp."proyekId" = $1 ORDER BY tp.id`, id)
+		SELECT tp.id, tp.role, u.id, u."fullName", u.email
+		FROM project_team tp JOIN users u ON u.id = tp."userId"
+		WHERE tp."projectId" = $1 ORDER BY tp.id`, id)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
-			var t ProyekDetailTim
-			if err := rows.Scan(&t.ID, &t.Role, &t.User.ID, &t.User.NamaLengkap, &t.User.Email); err == nil {
-				detail.TimProyek = append(detail.TimProyek, t)
+			var t ProjectDetailTeam
+			if err := rows.Scan(&t.ID, &t.Role, &t.User.ID, &t.User.FullName, &t.User.Email); err == nil {
+				detail.ProjectTeam = append(detail.ProjectTeam, t)
 			}
 		}
 	}
 
 	pRows, err := r.pool.Query(ctx, `
-		SELECT id, "uraianPekerjaan", volume::text, satuan, "hargaSatuan"::text, "totalBiaya"::text, kategori
-		FROM pekerjaan WHERE "proyekId" = $1 AND "deletedAt" IS NULL ORDER BY id DESC LIMIT 10`, id)
+		SELECT id, "description", volume::text, unit, "unitPrice"::text, "totalCost"::text, category
+		FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL ORDER BY id DESC LIMIT 10`, id)
 	if err == nil {
 		defer pRows.Close()
 		for pRows.Next() {
-			var pk ProyekDetailPekerjaan
+			var pk ProjectDetailWorkItem
 			var vol, hs, tb string
-			if err := pRows.Scan(&pk.ID, &pk.UraianPekerjaan, &vol, &pk.Satuan, &hs, &tb, &pk.Kategori); err == nil {
+			if err := pRows.Scan(&pk.ID, &pk.Description, &vol, &pk.Unit, &hs, &tb, &pk.Category); err == nil {
 				pk.Volume = scanDec(vol)
-				pk.HargaSatuan = scanDec(hs)
-				pk.TotalBiaya = scanDec(tb)
-				detail.Pekerjaan = append(detail.Pekerjaan, pk)
+				pk.UnitPrice = scanDec(hs)
+				pk.TotalCost = scanDec(tb)
+				detail.WorkItem = append(detail.WorkItem, pk)
 			}
 		}
 	}
 
-	var pekerjaanCount, rekapCount, invoiceCount int32
-	r.pool.QueryRow(ctx, `SELECT count(*) FROM pekerjaan WHERE "proyekId" = $1 AND "deletedAt" IS NULL`, id).Scan(&pekerjaanCount)
-	r.pool.QueryRow(ctx, `SELECT count(*) FROM rekap WHERE "proyekId" = $1`, id).Scan(&rekapCount)
-	r.pool.QueryRow(ctx, `SELECT count(*) FROM invoice WHERE "proyekId" = $1`, id).Scan(&invoiceCount)
-	detail.Count = ProyekDetailCount{Pekerjaan: pekerjaanCount, Rekap: rekapCount, Invoice: invoiceCount}
+	var workItemCount, recapCount, invoiceCount int32
+	r.pool.QueryRow(ctx, `SELECT count(*) FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL`, id).Scan(&workItemCount)
+	r.pool.QueryRow(ctx, `SELECT count(*) FROM recaps WHERE "projectId" = $1`, id).Scan(&recapCount)
+	r.pool.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE "projectId" = $1`, id).Scan(&invoiceCount)
+	detail.Count = ProjectDetailCount{WorkItem: workItemCount, Recap: recapCount, Invoice: invoiceCount}
 
 	return detail, nil
 }
 
-type CreateProyekInput struct {
-	UserID       int32
-	NamaProyek   string
-	Lokasi       *string
-	Tipe         models.TipeProyek
-	IsPitching   bool
-	NilaiKontrak *decimal.Decimal
-	Timeline     *string
+type CreateProjectInput struct {
+	UserID         int32
+	Name           string
+	Location       *string
+	Type           models.ProjectType
+	IsPitching     bool
+	IsDone         bool
+	ContractValue  *decimal.Decimal
+	TimelineMonths int
+	TimelineDays   int
 }
 
-func (r *ProyekRepo) Create(ctx context.Context, in CreateProyekInput) (*models.Proyek, error) {
+func (r *ProjectRepo) Create(ctx context.Context, in CreateProjectInput) (*models.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO proyek ("userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
-		in.UserID, in.NamaProyek, in.Lokasi, in.Tipe, in.IsPitching, decPtrArg(in.NilaiKontrak), in.Timeline)
-	return scanProyekRow(row)
+		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays")
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays)
+	return scanProjectRow(row)
 }
 
-type UpdateProyekInput struct {
-	NamaProyek   *string             `json:"namaProyek"`
-	Lokasi       *string             `json:"lokasi"`
-	Tipe         *models.TipeProyek  `json:"tipe"`
-	IsPitching   *bool               `json:"isPitching"`
-	NilaiKontrak *decimal.Decimal    `json:"nilaiKontrak"`
-	Timeline     *string             `json:"timeline"`
+// ImportedWorkItem is a BOQ row ready for work_items insertion.
+type ImportedWorkItem struct {
+	Category    models.WorkCategory
+	Description string
+	Volume      decimal.Decimal
+	Unit        string
+	UnitPrice   decimal.Decimal
+	TotalCost   decimal.Decimal
 }
 
-func (r *ProyekRepo) Update(ctx context.Context, id int32, in UpdateProyekInput) (*models.Proyek, error) {
+// ImportedRecap is one row of the BOQ REKAP PER DIVISI section.
+type ImportedRecap struct {
+	Category    string
+	Description string
+	Amount      decimal.Decimal
+}
+
+// ImportBOQ creates a project together with its work_items and recaps inside a
+// single transaction (used when creating a project from a BOQ/RAB file).
+func (r *ProjectRepo) ImportBOQ(ctx context.Context, in CreateProjectInput, items []ImportedWorkItem, divisions []ImportedRecap) (*models.Project, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	p, err := scanProjectRow(tx.QueryRow(ctx, `
+		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays")
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, it := range items {
+		if it.Description == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
+			VALUES ($1,$2,$3,$4,$5,$6,$7,'manual')`,
+			p.ID, it.Category, it.Description, decArg(it.Volume), it.Unit, decArg(it.UnitPrice), decArg(it.TotalCost)); err != nil {
+			return nil, err
+		}
+	}
+
+	for i, d := range divisions {
+		if d.Category == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO recaps ("projectId", category, description, sequence, margin)
+			VALUES ($1,$2,$3,$4,NULL)`,
+			p.ID, d.Category, d.Description, i+1); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+type UpdateProjectInput struct {
+	Name           *string             `json:"name"`
+	Location       *string             `json:"location"`
+	Type           *models.ProjectType `json:"type"`
+	IsPitching     *bool               `json:"isPitching"`
+	IsDone         *bool               `json:"isDone"`
+	ContractValue  *decimal.Decimal    `json:"contractValue"`
+	TimelineMonths *int                `json:"timelineMonths"`
+	TimelineDays   *int                `json:"timelineDays"`
+}
+
+func (r *ProjectRepo) Update(ctx context.Context, id int32, in UpdateProjectInput) (*models.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		UPDATE proyek SET
-			"namaProyek" = COALESCE($2, "namaProyek"),
-			lokasi = COALESCE($3, lokasi),
-			tipe = COALESCE($4, tipe),
+		UPDATE projects SET
+			"name" = COALESCE($2, "name"),
+			location = COALESCE($3, location),
+			type = COALESCE($4, type),
 			"isPitching" = COALESCE($5, "isPitching"),
-			"nilaiKontrak" = COALESCE($6, "nilaiKontrak"),
-			timeline = COALESCE($7, timeline),
+			"isDone" = COALESCE($6, "isDone"),
+			"contractValue" = COALESCE($7, "contractValue"),
+			"timelineMonths" = COALESCE($8, "timelineMonths"),
+			"timelineDays" = COALESCE($9, "timelineDays"),
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
-		RETURNING id, "userId", "namaProyek", lokasi, tipe, "isPitching", "nilaiKontrak", timeline, "createdAt", "updatedAt"`,
-		id, in.NamaProyek, in.Lokasi, in.Tipe, in.IsPitching, decPtrArg(in.NilaiKontrak), in.Timeline)
-	return scanProyekRow(row)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		id, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays)
+	return scanProjectRow(row)
 }
 
-// Delete soft-deletes a proyek and its pekerjaan rows in one transaction.
-func (r *ProyekRepo) Delete(ctx context.Context, id int32) error {
+// Delete soft-deletes a projects and its work_items rows in one transaction.
+func (r *ProjectRepo) Delete(ctx context.Context, id int32) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `UPDATE proyek SET "deletedAt" = NOW() WHERE id = $1`, id); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE projects SET "deletedAt" = NOW() WHERE id = $1`, id); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE pekerjaan SET "deletedAt" = NOW() WHERE "proyekId" = $1 AND "deletedAt" IS NULL`, id); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE work_items SET "deletedAt" = NOW() WHERE "projectId" = $1 AND "deletedAt" IS NULL`, id); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
 }
 
-// SummaryProyek is a lightweight projection used by the rekap/RAB rollup.
-type SummaryProyek struct {
-	ID           int32
-	NamaProyek   string
-	Lokasi       *string
-	NilaiKontrak *decimal.Decimal
+// SummaryProject is a lightweight projection used by the recaps/RAB rollup.
+type SummaryProject struct {
+	ID            int32
+	Name          string
+	Location      *string
+	ContractValue *decimal.Decimal
 }
 
-func (r *ProyekRepo) Summary(ctx context.Context, id int32) (*SummaryProyek, error) {
+func (r *ProjectRepo) Summary(ctx context.Context, id int32) (*SummaryProject, error) {
 	p, err := r.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return &SummaryProyek{ID: p.ID, NamaProyek: p.NamaProyek, Lokasi: p.Lokasi, NilaiKontrak: p.NilaiKontrak}, nil
+	return &SummaryProject{ID: p.ID, Name: p.Name, Location: p.Location, ContractValue: p.ContractValue}, nil
 }

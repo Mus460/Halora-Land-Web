@@ -38,7 +38,7 @@ func (h *AdminAHSPHandler) ImportStatus(w http.ResponseWriter, r *http.Request) 
 		f.Close()
 	}
 	if len(sheets) == 0 {
-		for sheet := range ahsp.SheetToKategori {
+		for sheet := range ahsp.SheetToCategory {
 			sheets = append(sheets, sheet)
 		}
 		sort.Strings(sheets)
@@ -46,7 +46,7 @@ func (h *AdminAHSPHandler) ImportStatus(w http.ResponseWriter, r *http.Request) 
 
 	type statusItem struct {
 		SheetName string `json:"sheetName"`
-		Kategori  string `json:"kategori"`
+		Category  string `json:"category"`
 		Imported  bool   `json:"imported"`
 		Count     int    `json:"count"`
 	}
@@ -55,7 +55,7 @@ func (h *AdminAHSPHandler) ImportStatus(w http.ResponseWriter, r *http.Request) 
 	for _, sheet := range sheets {
 		s := statusItem{
 			SheetName: sheet,
-			Kategori:  ahsp.SheetToKategori[sheet],
+			Category:  ahsp.SheetToCategory[sheet],
 		}
 		if st, ok := statusMap[sheet]; ok {
 			s.Imported = st.Imported
@@ -69,8 +69,8 @@ func (h *AdminAHSPHandler) ImportStatus(w http.ResponseWriter, r *http.Request) 
 
 func (h *AdminAHSPHandler) Import(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		SheetName      string `json:"sheetName"`
-		ForceReimport  bool   `json:"forceReimport"`
+		SheetName     string `json:"sheetName"`
+		ForceReimport bool   `json:"forceReimport"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -109,10 +109,10 @@ func (h *AdminAHSPHandler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"imported": res.Items,
-		"skipped":  res.Skipped,
-		"count":    res.Items + res.Skipped,
-		"rincian":  res.Rincian,
-		"sheet":    res.Sheet,
+		"imported":   res.Items,
+		"skipped":    res.Skipped,
+		"count":      res.Items + res.Skipped,
+		"components": res.Components,
+		"sheet":      res.Sheet,
 	})
 }

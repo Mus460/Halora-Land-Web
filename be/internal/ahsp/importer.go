@@ -13,22 +13,22 @@ import (
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-// Importer batch-inserts parsed AHSP work items into master_analisa +
-// rincian_analisa inside one transaction. Idempotent via ahsp_kode +
+// Importer batch-inserts parsed AHSP work items into analysis_masters +
+// analysis_components inside one transaction. Idempotent via ahsp_kode +
 // is_system; forceReimport deletes the sheet first.
 type Importer struct{ pool *pgxpool.Pool }
 
 func NewImporter(pool *pgxpool.Pool) *Importer { return &Importer{pool: pool} }
 
 type ImportResult struct {
-	Sheet   string
-	Items   int
-	Rincian int
-	Skipped int
+	Sheet      string
+	Items      int
+	Components int
+	Skipped    int
 }
 
-// ImportPriceList upserts the "Upah & Bahan" price list into master_harga
-// (global/system rows, deduped by nama+kategori). Returns rows inserted.
+// ImportPriceList upserts the "Upah & Bahan" price list into price_masters
+// (global/system rows, deduped by name+category). Returns rows inserted.
 func (im *Importer) ImportPriceList(ctx context.Context, prices []PriceItem, force bool) (int, error) {
 	if len(prices) == 0 {
 		return 0, nil
@@ -40,7 +40,7 @@ func (im *Importer) ImportPriceList(ctx context.Context, prices []PriceItem, for
 	defer tx.Rollback(ctx)
 
 	if force {
-		if _, err := tx.Exec(ctx, `DELETE FROM master_harga WHERE "isSystem" = true AND "isGlobal" = true`); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM price_masters WHERE "isSystem" = true AND "isGlobal" = true`); err != nil {
 			return 0, err
 		}
 	}
@@ -49,23 +49,23 @@ func (im *Importer) ImportPriceList(ctx context.Context, prices []PriceItem, for
 	for _, p := range prices {
 		var id int32
 		err := tx.QueryRow(ctx, `
-			SELECT id FROM master_harga
-			WHERE nama = $1 AND satuan = $2 AND kategori = $3 AND "isGlobal" = true AND "userId" IS NULL
-			LIMIT 1`, p.Nama, p.Satuan, models.TipeKomponen(p.Tipe)).Scan(&id)
+			SELECT id FROM price_masters
+			WHERE name = $1 AND unit = $2 AND type = $3 AND "isGlobal" = true AND "userId" IS NULL
+			LIMIT 1`, p.Name, p.Unit, models.ComponentType(p.Type)).Scan(&id)
 		if err == nil {
 			continue
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return inserted, err
 		}
-		var kodeAHSP any
-		if p.Kode != "" {
-			kodeAHSP = p.Kode
+		var ahspCode any
+		if p.Code != "" {
+			ahspCode = p.Code
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO master_harga (nama, satuan, harga, kategori, "isGlobal", "isSystem", "kodeAHSP")
+			INSERT INTO price_masters (name, unit, price, type, "isGlobal", "isSystem", "ahspCode")
 			VALUES ($1,$2,$3,$4,true,true,$5)`,
-			p.Nama, p.Satuan, p.Harga.String(), models.TipeKomponen(p.Tipe), kodeAHSP); err != nil {
+			p.Name, p.Unit, p.Price.String(), models.ComponentType(p.Type), ahspCode); err != nil {
 			return inserted, err
 		}
 		inserted++
@@ -76,10 +76,10 @@ func (im *Importer) ImportPriceList(ctx context.Context, prices []PriceItem, for
 	return inserted, nil
 }
 
-// ImportSheet inserts work items + rincian breakdowns. Rincian prices are
-// resolved from the price list (by kodeReferensi, fallback by name); rows
-// named "Tukang batu" also get waktu = 1/koef. Item hargaSatuan is computed
-// as sum(jumlahHarga) x (1 + biayaUmum).
+// ImportSheet inserts work items + components breakdowns. Components prices are
+// resolved from the price list (by referenceCode, fallback by name); rows
+// named "Tukang batu" also get duration = 1/coefficient. Item unitPrice is computed
+// as sum(totalPrice) x (1 + generalCost).
 func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []PriceItem, force bool) (*ImportResult, error) {
 	if len(items) == 0 {
 		return &ImportResult{}, nil
@@ -91,11 +91,11 @@ func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []
 	priceByNameSat := map[string]PriceItem{}
 	norm := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 	for _, p := range prices {
-		if p.Kode != "" {
-			priceByKode[norm(p.Kode)] = p
+		if p.Code != "" {
+			priceByKode[norm(p.Code)] = p
 		}
-		priceByName[norm(p.Nama)] = p
-		priceByNameSat[norm(p.Nama)+"|"+norm(p.Satuan)] = p
+		priceByName[norm(p.Name)] = p
+		priceByNameSat[norm(p.Name)+"|"+norm(p.Unit)] = p
 	}
 
 	tx, err := im.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -106,14 +106,14 @@ func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []
 
 	res := &ImportResult{Sheet: sheet}
 	if force {
-		if _, err := tx.Exec(ctx, `DELETE FROM master_analisa WHERE "ahspSheet" = $1 AND "isSystem" = true`, sheet); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM analysis_masters WHERE "ahspSheet" = $1 AND "isSystem" = true`, sheet); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, it := range items {
 		var existingID int32
-		err := tx.QueryRow(ctx, `SELECT id FROM master_analisa WHERE "ahspKode" = $1 AND "ahspSheet" = $2 AND "isSystem" = true LIMIT 1`, it.Kode, sheet).
+		err := tx.QueryRow(ctx, `SELECT id FROM analysis_masters WHERE "ahspCode" = $1 AND "ahspSheet" = $2 AND "isSystem" = true LIMIT 1`, it.Code, sheet).
 			Scan(&existingID)
 		if err == nil {
 			res.Skipped++
@@ -122,73 +122,73 @@ func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []
 
 		var masterID int32
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO master_analisa (kode, nama, level, satuan, "hargaSatuan", kategori, "isGlobal", "isSystem", "ahspKode", "ahspSheet", "biayaUmum")
+			INSERT INTO analysis_masters (code, name, level, unit, "unitPrice", category, "isGlobal", "isSystem", "ahspCode", "ahspSheet", "generalCost")
 			VALUES ($1,$2,4,$3,0,$4,true,true,$5,$6,$7)
 			RETURNING id`,
-			it.Kode, it.Nama, it.Satuan, it.Section, it.Kode, sheet, it.BiayaUmum.String()).
+			it.Code, it.Name, it.Unit, it.Section, it.Code, sheet, it.GeneralCost.String()).
 			Scan(&masterID); err != nil {
-			return nil, fmt.Errorf("insert master_analisa %s: %w", it.Kode, err)
+			return nil, fmt.Errorf("insert analysis_masters %s: %w", it.Code, err)
 		}
 		res.Items++
 
-		// waktu = 1/koefisien untuk baris tenaga kerja acuan: "Tukang batu"
-		// bila ada, selain itu baris upah dengan koef terbesar.
-		waktuIdx := -1
+		// duration = 1/koefisien untuk baris tenaga kerja acuan: "Tukang batu"
+		// bila ada, selain itu baris upah dengan coefficient terbesar.
+		durationIdx := -1
 		for i := range it.Breakdown {
 			b := &it.Breakdown[i]
-			if b.Tipe != string(models.KomponenUpah) || b.Koef.IsZero() {
+			if b.Type != string(models.ComponentLabor) || b.Coefficient.IsZero() {
 				continue
 			}
-			if waktuIdx < 0 {
-				waktuIdx = i
+			if durationIdx < 0 {
+				durationIdx = i
 				continue
 			}
-			cur := &it.Breakdown[waktuIdx]
-			isCurBatu := isTukangBatu(cur.Nama)
-			isNewBatu := isTukangBatu(b.Nama)
+			cur := &it.Breakdown[durationIdx]
+			isCurBatu := isMason(cur.Name)
+			isNewBatu := isMason(b.Name)
 			if isNewBatu && !isCurBatu {
-				waktuIdx = i
-			} else if isNewBatu == isCurBatu && b.Koef.GreaterThan(cur.Koef) {
-				waktuIdx = i
+				durationIdx = i
+			} else if isNewBatu == isCurBatu && b.Coefficient.GreaterThan(cur.Coefficient) {
+				durationIdx = i
 			}
 		}
 
 		total := decimal.Zero
 		for i, b := range it.Breakdown {
-			if b.Nama == "" {
+			if b.Name == "" {
 				continue
 			}
-			p, ok := priceByKode[norm(b.KodeReferensi)]
+			p, ok := priceByKode[norm(b.ReferenceCode)]
 			if !ok {
-				p, ok = priceByNameSat[norm(b.Nama)+"|"+norm(b.Satuan)]
+				p, ok = priceByNameSat[norm(b.Name)+"|"+norm(b.Unit)]
 			}
 			if !ok {
-				p, ok = priceByName[norm(b.Nama)]
+				p, ok = priceByName[norm(b.Name)]
 			}
 			hs := decimal.Zero
 			if ok {
-				hs = p.Harga
+				hs = p.Price
 			}
-			jh := b.Koef.Mul(hs).Round(2)
+			jh := b.Coefficient.Mul(hs).Round(2)
 			total = total.Add(jh)
 
-			var waktu any
-			if i == waktuIdx {
-				waktu = decimal.NewFromInt(1).Div(b.Koef).Round(4).String()
+			var duration any
+			if i == durationIdx {
+				duration = decimal.NewFromInt(1).Div(b.Coefficient).Round(4).String()
 			}
-			tipe := models.TipeKomponen(b.Tipe)
+			compType := models.ComponentType(b.Type)
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO rincian_analisa ("masterAnalisaId", "komponenId", koef, tipe, nama, satuan, "hargaSatuan", "jumlahHarga", "kodeReferensi", urutan, waktu)
+				INSERT INTO analysis_components ("analysisMasterId", "componentId", coefficient, type, name, unit, "unitPrice", "totalPrice", "referenceCode", sequence, duration)
 				VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-				masterID, b.Koef.String(), tipe, b.Nama, b.Satuan,
-				hs.String(), jh.String(), b.KodeReferensi, i, waktu); err != nil {
-				return nil, fmt.Errorf("insert rincian: %w", err)
+				masterID, b.Coefficient.String(), compType, b.Name, b.Unit,
+				hs.String(), jh.String(), b.ReferenceCode, i, duration); err != nil {
+				return nil, fmt.Errorf("insert components: %w", err)
 			}
-			res.Rincian++
+			res.Components++
 		}
 
-		itemHS := total.Mul(decimal.NewFromInt(1).Add(it.BiayaUmum)).Round(2)
-		if _, err := tx.Exec(ctx, `UPDATE master_analisa SET "hargaSatuan" = $1 WHERE id = $2`, itemHS.String(), masterID); err != nil {
+		itemHS := total.Mul(decimal.NewFromInt(1).Add(it.GeneralCost)).Round(2)
+		if _, err := tx.Exec(ctx, `UPDATE analysis_masters SET "unitPrice" = $1 WHERE id = $2`, itemHS.String(), masterID); err != nil {
 			return nil, err
 		}
 	}
@@ -199,13 +199,13 @@ func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []
 	return res, nil
 }
 
-func isTukangBatu(nama string) bool {
-	return strings.EqualFold(strings.TrimSpace(nama), "Tukang batu")
+func isMason(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), "Tukang batu")
 }
 
 // ImportStatus reports per-sheet whether it has been imported and the row count.
 func (im *Importer) ImportStatus(ctx context.Context) (map[string]ImportStatus, error) {
-	rows, err := im.pool.Query(ctx, `SELECT "ahspSheet", count(*) FROM master_analisa WHERE "isSystem" = true GROUP BY "ahspSheet"`)
+	rows, err := im.pool.Query(ctx, `SELECT "ahspSheet", count(*) FROM analysis_masters WHERE "isSystem" = true GROUP BY "ahspSheet"`)
 	if err != nil {
 		return nil, err
 	}

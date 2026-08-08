@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +11,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 )
+
+// nullStr converts sql.NullString to a *string (nil when NULL).
+func nullStr(s sql.NullString) *string {
+	if !s.Valid {
+		return nil
+	}
+	return &s.String
+}
 
 // writeJSON encodes v with the given status. Errors from encoding are ignored.
 func writeJSON(w http.ResponseWriter, status int, v any) {

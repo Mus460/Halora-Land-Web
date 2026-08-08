@@ -77,8 +77,8 @@ export default function AHSPImportPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               Pastikan format file sesuai dengan template AHSP PUPR 2026.
-              File harus memiliki sheet: Master Analisa, Rincian Analisa, dan
-              Master Harga.
+              File harus memiliki sheet: Master Analysis, Component Analysis, dan
+              Master Price.
             </AlertDescription>
           </Alert>
 

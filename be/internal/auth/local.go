@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/halora-land/halora-be/internal/models"
@@ -76,13 +76,13 @@ func VerifySessionToken(tokenStr, secret string) (int32, error) {
 // LocalLogin verifies email/password against the local DB and returns the user.
 func (v *Verifier) LocalLogin(ctx context.Context, email, password string) (*AuthUser, error) {
 	var (
-		u           models.User
+		u            models.User
 		passwordHash *string
 	)
 	err := v.pool.QueryRow(ctx, `
-		SELECT id, "namaLengkap", email, role, "accountType", "isDemo", "passwordHash"
+		SELECT id, "fullName", email, role, "accountType", "isDemo", "passwordHash"
 		FROM users WHERE email = $1`, email).
-		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &passwordHash)
+		Scan(&u.ID, &u.FullName, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &passwordHash)
 	if err == pgx.ErrNoRows {
 		return nil, errors.New("email atau password salah")
 	}
@@ -99,7 +99,7 @@ func (v *Verifier) LocalLogin(ctx context.Context, email, password string) (*Aut
 		UserID:      u.ID,
 		Email:       u.Email,
 		Role:        u.Role,
-		NamaLengkap: u.NamaLengkap,
+		FullName:    u.FullName,
 		AccountType: u.AccountType,
 		IsDemo:      u.IsDemo,
 	}, nil
@@ -107,18 +107,18 @@ func (v *Verifier) LocalLogin(ctx context.Context, email, password string) (*Aut
 
 // LocalRegister creates a new user in the local DB with a hashed password.
 // For now all users are created as ADMIN (per-product decision).
-func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, password string) (*AuthUser, error) {
+func (v *Verifier) LocalRegister(ctx context.Context, fullName, email, password string) (*AuthUser, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
 	var u models.User
 	err = v.pool.QueryRow(ctx, `
-		INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
+		INSERT INTO users ("fullName", email, role, "accountType", "isDemo", "passwordHash")
 		VALUES ($1, $2, 'ADMIN', 'free', false, $3)
-		RETURNING id, "namaLengkap", email, role, "accountType", "isDemo"`,
-		namaLengkap, email, hash).
-		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
+		RETURNING id, "fullName", email, role, "accountType", "isDemo"`,
+		fullName, email, hash).
+		Scan(&u.ID, &u.FullName, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, errors.New("email sudah terdaftar")
@@ -129,7 +129,7 @@ func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, passwo
 		UserID:      u.ID,
 		Email:       u.Email,
 		Role:        u.Role,
-		NamaLengkap: u.NamaLengkap,
+		FullName:    u.FullName,
 		AccountType: u.AccountType,
 		IsDemo:      u.IsDemo,
 	}, nil
@@ -138,7 +138,7 @@ func (v *Verifier) LocalRegister(ctx context.Context, namaLengkap, email, passwo
 // LocalListUsers returns all users, newest first.
 func (v *Verifier) LocalListUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := v.pool.Query(ctx, `
-		SELECT id, "namaLengkap", email, role, "accountType", "isDemo", "createdAt", "updatedAt"
+		SELECT id, "fullName", email, role, "accountType", "isDemo", "createdAt", "updatedAt"
 		FROM users ORDER BY "createdAt" DESC, id DESC`)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (v *Verifier) LocalListUsers(ctx context.Context) ([]models.User, error) {
 	var out []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.FullName, &u.Email, &u.Role, &u.AccountType, &u.IsDemo, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -165,15 +165,15 @@ func (v *Verifier) LocalUpdatePassword(ctx context.Context, userID int32, passwo
 	return err
 }
 
-// LocalUpdateProfile updates the namaLengkap and email for the given user ID.
-func (v *Verifier) LocalUpdateProfile(ctx context.Context, userID int32, namaLengkap, email string) (*AuthUser, error) {
+// LocalUpdateProfile updates the fullName and email for the given user ID.
+func (v *Verifier) LocalUpdateProfile(ctx context.Context, userID int32, fullName, email string) (*AuthUser, error) {
 	var u models.User
 	err := v.pool.QueryRow(ctx, `
-		UPDATE users SET "namaLengkap" = $1, email = $2, "updatedAt" = NOW()
+		UPDATE users SET "fullName" = $1, email = $2, "updatedAt" = NOW()
 		WHERE id = $3
-		RETURNING id, "namaLengkap", email, role, "accountType", "isDemo"`,
-		namaLengkap, email, userID).
-		Scan(&u.ID, &u.NamaLengkap, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
+		RETURNING id, "fullName", email, role, "accountType", "isDemo"`,
+		fullName, email, userID).
+		Scan(&u.ID, &u.FullName, &u.Email, &u.Role, &u.AccountType, &u.IsDemo)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, errors.New("email sudah terdaftar")
@@ -184,7 +184,7 @@ func (v *Verifier) LocalUpdateProfile(ctx context.Context, userID int32, namaLen
 		UserID:      u.ID,
 		Email:       u.Email,
 		Role:        u.Role,
-		NamaLengkap: u.NamaLengkap,
+		FullName:    u.FullName,
 		AccountType: u.AccountType,
 		IsDemo:      u.IsDemo,
 	}, nil

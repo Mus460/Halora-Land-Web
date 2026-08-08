@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -33,6 +34,17 @@ func strPtr(s sql.NullString) *string {
 		return nil
 	}
 	return &s.String
+}
+
+func timePtr(s sql.NullString) *time.Time {
+	if !s.Valid {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s.String)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 func i32Ptr(s sql.NullInt32) *int32 {

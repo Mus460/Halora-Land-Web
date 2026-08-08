@@ -27,8 +27,8 @@ type Params struct {
 	Action      string
 	EntityType  string
 	EntityID    *int32
-	ProyekID    *int32
-	PekerjaanID *int32
+	ProjectID   *int32
+	WorkItemID  *int32
 	UserID      int32
 	OldValue    any
 	NewValue    any
@@ -97,9 +97,9 @@ func (l *Logger) write(ctx context.Context, p Params) {
 		newB, _ = json.Marshal(p.NewValue)
 	}
 	_, err := l.pool.Exec(ctx, `
-		INSERT INTO audit_log ("proyekId", "pekerjaanId", "userId", action, "entityType", "entityId", "oldValue", "newValue", description, "ipAddress", "userAgent")
+		INSERT INTO audit_log ("projectId", "workItemId", "userId", action, "entityType", "entityId", "oldValue", "newValue", description, "ipAddress", "userAgent")
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-		p.ProyekID, p.PekerjaanID, p.UserID, p.Action, p.EntityType, p.EntityID,
+		p.ProjectID, p.WorkItemID, p.UserID, p.Action, p.EntityType, p.EntityID,
 		oldB, newB, p.Description, p.IPAddress, p.UserAgent)
 	if err != nil {
 		// swallow — audit must not break user flows (§3.6)

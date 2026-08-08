@@ -70,9 +70,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`Selamat datang kembali, ${user?.namaLengkap || 'User'}!`}
+        description={`Selamat datang kembali, ${user?.fullName || 'User'}!`}
         actions={
-          <Link href="/proyek">
+          <Link href="/projects">
             <Button className="bg-amber-500 hover:bg-amber-600">
               <Plus className="w-4 h-4 mr-2" />
               Proyek Baru
@@ -84,20 +84,20 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard
-          title="Total Proyek"
-          value={stats.totalProyek || 0}
+          title="Total Project"
+          value={stats.totalProjects || 0}
           icon={<Building2 className="w-6 h-6" />}
           description="proyek terdaftar"
         />
         <StatCard
           title="Proyek Aktif"
-          value={stats.proyekAktif || 0}
+          value={stats.activeProjects || 0}
           icon={<ClipboardCheck className="w-6 h-6" />}
           description="sedang dikerjakan"
         />
         <StatCard
           title="Proyek Pitching"
-          value={stats.proyekPitching || 0}
+          value={stats.pitchingProjects || 0}
           icon={<Handshake className="w-6 h-6" />}
           description="dalam penawaran"
         />
@@ -108,8 +108,8 @@ export default function DashboardPage() {
           description="nilai keseluruhan"
         />
         <StatCard
-          title="Total Pekerjaan"
-          value={stats.totalPekerjaan || 0}
+          title="Total WorkItem"
+          value={stats.totalWorkItems || 0}
           icon={<TrendingUp className="w-6 h-6" />}
           description="item pekerjaan"
         />
@@ -119,8 +119,8 @@ export default function DashboardPage() {
         {/* Recent Projects */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Proyek Terbaru</CardTitle>
-            <Link href="/proyek">
+            <CardTitle className="text-lg">Project Terbaru</CardTitle>
+            <Link href="/projects">
               <Button variant="ghost" size="sm" className="text-amber-600">
                 Lihat Semua
               </Button>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
               {(recentProjects || []).map((project: any) => (
                 <Link
                   key={project.id}
-                  href={`/proyek/${project.id}`}
+                  href={`/projects/${project.id}`}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -140,10 +140,10 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">
-                        {project.nama}
+                        {project.name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {project.lokasi || "Lokasi belum diatur"}
+                        {project.location || "Lokasi belum diatur"}
                       </p>
                     </div>
                   </div>
@@ -181,25 +181,25 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link href="/proyek">
+            <Link href="/projects">
               <Button
                 variant="outline"
                 className="w-full h-auto py-4 flex flex-col gap-2"
               >
                 <Building2 className="w-5 h-5 text-amber-600" />
-                <span className="text-xs">Buat Proyek</span>
+                <span className="text-xs">Buat Project</span>
               </Button>
             </Link>
-            <Link href="/master-harga">
+            <Link href="/price-masters">
               <Button
                 variant="outline"
                 className="w-full h-auto py-4 flex flex-col gap-2"
               >
                 <Calculator className="w-5 h-5 text-amber-600" />
-                <span className="text-xs">Master Harga</span>
+                <span className="text-xs">Master Price</span>
               </Button>
             </Link>
-            <Link href="/rekap">
+            <Link href="/recaps">
               <Button
                 variant="outline"
                 className="w-full h-auto py-4 flex flex-col gap-2"

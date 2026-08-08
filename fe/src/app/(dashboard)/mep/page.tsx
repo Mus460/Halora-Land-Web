@@ -1,16 +1,15 @@
 "use client";
 
 import { Zap } from "lucide-react";
-import { PekerjaanPage } from "@/components/pekerjaan/pekerjaan-page";
+import { WorkItemPage } from "@/components/work-items/work-item-page";
 
 export default function MEPPage() {
   return (
-    <PekerjaanPage
-      kategori="mep"
+    <WorkItemPage
+      category="mep"
       title="Instalasi MEP"
       description="Pekerjaan mekanikal, elektrikal, dan plumbing"
       icon={Zap}
-      proyekId={1}
     />
   );
 }

@@ -30,20 +30,20 @@ func TestParsePriceList(t *testing.T) {
 	}
 	found := map[string][]PriceItem{}
 	for _, p := range prices {
-		key := strings.ToLower(strings.TrimSpace(p.Nama))
+		key := strings.ToLower(strings.TrimSpace(p.Name))
 		found[key] = append(found[key], p)
 	}
-	assert := func(name, sat string, harga int64) {
+	assert := func(name, sat string, price int64) {
 		t.Helper()
 		for _, p := range found[strings.ToLower(name)] {
-			if p.Satuan == sat {
-				if !p.Harga.Equal(decimal.NewFromInt(harga)) {
-					t.Errorf("price %q %s = %s want %d", name, sat, p.Harga, harga)
+			if p.Unit == sat {
+				if !p.Price.Equal(decimal.NewFromInt(price)) {
+					t.Errorf("price %q %s = %s want %d", name, sat, p.Price, price)
 				}
 				return
 			}
 		}
-		t.Errorf("price %q satuan %q not found", name, sat)
+		t.Errorf("price %q unit %q not found", name, sat)
 	}
 	assert("Pekerja", "OH", 100000)
 	assert("Tukang batu", "OH", 145000)
@@ -62,7 +62,7 @@ func TestParseSheetPersiapan(t *testing.T) {
 	}
 	var found *WorkItem
 	for i := range items {
-		if items[i].Kode == "1.1.1.1" {
+		if items[i].Code == "1.1.1.1" {
 			found = &items[i]
 			break
 		}
@@ -70,25 +70,25 @@ func TestParseSheetPersiapan(t *testing.T) {
 	if found == nil {
 		t.Fatalf("item 1.1.1.1 not parsed; got %d items", len(items))
 	}
-	if found.Satuan != "m'" {
-		t.Errorf("satuan = %q want m'", found.Satuan)
+	if found.Unit != "m'" {
+		t.Errorf("unit = %q want m'", found.Unit)
 	}
 	if len(found.Breakdown) < 10 {
 		t.Fatalf("breakdown too small: %d", len(found.Breakdown))
 	}
 	byName := map[string]BreakdownRow{}
 	for _, b := range found.Breakdown {
-		byName[strings.ToLower(strings.TrimSpace(b.Nama))] = b
+		byName[strings.ToLower(strings.TrimSpace(b.Name))] = b
 	}
 	tb, ok := byName["tukang batu"]
 	if !ok {
 		t.Fatal("Tukang batu row missing")
 	}
-	if !tb.Koef.Equal(decimal.NewFromFloat(0.2)) {
-		t.Errorf("Tukang batu koef = %s want 0.2", tb.Koef)
+	if !tb.Coefficient.Equal(decimal.NewFromFloat(0.2)) {
+		t.Errorf("Tukang batu coefficient = %s want 0.2", tb.Coefficient)
 	}
-	if tb.KodeReferensi != "L.02" {
-		t.Errorf("Tukang batu kodeReferensi = %q want L.02", tb.KodeReferensi)
+	if tb.ReferenceCode != "L.02" {
+		t.Errorf("Tukang batu referenceCode = %q want L.02", tb.ReferenceCode)
 	}
 }
 

@@ -66,7 +66,7 @@ func importAHSP(cfg *env.Config) error {
 			log.Printf("import %s: %v", sh, err)
 			continue
 		}
-		log.Printf("sheet=%s items=%d rincian=%d skipped=%d", res.Sheet, res.Items, res.Rincian, res.Skipped)
+		log.Printf("sheet=%s items=%d components=%d skipped=%d", res.Sheet, res.Items, res.Components, res.Skipped)
 	}
 	return nil
 }

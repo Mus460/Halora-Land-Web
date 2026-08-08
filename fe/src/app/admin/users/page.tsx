@@ -44,7 +44,7 @@ export default function AdminUsersPage() {
     fetchData();
   }, []);
 
-  const handleCreate = async (form: { namaLengkap: string; email: string; password: string }) => {
+  const handleCreate = async (form: { fullName: string; email: string; password: string }) => {
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -66,11 +66,11 @@ export default function AdminUsersPage() {
 
   const columns: ColumnDef<User>[] = [
     {
-      accessorKey: "namaLengkap",
+      accessorKey: "fullName",
       header: "Nama",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{row.original.namaLengkap}</p>
+          <p className="font-medium">{row.original.fullName}</p>
           <p className="text-xs text-gray-500">{row.original.email}</p>
         </div>
       ),
@@ -147,19 +147,19 @@ function UserFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { namaLengkap: string; email: string; password: string }) => void;
+  onSubmit: (data: { fullName: string; email: string; password: string }) => void;
 }) {
-  const [form, setForm] = useState({ namaLengkap: "", email: "", password: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(form);
-    setForm({ namaLengkap: "", email: "", password: "" });
+    setForm({ fullName: "", email: "", password: "" });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Tambah User</DialogTitle>
         </DialogHeader>
@@ -167,8 +167,8 @@ function UserFormDialog({
           <div className="space-y-2">
             <Label>Nama Lengkap (opsional)</Label>
             <Input
-              value={form.namaLengkap}
-              onChange={(e) => setForm({ ...form, namaLengkap: e.target.value })}
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
               placeholder="Nama user"
             />
           </div>

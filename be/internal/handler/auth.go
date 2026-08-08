@@ -67,9 +67,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		NamaLengkap string `json:"namaLengkap"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		FullName string `json:"fullName"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -82,10 +82,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Password minimal 6 karakter")
 		return
 	}
-	if in.NamaLengkap == "" {
-		in.NamaLengkap = strings.SplitN(in.Email, "@", 2)[0]
+	if in.FullName == "" {
+		in.FullName = strings.SplitN(in.Email, "@", 2)[0]
 	}
-	u, err := h.verifier.LocalRegister(r.Context(), in.NamaLengkap, in.Email, in.Password)
+	u, err := h.verifier.LocalRegister(r.Context(), in.FullName, in.Email, in.Password)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -106,17 +106,17 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPut {
 		var in struct {
-			NamaLengkap string `json:"namaLengkap"`
-			Email       string `json:"email"`
+			FullName string `json:"fullName"`
+			Email    string `json:"email"`
 		}
 		if !decodeJSON(w, r, &in) {
 			return
 		}
-		if in.NamaLengkap == "" || in.Email == "" {
-			writeError(w, http.StatusBadRequest, "namaLengkap dan email wajib diisi")
+		if in.FullName == "" || in.Email == "" {
+			writeError(w, http.StatusBadRequest, "fullName dan email wajib diisi")
 			return
 		}
-		updated, err := h.verifier.LocalUpdateProfile(r.Context(), u.UserID, in.NamaLengkap, in.Email)
+		updated, err := h.verifier.LocalUpdateProfile(r.Context(), u.UserID, in.FullName, in.Email)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -151,7 +151,9 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Password string `json:"password"` }
+	var in struct {
+		Password string `json:"password"`
+	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
@@ -179,7 +181,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) writeUser(w http.ResponseWriter, status int, u *auth.AuthUser) {
 	writeJSON(w, status, map[string]any{"user": map[string]any{
-		"id": u.UserID, "namaLengkap": u.NamaLengkap, "email": u.Email,
+		"id": u.UserID, "fullName": u.FullName, "email": u.Email,
 		"role": u.Role, "accountType": u.AccountType, "isDemo": u.IsDemo,
 	}})
 }

@@ -3,111 +3,111 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '@/lib/api';
 
-interface Proyek {
+interface Project {
   id: number;
-  namaProyek: string;
-  lokasi: string | null;
+  name: string;
+  location: string | null;
   userId: string;
 }
 
 interface ProjectContextType {
-  currentProyekId: number | null;
-  setCurrentProyekId: (id: number) => void;
-  proyek: Proyek | null;
-  proyekList: Proyek[];
+  currentProjectId: number | null;
+  setCurrentProjectId: (id: number) => void;
+  project: Project | null;
+  projectList: Project[];
   loading: boolean;
-  refreshProyekList: () => void;
+  refreshProjectList: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType>({
-  currentProyekId: null,
-  setCurrentProyekId: () => {},
-  proyek: null,
-  proyekList: [],
+  currentProjectId: null,
+  setCurrentProjectId: () => {},
+  project: null,
+  projectList: [],
   loading: false,
-  refreshProyekList: () => {},
+  refreshProjectList: () => {},
 });
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [currentProyekId, setCurrentProyekIdState] = useState<number | null>(null);
-  const [proyek, setProyek] = useState<Proyek | null>(null);
-  const [proyekList, setProyekList] = useState<Proyek[]>([]);
+  const [currentProjectId, setCurrentProjectIdState] = useState<number | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [projectList, setProjectList] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Load from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem('currentProyekId');
+    const stored = localStorage.getItem('currentProjectId');
     if (stored) {
       const id = parseInt(stored);
       if (!isNaN(id)) {
-        setCurrentProyekIdState(id);
+        setCurrentProjectIdState(id);
       }
     }
   }, []);
 
   // Fetch project list on mount
   useEffect(() => {
-    fetchProyekList();
+    fetchProjectList();
   }, []);
 
   // Fetch current project details when ID changes
   useEffect(() => {
-    if (currentProyekId) {
-      fetchProyek(currentProyekId);
+    if (currentProjectId) {
+      fetchProject(currentProjectId);
     } else {
-      setProyek(null);
+      setProject(null);
     }
-  }, [currentProyekId]);
+  }, [currentProjectId]);
 
-  const fetchProyekList = async () => {
+  const fetchProjectList = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.get<{ proyek: Proyek[] }>('/proyek');
-      const list = Array.isArray(data?.proyek) ? data.proyek : [];
-      setProyekList(list);
+      const data = await apiClient.get<{ projects: Project[] }>("/projects");
+      const list = Array.isArray(data?.projects) ? data?.projects : [];
+      setProjectList(list);
 
-      const stored = localStorage.getItem('currentProyekId');
+      const stored = localStorage.getItem('currentProjectId');
       const storedId = stored ? parseInt(stored) : NaN;
       const storedIsValid = list.some((p) => p.id === storedId);
       if (list.length > 0 && !storedIsValid) {
         const firstId = list[0].id;
-        setCurrentProyekIdState(firstId);
-        localStorage.setItem('currentProyekId', String(firstId));
+        setCurrentProjectIdState(firstId);
+        localStorage.setItem('currentProjectId', String(firstId));
       }
     } catch (error) {
-      console.error('Fetch proyek list error:', error);
+      console.error('Fetch project list error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProyek = async (id: number) => {
+  const fetchProject = async (id: number) => {
     try {
-      const data = await apiClient.get<{ proyek: Proyek }>(`/proyek/${id}`);
-      setProyek(data?.proyek || null);
+      const data = await apiClient.get<{ projects: Project }>(`/projects/${id}`);
+      setProject(data?.projects || null);
     } catch (error) {
-      console.error('Fetch proyek error:', error);
+      console.error('Fetch project error:', error);
     }
   };
 
-  const setCurrentProyekId = (id: number) => {
-    setCurrentProyekIdState(id);
-    localStorage.setItem('currentProyekId', String(id));
+  const setCurrentProjectId = (id: number) => {
+    setCurrentProjectIdState(id);
+    localStorage.setItem('currentProjectId', String(id));
   };
 
-  const refreshProyekList = () => {
-    fetchProyekList();
+  const refreshProjectList = () => {
+    fetchProjectList();
   };
 
   return (
     <ProjectContext.Provider
       value={{
-        currentProyekId,
-        setCurrentProyekId,
-        proyek,
-        proyekList,
+        currentProjectId,
+        setCurrentProjectId,
+        project,
+        projectList,
         loading,
-        refreshProyekList,
+        refreshProjectList,
       }}
     >
       {children}

@@ -18,6 +18,13 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID").format(value);
 }
 
+export function formatTimeline(months: number, days: number): string {
+  const parts: string[] = [];
+  if (months > 0) parts.push(`${months} bulan`);
+  if (days > 0) parts.push(`${days} hari`);
+  return parts.join(" ");
+}
+
 export function parseCurrency(value: string): number {
   return Number(value.replace(/[^0-9-]/g, "")) || 0;
 }
@@ -38,9 +45,9 @@ export function formatDateShort(date: string | Date): string {
   }).format(new Date(date));
 }
 
-// formatWaktu renders an hour count as "X hari Y jam" (1 hari = 24 jam).
+// formatDuration renders an hour count as "X hari Y jam" (1 hari = 24 jam).
 // Sub-day values are shown as plain hours.
-export function formatWaktu(value: number | null | undefined): string {
+export function formatDuration(value: number | null | undefined): string {
   if (value == null || value === 0) return "—";
   const fmt = (v: number) =>
     new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(v);
@@ -53,23 +60,23 @@ export function formatWaktu(value: number | null | undefined): string {
 
 export function calculateAHS(
   volume: number,
-  components: { koef: number; hargaSatuan: number; tipe: string }[]
+  components: { coefficient: number; unitPrice: number; type: string }[]
 ) {
   const breakdown = { material: 0, upah: 0, alat: 0 };
-  let hargaSatuan = 0;
+  let unitPrice = 0;
 
   for (const c of components) {
-    const total = c.koef * c.hargaSatuan;
-    hargaSatuan += total;
-    if (c.tipe in breakdown) {
-      breakdown[c.tipe as keyof typeof breakdown] += total;
+    const total = c.coefficient * c.unitPrice;
+    unitPrice += total;
+    if (c.type in breakdown) {
+      breakdown[c.type as keyof typeof breakdown] += total;
     }
   }
 
   return {
     volume,
-    hargaSatuan,
-    totalBiaya: volume * hargaSatuan,
+    unitPrice,
+    totalCost: volume * unitPrice,
     breakdown,
   };
 }

@@ -14,16 +14,16 @@ import (
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type MasterAnalisaRepo struct {
+type AnalysisMasterRepo struct {
 	pool  *pgxpool.Pool
 	cache *cache.Cache
 }
 
-func NewMasterAnalisaRepo(pool *pgxpool.Pool) *MasterAnalisaRepo {
-	return &MasterAnalisaRepo{pool: pool, cache: cache.New(60 * time.Second)}
+func NewAnalysisMasterRepo(pool *pgxpool.Pool) *AnalysisMasterRepo {
+	return &AnalysisMasterRepo{pool: pool, cache: cache.New(60 * time.Second)}
 }
 
-type ListMasterAnalisaFilter struct {
+type ListAnalysisMasterFilter struct {
 	Level    *int
 	ParentID *int32
 	Search   string
@@ -31,7 +31,7 @@ type ListMasterAnalisaFilter struct {
 	UserID   int32
 }
 
-func (f ListMasterAnalisaFilter) cacheKey() string {
+func (f ListAnalysisMasterFilter) cacheKey() string {
 	level, parentID, isGlobal := "nil", "nil", "nil"
 	if f.Level != nil {
 		level = strconv.Itoa(*f.Level)
@@ -45,13 +45,13 @@ func (f ListMasterAnalisaFilter) cacheKey() string {
 	return fmt.Sprintf("analisa|u:%d|level:%s|parent:%s|search:%s|global:%s", f.UserID, level, parentID, f.Search, isGlobal)
 }
 
-func (r *MasterAnalisaRepo) List(ctx context.Context, f ListMasterAnalisaFilter) ([]models.MasterAnalisa, error) {
+func (r *AnalysisMasterRepo) List(ctx context.Context, f ListAnalysisMasterFilter) ([]models.AnalysisMaster, error) {
 	if v, ok := r.cache.Get(f.cacheKey()); ok {
-		return v.([]models.MasterAnalisa), nil
+		return v.([]models.AnalysisMaster), nil
 	}
-	q := `SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
-		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true) AND "deletedAt" IS NULL`
+	q := `SELECT id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+		"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"
+		FROM analysis_masters WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true) AND "deletedAt" IS NULL`
 	args := []any{f.UserID}
 	if f.Level != nil {
 		args = append(args, *f.Level)
@@ -70,19 +70,19 @@ func (r *MasterAnalisaRepo) List(ctx context.Context, f ListMasterAnalisaFilter)
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")
-		q += ` AND (nama ILIKE $` + strconv.Itoa(len(args))
+		q += ` AND (name ILIKE $` + strconv.Itoa(len(args))
 		args = append(args, "%"+f.Search+"%")
-		q += ` OR "ahspKode" ILIKE $` + strconv.Itoa(len(args)) + `)`
+		q += ` OR "ahspCode" ILIKE $` + strconv.Itoa(len(args)) + `)`
 	}
-	q += ` ORDER BY level ASC, kode ASC`
+	q += ` ORDER BY level ASC, code ASC`
 	rows, err := r.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.MasterAnalisa
+	var out []models.AnalysisMaster
 	for rows.Next() {
-		m, err := scanMasterAnalisa(rows)
+		m, err := scanAnalysisMaster(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -95,53 +95,53 @@ func (r *MasterAnalisaRepo) List(ctx context.Context, f ListMasterAnalisaFilter)
 	return out, nil
 }
 
-func scanMasterAnalisa(s rowScanner) (*models.MasterAnalisa, error) {
-	var m models.MasterAnalisa
+func scanAnalysisMaster(s rowScanner) (*models.AnalysisMaster, error) {
+	var m models.AnalysisMaster
 	var parentID sql.NullInt32
-	var satuan, kategori, ahspKode, ahspSheet, hs, biayaUmum sql.NullString
+	var unit, category, ahspCode, ahspSheet, hs, generalCost sql.NullString
 	var userID sql.NullInt32
-	if err := s.Scan(&m.ID, &m.Kode, &m.Nama, &m.Level, &parentID, &satuan, &hs, &kategori,
-		&m.IsGlobal, &userID, &m.IsSystem, &ahspKode, &ahspSheet, &biayaUmum, &m.CreatedAt, &m.UpdatedAt); err != nil {
+	if err := s.Scan(&m.ID, &m.Code, &m.Name, &m.Level, &parentID, &unit, &hs, &category,
+		&m.IsGlobal, &userID, &m.IsSystem, &ahspCode, &ahspSheet, &generalCost, &m.CreatedAt, &m.UpdatedAt); err != nil {
 		return nil, err
 	}
 	m.ParentID = i32Ptr(parentID)
-	m.Satuan = strPtr(satuan)
-	m.HargaSatuan = scanDecPtr(hs)
-	m.Kategori = strPtr(kategori)
+	m.Unit = strPtr(unit)
+	m.UnitPrice = scanDecPtr(hs)
+	m.Category = strPtr(category)
 	m.UserID = i32Ptr(userID)
-	m.AHSPKode = strPtr(ahspKode)
+	m.AHSPCode = strPtr(ahspCode)
 	m.AHSPSheet = strPtr(ahspSheet)
-	m.BiayaUmum = scanDec(biayaUmum.String)
+	m.GeneralCost = scanDec(generalCost.String)
 	return &m, nil
 }
 
-func (r *MasterAnalisaRepo) Get(ctx context.Context, id int32) (*models.MasterAnalisa, error) {
+func (r *AnalysisMasterRepo) Get(ctx context.Context, id int32) (*models.AnalysisMaster, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
-		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE id = $1 AND "deletedAt" IS NULL`, id)
-	return scanMasterAnalisa(row)
+		SELECT id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+		"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"
+		FROM analysis_masters WHERE id = $1 AND "deletedAt" IS NULL`, id)
+	return scanAnalysisMaster(row)
 }
 
-type CreateMasterAnalisaInput struct {
-	Kode     string
-	Nama     string
+type CreateAnalysisMasterInput struct {
+	Code     string
+	Name     string
 	Level    int32
 	ParentID *int32
-	Satuan   *string
+	Unit     *string
 	IsGlobal bool
 	UserID   *int32
 	IsSystem bool
 }
 
-func (r *MasterAnalisaRepo) Create(ctx context.Context, in CreateMasterAnalisaInput) (*models.MasterAnalisa, error) {
+func (r *AnalysisMasterRepo) Create(ctx context.Context, in CreateAnalysisMasterInput) (*models.AnalysisMaster, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO master_analisa (kode, nama, level, "parentId", satuan, "isGlobal", "userId", "isSystem")
+		INSERT INTO analysis_masters (code, name, level, "parentId", unit, "isGlobal", "userId", "isSystem")
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		RETURNING id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
-		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"`,
-		in.Kode, in.Nama, in.Level, in.ParentID, in.Satuan, in.IsGlobal, in.UserID, in.IsSystem)
-	m, err := scanMasterAnalisa(row)
+		RETURNING id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+		"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"`,
+		in.Code, in.Name, in.Level, in.ParentID, in.Unit, in.IsGlobal, in.UserID, in.IsSystem)
+	m, err := scanAnalysisMaster(row)
 	if err != nil {
 		return nil, err
 	}
@@ -149,74 +149,246 @@ func (r *MasterAnalisaRepo) Create(ctx context.Context, in CreateMasterAnalisaIn
 	return m, nil
 }
 
-func (r *MasterAnalisaRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `UPDATE master_analisa SET "deletedAt" = NOW() WHERE id = $1`, id)
+func (r *AnalysisMasterRepo) Delete(ctx context.Context, id int32) error {
+	_, err := r.pool.Exec(ctx, `UPDATE analysis_masters SET "deletedAt" = NOW() WHERE id = $1`, id)
 	if err == nil {
 		r.cache.Clear()
 	}
 	return err
 }
 
-func (r *MasterAnalisaRepo) HasChildren(ctx context.Context, id int32) (bool, error) {
+// Copy duplicates an analysis master (and its components, plus any children)
+// into a user-owned, editable row that is detached from AHSP source data.
+func (r *AnalysisMasterRepo) Copy(ctx context.Context, id, userID int32, newName string) (*models.AnalysisMaster, error) {
+	src, err := r.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	name := newName
+	if name == "" {
+		name = "Salin - " + src.Name
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(context.Background())
+
+	newCode := func(srcCode string) (string, error) {
+		candidate := srcCode
+		suffix := 2
+		for {
+			var exists bool
+			err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM analysis_masters WHERE code = $1 AND "userId" = $2 AND "deletedAt" IS NULL)`, candidate, userID).Scan(&exists)
+			if err != nil {
+				return "", err
+			}
+			if !exists {
+				return candidate, nil
+			}
+			candidate = fmt.Sprintf("%s-%d", srcCode, suffix)
+			suffix++
+		}
+	}
+
+	var copyNode func(srcID, newParentID int32) (int32, error)
+	copyNode = func(srcID, newParentID int32) (int32, error) {
+		var srcChild models.AnalysisMaster
+		m, err := scanAnalysisMaster(tx.QueryRow(ctx, `
+			SELECT id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+			"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"
+			FROM analysis_masters WHERE id = $1 AND "deletedAt" IS NULL`, srcID))
+		if err != nil {
+			return 0, err
+		}
+		srcChild = *m
+		code, err := newCode(srcChild.Code)
+		if err != nil {
+			return 0, err
+		}
+		var newID int32
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO analysis_masters (code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId", "isSystem", "generalCost")
+			VALUES ($1,$2,$3,NULLIF($4,0),$5,$6,$7,false,$8,false,$9)
+			RETURNING id`,
+			code, name, srcChild.Level, newParentID, srcChild.Unit, decPtrArg(srcChild.UnitPrice),
+			srcChild.Category, userID, decArg(srcChild.GeneralCost)).Scan(&newID); err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO analysis_components ("analysisMasterId", "componentId", coefficient, type, name, unit, "unitPrice", "totalPrice", "referenceCode", duration, sequence)
+			SELECT $1, "componentId", coefficient, type, name, unit, "unitPrice", "totalPrice", "referenceCode", duration, sequence
+			FROM analysis_components WHERE "analysisMasterId" = $2 AND "deletedAt" IS NULL`, newID, srcID); err != nil {
+			return 0, err
+		}
+		rows, err := tx.Query(ctx, `SELECT id FROM analysis_masters WHERE "parentId" = $1 AND "deletedAt" IS NULL ORDER BY code`, srcID)
+		if err != nil {
+			return 0, err
+		}
+		var childIDs []int32
+		for rows.Next() {
+			var c int32
+			if err := rows.Scan(&c); err != nil {
+				rows.Close()
+				return 0, err
+			}
+			childIDs = append(childIDs, c)
+		}
+		rows.Close()
+		for _, c := range childIDs {
+			if _, err := copyNode(c, newID); err != nil {
+				return 0, err
+			}
+		}
+		return newID, nil
+	}
+
+	newID, err := copyNode(id, 0)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		return nil, err
+	}
+	r.cache.Clear()
+	return r.Get(ctx, newID)
+}
+
+type UpdateAnalysisMasterInput struct {
+	Name *string
+	Unit *string
+}
+
+func (r *AnalysisMasterRepo) Update(ctx context.Context, id, userID int32, isAdmin bool, in UpdateAnalysisMasterInput) (*models.AnalysisMaster, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE analysis_masters SET name = COALESCE($1, name), unit = COALESCE($2, unit), "updatedAt" = NOW()
+		WHERE id = $3 AND "deletedAt" IS NULL AND "isSystem" = false AND ("userId" = $4 OR $5)
+		RETURNING id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+		"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"`,
+		in.Name, in.Unit, id, userID, isAdmin)
+	m, err := scanAnalysisMaster(row)
+	if err == nil {
+		r.cache.Clear()
+	}
+	return m, err
+}
+
+func (r *AnalysisMasterRepo) HasChildren(ctx context.Context, id int32) (bool, error) {
 	var n int
-	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM master_analisa WHERE "parentId" = $1 AND "deletedAt" IS NULL`, id).Scan(&n)
+	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM analysis_masters WHERE "parentId" = $1 AND "deletedAt" IS NULL`, id).Scan(&n)
 	return n > 0, err
 }
 
-// --- rincian_analisa (template breakdown, §3.2) ---
+// --- analysis_components (template breakdown, §3.2) ---
 
-func (r *MasterAnalisaRepo) ListRincian(ctx context.Context, masterAnalisaID int32) ([]models.RincianAnalisa, error) {
+func (r *AnalysisMasterRepo) ListComponents(ctx context.Context, analysisMasterID int32) ([]models.AnalysisComponent, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, "masterAnalisaId", "komponenId", koef, tipe, nama, satuan, "hargaSatuan", "jumlahHarga",
-		"kodeReferensi", waktu, urutan, "createdAt", "updatedAt"
-		FROM rincian_analisa WHERE "masterAnalisaId" = $1 AND "deletedAt" IS NULL ORDER BY urutan ASC, id ASC`, masterAnalisaID)
+		SELECT id, "analysisMasterId", "componentId", coefficient, type, name, unit, "unitPrice", "totalPrice",
+		"referenceCode", duration, sequence, "createdAt", "updatedAt"
+		FROM analysis_components WHERE "analysisMasterId" = $1 AND "deletedAt" IS NULL ORDER BY sequence ASC, id ASC`, analysisMasterID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.RincianAnalisa
+	var out []models.AnalysisComponent
 	for rows.Next() {
-		var rin models.RincianAnalisa
-		var komponenID sql.NullInt32
-		var koef string
-		var nama, satuan, hs, jh, kodeRef, waktu sql.NullString
-		if err := rows.Scan(&rin.ID, &rin.MasterAnalisaID, &komponenID, &koef, &rin.Tipe, &nama, &satuan, &hs, &jh, &kodeRef, &waktu, &rin.Urutan, &rin.CreatedAt, &rin.UpdatedAt); err != nil {
+		rin, err := scanAnalysisComponent(rows)
+		if err != nil {
 			return nil, err
 		}
-		rin.KomponenID = i32Ptr(komponenID)
-		rin.Koef = scanDec(koef)
-		rin.Nama = strPtr(nama)
-		rin.Satuan = strPtr(satuan)
-		rin.HargaSatuan = scanDecPtr(hs)
-		rin.JumlahHarga = scanDecPtr(jh)
-		rin.KodeReferensi = strPtr(kodeRef)
-		rin.Waktu = scanDecPtr(waktu)
-		out = append(out, rin)
+		out = append(out, *rin)
 	}
 	return out, rows.Err()
 }
 
-type CreateRincianInput struct {
-	MasterAnalisaID int32                  `json:"masterAnalisaId"`
-	KomponenID      *int32                 `json:"komponenId"`
-	Koef            decimal.Decimal        `json:"koef"`
-	Tipe            models.TipeKomponen    `json:"tipe"`
+func scanAnalysisComponent(s rowScanner) (*models.AnalysisComponent, error) {
+	var rin models.AnalysisComponent
+	var komponenID sql.NullInt32
+	var coefficient string
+	var name, unit, hs, jh, kodeRef, duration sql.NullString
+	if err := s.Scan(&rin.ID, &rin.AnalysisMasterID, &komponenID, &coefficient, &rin.Type, &name, &unit, &hs, &jh, &kodeRef, &duration, &rin.Sequence, &rin.CreatedAt, &rin.UpdatedAt); err != nil {
+		return nil, err
+	}
+	rin.ComponentID = i32Ptr(komponenID)
+	rin.Coefficient = scanDec(coefficient)
+	rin.Name = strPtr(name)
+	rin.Unit = strPtr(unit)
+	rin.UnitPrice = scanDecPtr(hs)
+	rin.TotalPrice = scanDecPtr(jh)
+	rin.ReferenceCode = strPtr(kodeRef)
+	rin.Duration = scanDecPtr(duration)
+	return &rin, nil
 }
 
-func (r *MasterAnalisaRepo) CreateRincian(ctx context.Context, in CreateRincianInput) error {
+type UpdateComponentInput struct {
+	ID               int32
+	AnalysisMasterID int32
+	Coefficient      *decimal.Decimal
+	UnitPrice        *decimal.Decimal
+	Unit             *string
+	Name             *string
+	Type             *models.ComponentType
+}
+
+// UpdateComponent edits a breakdown row of a non-system, user-owned master,
+// then recomputes the component totalPrice and the master unitPrice.
+func (r *AnalysisMasterRepo) UpdateComponent(ctx context.Context, userID int32, isAdmin bool, in UpdateComponentInput) (*models.AnalysisComponent, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE analysis_components c SET
+			coefficient = COALESCE($1, c.coefficient),
+			"unitPrice" = COALESCE($2, c."unitPrice"),
+			unit = COALESCE($3, c.unit),
+			name = COALESCE($4, c.name),
+			type = COALESCE($5, c.type),
+			"totalPrice" = CASE
+				WHEN (COALESCE($2, c."unitPrice") IS NOT NULL)
+				THEN ROUND(COALESCE($1, c.coefficient) * COALESCE($2, c."unitPrice") * 100) / 100
+				ELSE c."totalPrice" END,
+			"updatedAt" = NOW()
+		FROM analysis_masters m
+		WHERE c.id = $6 AND c."analysisMasterId" = m.id AND c."deletedAt" IS NULL
+			AND m."deletedAt" IS NULL AND m."isSystem" = false AND (m."userId" = $7 OR $8)
+		RETURNING c.id, c."analysisMasterId", c."componentId", c.coefficient, c.type, c.name, c.unit, c."unitPrice", c."totalPrice",
+		"referenceCode", duration, sequence, c."createdAt", c."updatedAt"`,
+		decPtrArg(in.Coefficient), decPtrArg(in.UnitPrice), in.Unit, in.Name, in.Type,
+		in.ID, userID, isAdmin)
+	comp, err := scanAnalysisComponent(row)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := r.pool.Exec(ctx, `
+		UPDATE analysis_masters m SET
+			"unitPrice" = ROUND((SELECT COALESCE(SUM(COALESCE(c."totalPrice",0)),0) FROM analysis_components c
+				WHERE c."analysisMasterId" = m.id AND c."deletedAt" IS NULL) * (1 + COALESCE(m."generalCost",0)), 2),
+			"updatedAt" = NOW()
+		WHERE m.id = $1 AND m."deletedAt" IS NULL`, in.AnalysisMasterID); err != nil {
+		return nil, err
+	}
+	r.cache.Clear()
+	return comp, nil
+}
+
+type CreateComponentInput struct {
+	AnalysisMasterID int32                `json:"analysisMasterId"`
+	ComponentID      *int32               `json:"componentId"`
+	Coefficient      decimal.Decimal      `json:"coefficient"`
+	Type             models.ComponentType `json:"type"`
+}
+
+func (r *AnalysisMasterRepo) CreateComponent(ctx context.Context, in CreateComponentInput) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO rincian_analisa ("masterAnalisaId", "komponenId", koef, tipe)
-		VALUES ($1,$2,$3,$4)`, in.MasterAnalisaID, in.KomponenID, decArg(in.Koef), in.Tipe)
+		INSERT INTO analysis_components ("analysisMasterId", "componentId", coefficient, type)
+		VALUES ($1,$2,$3,$4)`, in.AnalysisMasterID, in.ComponentID, decArg(in.Coefficient), in.Type)
 	return err
 }
 
-func (r *MasterAnalisaRepo) DeleteRincian(ctx context.Context, masterAnalisaID, rincianID int32) error {
-	_, err := r.pool.Exec(ctx, `UPDATE rincian_analisa SET "deletedAt" = NOW() WHERE id = $1 AND "masterAnalisaId" = $2`, rincianID, masterAnalisaID)
+func (r *AnalysisMasterRepo) DeleteComponent(ctx context.Context, analysisMasterID, componentID int32) error {
+	_, err := r.pool.Exec(ctx, `UPDATE analysis_components SET "deletedAt" = NOW() WHERE id = $1 AND "analysisMasterId" = $2`, componentID, analysisMasterID)
 	return err
 }
 
 // ListTree fetches all accessible nodes and builds a tree from the root level.
-func (r *MasterAnalisaRepo) ListTree(ctx context.Context, f ListMasterAnalisaFilter) ([]models.MasterAnalisa, error) {
+func (r *AnalysisMasterRepo) ListTree(ctx context.Context, f ListAnalysisMasterFilter) ([]models.AnalysisMaster, error) {
 	treeFilter := f
 	treeFilter.Level = nil
 	treeFilter.ParentID = nil
@@ -224,12 +396,12 @@ func (r *MasterAnalisaRepo) ListTree(ctx context.Context, f ListMasterAnalisaFil
 	if err != nil {
 		return nil, err
 	}
-	return buildMasterAnalisaTree(all), nil
+	return buildAnalysisMasterTree(all), nil
 }
 
-func buildMasterAnalisaTree(all []models.MasterAnalisa) []models.MasterAnalisa {
-	byID := make(map[int32]*models.MasterAnalisa, len(all))
-	roots := make([]models.MasterAnalisa, 0)
+func buildAnalysisMasterTree(all []models.AnalysisMaster) []models.AnalysisMaster {
+	byID := make(map[int32]*models.AnalysisMaster, len(all))
+	roots := make([]models.AnalysisMaster, 0)
 	for i := range all {
 		byID[all[i].ID] = &all[i]
 	}
@@ -246,29 +418,29 @@ func buildMasterAnalisaTree(all []models.MasterAnalisa) []models.MasterAnalisa {
 	return roots
 }
 
-// SearchAHSP searches system AHSP items by nama/ahspKode ILIKE (§6.6 search).
-func (r *MasterAnalisaRepo) SearchAHSP(ctx context.Context, q, kategori string, limit int) ([]models.MasterAnalisa, error) {
+// SearchAHSP searches system AHSP items by name/ahspCode ILIKE (§6.6 search).
+func (r *AnalysisMasterRepo) SearchAHSP(ctx context.Context, q, category string, limit int) ([]models.AnalysisMaster, error) {
 	args := []any{"%" + q + "%"}
-	query := `SELECT id, kode, nama, level, "parentId", satuan, "hargaSatuan", kategori, "isGlobal", "userId",
-		"isSystem", "ahspKode", "ahspSheet", "biayaUmum", "createdAt", "updatedAt"
-		FROM master_analisa WHERE "isSystem" = true AND "deletedAt" IS NULL AND (nama ILIKE $1 OR "ahspKode" ILIKE $1)`
-	if kategori != "" && kategori != "custom" {
-		args = append(args, kategori)
-		query += ` AND kategori = $` + strconv.Itoa(len(args))
+	query := `SELECT id, code, name, level, "parentId", unit, "unitPrice", category, "isGlobal", "userId",
+		"isSystem", "ahspCode", "ahspSheet", "generalCost", "createdAt", "updatedAt"
+		FROM analysis_masters WHERE "isSystem" = true AND "deletedAt" IS NULL AND (name ILIKE $1 OR "ahspCode" ILIKE $1)`
+	if category != "" && category != "custom" {
+		args = append(args, category)
+		query += ` AND category = $` + strconv.Itoa(len(args))
 	}
 	if limit <= 0 {
 		limit = 20
 	}
 	args = append(args, limit)
-	query += ` ORDER BY similarity(nama, $1) DESC, nama ASC LIMIT $` + strconv.Itoa(len(args))
+	query += ` ORDER BY similarity(name, $1) DESC, name ASC LIMIT $` + strconv.Itoa(len(args))
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.MasterAnalisa
+	var out []models.AnalysisMaster
 	for rows.Next() {
-		m, err := scanMasterAnalisa(rows)
+		m, err := scanAnalysisMaster(rows)
 		if err != nil {
 			return nil, err
 		}

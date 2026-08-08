@@ -14,40 +14,40 @@ import (
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type MasterHargaRepo struct {
+type PriceMasterRepo struct {
 	pool  *pgxpool.Pool
 	cache *cache.Cache
 }
 
-func NewMasterHargaRepo(pool *pgxpool.Pool) *MasterHargaRepo {
-	return &MasterHargaRepo{pool: pool, cache: cache.New(60 * time.Second)}
+func NewPriceMasterRepo(pool *pgxpool.Pool) *PriceMasterRepo {
+	return &PriceMasterRepo{pool: pool, cache: cache.New(60 * time.Second)}
 }
 
-type ListMasterHargaFilter struct {
+type ListPriceMasterFilter struct {
 	UserID   int32
-	Kategori string
+	Type     string
 	Search   string
 	IsGlobal *bool
 }
 
-func (f ListMasterHargaFilter) cacheKey() string {
+func (f ListPriceMasterFilter) cacheKey() string {
 	isGlobal := "nil"
 	if f.IsGlobal != nil {
 		isGlobal = strconv.FormatBool(*f.IsGlobal)
 	}
-	return fmt.Sprintf("harga|u:%d|kategori:%s|search:%s|global:%s", f.UserID, f.Kategori, f.Search, isGlobal)
+	return fmt.Sprintf("price|u:%d|type:%s|search:%s|global:%s", f.UserID, f.Type, f.Search, isGlobal)
 }
 
-func (r *MasterHargaRepo) List(ctx context.Context, f ListMasterHargaFilter) ([]models.MasterHarga, error) {
+func (r *PriceMasterRepo) List(ctx context.Context, f ListPriceMasterFilter) ([]models.PriceMaster, error) {
 	if v, ok := r.cache.Get(f.cacheKey()); ok {
-		return v.([]models.MasterHarga), nil
+		return v.([]models.PriceMaster), nil
 	}
-	q := `SELECT id, nama, satuan, harga, kategori, "isGlobal", "userId", "kodeAHSP", "isSystem", "createdAt", "updatedAt"
-		FROM master_harga WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true) AND "deletedAt" IS NULL`
+	q := `SELECT id, name, unit, price, type, "isGlobal", "userId", "ahspCode", "isSystem", "createdAt", "updatedAt"
+		FROM price_masters WHERE ("userId" = $1 OR "isGlobal" = true OR "isSystem" = true) AND "deletedAt" IS NULL`
 	args := []any{f.UserID}
-	if f.Kategori != "" {
-		args = append(args, f.Kategori)
-		q += ` AND kategori = $` + strconv.Itoa(len(args))
+	if f.Type != "" {
+		args = append(args, f.Type)
+		q += ` AND type = $` + strconv.Itoa(len(args))
 	}
 	if f.IsGlobal != nil {
 		args = append(args, *f.IsGlobal)
@@ -55,17 +55,17 @@ func (r *MasterHargaRepo) List(ctx context.Context, f ListMasterHargaFilter) ([]
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")
-		q += ` AND nama ILIKE $` + strconv.Itoa(len(args))
+		q += ` AND name ILIKE $` + strconv.Itoa(len(args))
 	}
-	q += ` ORDER BY nama ASC`
+	q += ` ORDER BY name ASC`
 	rows, err := r.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.MasterHarga
+	var out []models.PriceMaster
 	for rows.Next() {
-		m, err := scanMasterHarga(rows)
+		m, err := scanPriceMaster(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -78,43 +78,43 @@ func (r *MasterHargaRepo) List(ctx context.Context, f ListMasterHargaFilter) ([]
 	return out, nil
 }
 
-func scanMasterHarga(s rowScanner) (*models.MasterHarga, error) {
-	var m models.MasterHarga
-	var harga, kodeAHSP sql.NullString
+func scanPriceMaster(s rowScanner) (*models.PriceMaster, error) {
+	var m models.PriceMaster
+	var price, ahspCode sql.NullString
 	var userID sql.NullInt32
-	if err := s.Scan(&m.ID, &m.Nama, &m.Satuan, &harga, &m.Kategori, &m.IsGlobal, &userID, &kodeAHSP, &m.IsSystem, &m.CreatedAt, &m.UpdatedAt); err != nil {
+	if err := s.Scan(&m.ID, &m.Name, &m.Unit, &price, &m.Type, &m.IsGlobal, &userID, &ahspCode, &m.IsSystem, &m.CreatedAt, &m.UpdatedAt); err != nil {
 		return nil, err
 	}
-	m.Harga = scanDec(harga.String)
+	m.Price = scanDec(price.String)
 	m.UserID = i32Ptr(userID)
-	m.KodeAHSP = strPtr(kodeAHSP)
+	m.AHSPCode = strPtr(ahspCode)
 	return &m, nil
 }
 
-func (r *MasterHargaRepo) Get(ctx context.Context, id int32) (*models.MasterHarga, error) {
+func (r *PriceMasterRepo) Get(ctx context.Context, id int32) (*models.PriceMaster, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, nama, satuan, harga, kategori, "isGlobal", "userId", "kodeAHSP", "isSystem", "createdAt", "updatedAt"
-		FROM master_harga WHERE id = $1 AND "deletedAt" IS NULL`, id)
-	return scanMasterHarga(row)
+		SELECT id, name, unit, price, type, "isGlobal", "userId", "ahspCode", "isSystem", "createdAt", "updatedAt"
+		FROM price_masters WHERE id = $1 AND "deletedAt" IS NULL`, id)
+	return scanPriceMaster(row)
 }
 
-type CreateMasterHargaInput struct {
-	Nama     string
-	Satuan   string
-	Harga    decimal.Decimal
-	Kategori models.TipeKomponen
+type CreatePriceMasterInput struct {
+	Name     string
+	Unit     string
+	Price    decimal.Decimal
+	Type     models.ComponentType
 	IsGlobal bool
 	UserID   *int32
 	IsSystem bool
 }
 
-func (r *MasterHargaRepo) Create(ctx context.Context, in CreateMasterHargaInput) (*models.MasterHarga, error) {
+func (r *PriceMasterRepo) Create(ctx context.Context, in CreatePriceMasterInput) (*models.PriceMaster, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO master_harga (nama, satuan, harga, kategori, "isGlobal", "userId", "isSystem")
+		INSERT INTO price_masters (name, unit, price, type, "isGlobal", "userId", "isSystem")
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING id, nama, satuan, harga, kategori, "isGlobal", "userId", "kodeAHSP", "isSystem", "createdAt", "updatedAt"`,
-		in.Nama, in.Satuan, decArg(in.Harga), in.Kategori, in.IsGlobal, in.UserID, in.IsSystem)
-	m, err := scanMasterHarga(row)
+		RETURNING id, name, unit, price, type, "isGlobal", "userId", "ahspCode", "isSystem", "createdAt", "updatedAt"`,
+		in.Name, in.Unit, decArg(in.Price), in.Type, in.IsGlobal, in.UserID, in.IsSystem)
+	m, err := scanPriceMaster(row)
 	if err != nil {
 		return nil, err
 	}
@@ -122,33 +122,33 @@ func (r *MasterHargaRepo) Create(ctx context.Context, in CreateMasterHargaInput)
 	return m, nil
 }
 
-func (r *MasterHargaRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `UPDATE master_harga SET "deletedAt" = NOW() WHERE id = $1`, id)
+func (r *PriceMasterRepo) Delete(ctx context.Context, id int32) error {
+	_, err := r.pool.Exec(ctx, `UPDATE price_masters SET "deletedAt" = NOW() WHERE id = $1`, id)
 	if err == nil {
 		r.cache.Clear()
 	}
 	return err
 }
 
-type UpdateMasterHargaInput struct {
-	Nama     *string
-	Satuan   *string
-	Harga    *decimal.Decimal
-	Kategori *models.TipeKomponen
+type UpdatePriceMasterInput struct {
+	Name  *string
+	Unit  *string
+	Price *decimal.Decimal
+	Type  *models.ComponentType
 }
 
-func (r *MasterHargaRepo) Update(ctx context.Context, id int32, in UpdateMasterHargaInput) (*models.MasterHarga, error) {
+func (r *PriceMasterRepo) Update(ctx context.Context, id int32, in UpdatePriceMasterInput) (*models.PriceMaster, error) {
 	row := r.pool.QueryRow(ctx, `
-		UPDATE master_harga SET
-			nama = COALESCE($2, nama),
-			satuan = COALESCE($3, satuan),
-			harga = COALESCE($4, harga),
-			kategori = COALESCE($5, kategori),
+		UPDATE price_masters SET
+			name = COALESCE($2, name),
+			unit = COALESCE($3, unit),
+			price = COALESCE($4, price),
+			type = COALESCE($5, type),
 			"updatedAt" = NOW()
 		WHERE id = $1
-		RETURNING id, nama, satuan, harga, kategori, "isGlobal", "userId", "kodeAHSP", "isSystem", "createdAt", "updatedAt"`,
-		id, in.Nama, in.Satuan, decPtrArg(in.Harga), in.Kategori)
-	m, err := scanMasterHarga(row)
+		RETURNING id, name, unit, price, type, "isGlobal", "userId", "ahspCode", "isSystem", "createdAt", "updatedAt"`,
+		id, in.Name, in.Unit, decPtrArg(in.Price), in.Type)
+	m, err := scanPriceMaster(row)
 	if err != nil {
 		return nil, err
 	}
@@ -156,13 +156,13 @@ func (r *MasterHargaRepo) Update(ctx context.Context, id int32, in UpdateMasterH
 	return m, nil
 }
 
-// GetMany loads a set of master_harga rows by ID (used by drift detection).
-func (r *MasterHargaRepo) GetMany(ctx context.Context, ids []int32) (map[int32]decimal.Decimal, error) {
+// GetMany loads a set of price_masters rows by ID (used by drift detection).
+func (r *PriceMasterRepo) GetMany(ctx context.Context, ids []int32) (map[int32]decimal.Decimal, error) {
 	if len(ids) == 0 {
 		return map[int32]decimal.Decimal{}, nil
 	}
 	out := make(map[int32]decimal.Decimal, len(ids))
-	rows, err := r.pool.Query(ctx, `SELECT id, harga::text FROM master_harga WHERE id = ANY($1) AND "deletedAt" IS NULL`, ids)
+	rows, err := r.pool.Query(ctx, `SELECT id, price::text FROM price_masters WHERE id = ANY($1) AND "deletedAt" IS NULL`, ids)
 	if err != nil {
 		return nil, err
 	}

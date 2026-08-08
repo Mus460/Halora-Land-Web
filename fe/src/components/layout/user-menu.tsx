@@ -18,7 +18,7 @@ import { useProjectStore } from "@/stores/use-project-store";
 
 interface UserInfo {
   id: number;
-  namaLengkap: string;
+  fullName: string;
   email: string;
   role: string;
   accountType?: string;
@@ -68,7 +68,7 @@ export function UserMenu() {
         const data = await response.json().catch(() => null);
         throw new Error(data?.error || "Logout gagal");
       }
-      localStorage.removeItem("currentProyekId");
+      localStorage.removeItem("currentProjectId");
       setActiveProject(null);
       toast.success("Logout berhasil");
       router.push("/login");
@@ -83,12 +83,12 @@ export function UserMenu() {
       <DropdownMenuTrigger className="flex items-center gap-2 hover:opacity-80 transition-opacity">
         <Avatar className="w-8 h-8">
           <AvatarFallback className="bg-amber-500 text-white text-sm font-bold">
-            {user ? initialsOf(user.namaLengkap) : "U"}
+            {user ? initialsOf(user.fullName) : "U"}
           </AvatarFallback>
         </Avatar>
         <div className="hidden md:block text-left">
           <p className="text-sm font-medium text-gray-700">
-            {user?.namaLengkap || "Memuat..."}
+            {user?.fullName || "Memuat..."}
           </p>
           <p className="text-xs text-gray-500">
             {user ? ROLE_LABELS[user.role] || user.role : "..."}
