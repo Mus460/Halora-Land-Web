@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
@@ -60,7 +60,7 @@ const (
 // the project does not exist, and (nil, membership, true, false) when the user
 // lacks the required level. This is the single, central replacement for the
 // inline `hasAccess` block repeated across every route today (§2.1, §3.9).
-func ProjectAccess(ctx context.Context, pool *pgxpool.Pool, projectID int32, level AccessLevel) (*models.Project, *TeamMembership, bool, bool) {
+func ProjectAccess(ctx context.Context, pool database.Pool, projectID int32, level AccessLevel) (*models.Project, *TeamMembership, bool, bool) {
 	u := FromContext(ctx)
 	if u == nil {
 		return nil, nil, false, false

@@ -6,19 +6,19 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type WorkItemRepo struct{ pool *pgxpool.Pool }
+type WorkItemRepo struct{ pool database.Pool }
 
 var ErrProgressNotIncreasing = errors.New("progress baru harus lebih tinggi dari progress saat ini")
 
-func NewWorkItemRepo(pool *pgxpool.Pool) *WorkItemRepo { return &WorkItemRepo{pool: pool} }
+func NewWorkItemRepo(pool database.Pool) *WorkItemRepo { return &WorkItemRepo{pool: pool} }
 
 type ListWorkItemFilter struct {
 	ProjectID *int32

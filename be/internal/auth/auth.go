@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
@@ -21,12 +21,12 @@ const (
 // the token is verified with the shared JWT secret and the user row is loaded
 // from Postgres on every request.
 type Verifier struct {
-	pool      *pgxpool.Pool
+	pool      database.Pool
 	jwtSecret string
 }
 
 // NewVerifier builds a local-auth verifier.
-func NewVerifier(pool *pgxpool.Pool, jwtSecret string) *Verifier {
+func NewVerifier(pool database.Pool, jwtSecret string) *Verifier {
 	return &Verifier{pool: pool, jwtSecret: jwtSecret}
 }
 

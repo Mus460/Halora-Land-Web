@@ -5,16 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
 
 // ProjectRepo handles projects + project_team persistence.
-type ProjectRepo struct{ pool *pgxpool.Pool }
+type ProjectRepo struct{ pool database.Pool }
 
-func NewProjectRepo(pool *pgxpool.Pool) *ProjectRepo { return &ProjectRepo{pool: pool} }
+func NewProjectRepo(pool database.Pool) *ProjectRepo { return &ProjectRepo{pool: pool} }
 
 type ListProjectFilter struct {
 	UserID  int32

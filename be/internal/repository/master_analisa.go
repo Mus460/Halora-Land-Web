@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/cache"
@@ -15,11 +15,11 @@ import (
 )
 
 type AnalysisMasterRepo struct {
-	pool  *pgxpool.Pool
+	pool  database.Pool
 	cache *cache.Cache
 }
 
-func NewAnalysisMasterRepo(pool *pgxpool.Pool) *AnalysisMasterRepo {
+func NewAnalysisMasterRepo(pool database.Pool) *AnalysisMasterRepo {
 	return &AnalysisMasterRepo{pool: pool, cache: cache.New(60 * time.Second)}
 }
 
@@ -399,21 +399,41 @@ func (r *AnalysisMasterRepo) ListTree(ctx context.Context, f ListAnalysisMasterF
 	return buildAnalysisMasterTree(all), nil
 }
 
+// buildAnalysisMasterTree assembles the parent/child tree. all is sorted by
+// level ASC (parents before children), so we wire children deepest-first:
+// every node is fully assembled before it is copied into its parent, and root
+// copies are taken only after the whole tree is wired.
 func buildAnalysisMasterTree(all []models.AnalysisMaster) []models.AnalysisMaster {
 	byID := make(map[int32]*models.AnalysisMaster, len(all))
-	roots := make([]models.AnalysisMaster, 0)
 	for i := range all {
 		byID[all[i].ID] = &all[i]
 	}
+	// roots: nodes without a parent, or whose parent is missing from the set
+	rootIDs := make([]int32, 0, len(all))
 	for i := range all {
-		node := &all[i]
-		if node.ParentID != nil {
-			if parent, ok := byID[*node.ParentID]; ok {
-				parent.Children = append(parent.Children, *node)
-				continue
-			}
+		if all[i].ParentID == nil {
+			rootIDs = append(rootIDs, all[i].ID)
+			continue
 		}
-		roots = append(roots, *node)
+		if _, ok := byID[*all[i].ParentID]; !ok {
+			rootIDs = append(rootIDs, all[i].ID)
+		}
+	}
+	for i := len(all) - 1; i >= 0; i-- {
+		node := &all[i]
+		if node.ParentID == nil {
+			continue
+		}
+		parent, ok := byID[*node.ParentID]
+		if !ok {
+			continue
+		}
+		// prepend so siblings stay in code-ascending order
+		parent.Children = append([]models.AnalysisMaster{*node}, parent.Children...)
+	}
+	roots := make([]models.AnalysisMaster, 0, len(rootIDs))
+	for _, id := range rootIDs {
+		roots = append(roots, *byID[id])
 	}
 	return roots
 }

@@ -7,15 +7,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type AuditLogRepo struct{ pool *pgxpool.Pool }
+type AuditLogRepo struct{ pool database.Pool }
 
-func NewAuditLogRepo(pool *pgxpool.Pool) *AuditLogRepo { return &AuditLogRepo{pool: pool} }
+func NewAuditLogRepo(pool database.Pool) *AuditLogRepo { return &AuditLogRepo{pool: pool} }
 
 type ListAuditFilter struct {
 	UserID     *int32
@@ -104,9 +104,9 @@ type RecentProject struct {
 	CreatedAt time.Time       `json:"createdAt"`
 }
 
-type DashboardRepo struct{ pool *pgxpool.Pool }
+type DashboardRepo struct{ pool database.Pool }
 
-func NewDashboardRepo(pool *pgxpool.Pool) *DashboardRepo { return &DashboardRepo{pool: pool} }
+func NewDashboardRepo(pool database.Pool) *DashboardRepo { return &DashboardRepo{pool: pool} }
 
 func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (*DashboardStats, error) {
 	scope := ``

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/cache"
@@ -15,11 +15,11 @@ import (
 )
 
 type PriceMasterRepo struct {
-	pool  *pgxpool.Pool
+	pool  database.Pool
 	cache *cache.Cache
 }
 
-func NewPriceMasterRepo(pool *pgxpool.Pool) *PriceMasterRepo {
+func NewPriceMasterRepo(pool database.Pool) *PriceMasterRepo {
 	return &PriceMasterRepo{pool: pool, cache: cache.New(60 * time.Second)}
 }
 

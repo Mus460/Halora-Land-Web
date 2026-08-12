@@ -31,11 +31,18 @@ export const SATUAN_OPTIONS = [
   { value: "m3", label: "m³" },
   { value: "m1", label: "m¹" },
   { value: "m", label: "m" },
+  { value: "m'", label: "m'" },
   { value: "unit", label: "Unit" },
+  { value: "buah", label: "Buah" },
   { value: "kg", label: "Kg" },
+  { value: "ton", label: "Ton" },
   { value: "ls", label: "LS" },
   { value: "set", label: "Set" },
   { value: "titik", label: "Titik" },
+  { value: "hari", label: "Hari" },
+  { value: "btg", label: "Batang" },
+  { value: "Ha", label: "Ha" },
+  { value: "liter", label: "Liter" },
 ];
 
 export const TIPE_KOMPONEN: { value: ComponentType; label: string }[] = [

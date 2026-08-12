@@ -59,12 +59,12 @@ type Division struct {
 
 // Document is the parsed BOQ file.
 type Document struct {
-	Title    string
-	Items    []Item
+	Title     string
+	Items     []Item
 	Divisions []Division
-	Subtotal decimal.Decimal
-	PPN      decimal.Decimal
-	Total    decimal.Decimal
+	Subtotal  decimal.Decimal
+	PPN       decimal.Decimal
+	Total     decimal.Decimal
 }
 
 var divRe = regexp.MustCompile(`^[A-H]$`)
@@ -92,7 +92,7 @@ func Parse(f *excelize.File) (*Document, error) {
 		}
 		sheet = all[0]
 	}
-	rows, err := f.GetRows(sheet)
+	rows, err := f.GetRows(sheet, excelize.Options{RawCellValue: true})
 	if err != nil {
 		return nil, fmt.Errorf("boq: baca sheet %s: %w", sheet, err)
 	}
@@ -213,20 +213,37 @@ func lastNum(row []string) (decimal.Decimal, error) {
 	return decimal.Zero, fmt.Errorf("no number")
 }
 
-// parseNum parses a numeric cell. Plain integers and dot-decimal are expected
-// (e.g. "60.5"); thousands separators like "1.000.000" and "Rp" are stripped.
+// parseNum parses a numeric cell. Number cells arrive as plain dot-decimal
+// (RawCellValue), while text cells use Indonesian conventions: comma as the
+// decimal separator ("18,5") and dots as thousands separators ("1.800.000").
+// "Rp" prefixes are stripped.
 func parseNum(s string) (decimal.Decimal, error) {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "Rp", "")
 	s = strings.ReplaceAll(s, "rp", "")
-	s = strings.ReplaceAll(s, ",", "")
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return decimal.Zero, fmt.Errorf("empty")
 	}
-	// "1.000.000" → thousands; "60.5" → decimal. Multiple dots mean thousands.
-	if strings.Count(s, ".") > 1 {
-		s = strings.ReplaceAll(s, ".", "")
+	// Comma is always the decimal separator in Indonesian text cells.
+	// Split integer/fraction: "1.800.000,50" → "1800000" + "50", "2,625" → 2.625.
+	if i := strings.Index(s, ","); i >= 0 {
+		intPart := strings.ReplaceAll(s[:i], ".", "")
+		fracPart := s[i+1:]
+		s = intPart + "." + fracPart
+	} else {
+		// Multiple dots mean thousands ("1.000.000"). A single dot is a decimal
+		// ("60.5") unless it groups exactly three digits, e.g. "15.000" → 15000.
+		switch strings.Count(s, ".") {
+		case 0:
+			// plain integer
+		case 1:
+			if len(s)-strings.Index(s, ".")-1 == 3 {
+				s = strings.ReplaceAll(s, ".", "")
+			}
+		default:
+			s = strings.ReplaceAll(s, ".", "")
+		}
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {

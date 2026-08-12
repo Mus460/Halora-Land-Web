@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/models"
@@ -13,11 +13,11 @@ import (
 )
 
 type DashboardHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 	repo *repository.DashboardRepo
 }
 
-func NewDashboardHandler(pool *pgxpool.Pool, repo *repository.DashboardRepo) *DashboardHandler {
+func NewDashboardHandler(pool database.Pool, repo *repository.DashboardRepo) *DashboardHandler {
 	return &DashboardHandler{pool: pool, repo: repo}
 }
 
@@ -173,10 +173,10 @@ func (h *NewsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 type MonitoringHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 }
 
-func NewMonitoringHandler(pool *pgxpool.Pool) *MonitoringHandler {
+func NewMonitoringHandler(pool database.Pool) *MonitoringHandler {
 	return &MonitoringHandler{pool: pool}
 }
 

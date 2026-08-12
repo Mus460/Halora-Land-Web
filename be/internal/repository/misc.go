@@ -8,17 +8,17 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
 
 // RecapRepo manages the per-project margin settings row (category='settings').
-type RecapRepo struct{ pool *pgxpool.Pool }
+type RecapRepo struct{ pool database.Pool }
 
-func NewRecapRepo(pool *pgxpool.Pool) *RecapRepo { return &RecapRepo{pool: pool} }
+func NewRecapRepo(pool database.Pool) *RecapRepo { return &RecapRepo{pool: pool} }
 
 func (r *RecapRepo) GetMargin(ctx context.Context, projectID int32) (decimal.Decimal, error) {
 	var m sql.NullString
@@ -44,9 +44,9 @@ func (r *RecapRepo) UpsertMargin(ctx context.Context, projectID int32, margin de
 
 // --- Invoice ---
 
-type InvoiceRepo struct{ pool *pgxpool.Pool }
+type InvoiceRepo struct{ pool database.Pool }
 
-func NewInvoiceRepo(pool *pgxpool.Pool) *InvoiceRepo { return &InvoiceRepo{pool: pool} }
+func NewInvoiceRepo(pool database.Pool) *InvoiceRepo { return &InvoiceRepo{pool: pool} }
 
 type InvoiceInput struct {
 	Date                 string
@@ -289,9 +289,9 @@ func pad3(n int) string {
 
 // --- Logistics ---
 
-type LogisticsRepo struct{ pool *pgxpool.Pool }
+type LogisticsRepo struct{ pool database.Pool }
 
-func NewLogisticsRepo(pool *pgxpool.Pool) *LogisticsRepo { return &LogisticsRepo{pool: pool} }
+func NewLogisticsRepo(pool database.Pool) *LogisticsRepo { return &LogisticsRepo{pool: pool} }
 
 func (r *LogisticsRepo) List(ctx context.Context, projectID int32) ([]models.Logistics, error) {
 	rows, err := r.pool.Query(ctx, `
@@ -371,9 +371,9 @@ func (r *LogisticsRepo) Create(ctx context.Context, projectID int32, materialNam
 }
 
 // --- Transaction ---
-type TransactionRepo struct{ pool *pgxpool.Pool }
+type TransactionRepo struct{ pool database.Pool }
 
-func NewTransactionRepo(pool *pgxpool.Pool) *TransactionRepo { return &TransactionRepo{pool: pool} }
+func NewTransactionRepo(pool database.Pool) *TransactionRepo { return &TransactionRepo{pool: pool} }
 
 func (r *TransactionRepo) List(ctx context.Context, projectID int32) ([]models.Transaction, error) {
 	rows, err := r.pool.Query(ctx, `
@@ -455,9 +455,9 @@ func (r *TransactionRepo) TagReverted(ctx context.Context, projectID, id int32) 
 
 // --- Feedback + News ---
 
-type FeedbackRepo struct{ pool *pgxpool.Pool }
+type FeedbackRepo struct{ pool database.Pool }
 
-func NewFeedbackRepo(pool *pgxpool.Pool) *FeedbackRepo { return &FeedbackRepo{pool: pool} }
+func NewFeedbackRepo(pool database.Pool) *FeedbackRepo { return &FeedbackRepo{pool: pool} }
 
 func (r *FeedbackRepo) ListByUser(ctx context.Context, userID int32) ([]models.Feedback, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id, "userId", subject, message, status, "createdAt", "updatedAt" FROM feedback WHERE "userId" = $1 ORDER BY id DESC`, userID)
@@ -488,9 +488,9 @@ func (r *FeedbackRepo) Create(ctx context.Context, userID int32, subject, messag
 	return &f, nil
 }
 
-type NewsRepo struct{ pool *pgxpool.Pool }
+type NewsRepo struct{ pool database.Pool }
 
-func NewNewsRepo(pool *pgxpool.Pool) *NewsRepo { return &NewsRepo{pool: pool} }
+func NewNewsRepo(pool database.Pool) *NewsRepo { return &NewsRepo{pool: pool} }
 
 func (r *NewsRepo) ListActive(ctx context.Context) ([]models.News, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "isActive" = true AND "deletedAt" IS NULL ORDER BY id DESC`)

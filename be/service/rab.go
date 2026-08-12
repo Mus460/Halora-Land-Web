@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/repository"
@@ -13,14 +13,14 @@ import (
 // RABService computes the RAB rollup centrally in the BE (ARCHITECTURE.md §3.5,
 // §8.3). Rates are configurable (no longer hardcoded 0.10/0.11).
 type RABService struct {
-	pool         *pgxpool.Pool
+	pool         database.Pool
 	work_items   *repository.WorkItemRepo
 	recaps       *repository.RecapRepo
 	overheadRate decimal.Decimal
 	ppnRate      decimal.Decimal
 }
 
-func NewRABService(pool *pgxpool.Pool, pr *repository.WorkItemRepo, rr *repository.RecapRepo, overhead, ppn decimal.Decimal) *RABService {
+func NewRABService(pool database.Pool, pr *repository.WorkItemRepo, rr *repository.RecapRepo, overhead, ppn decimal.Decimal) *RABService {
 	return &RABService{pool: pool, work_items: pr, recaps: rr, overheadRate: overhead, ppnRate: ppn}
 }
 

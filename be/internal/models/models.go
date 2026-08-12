@@ -119,18 +119,18 @@ type User struct {
 }
 
 type Project struct {
-	ID            int32            `json:"id"`
-	UserID        int32            `json:"userId"`
-	Name          string           `json:"name"`
-	Location      *string          `json:"location"`
-	Type          ProjectType      `json:"type"`
-	IsPitching    bool             `json:"isPitching"`
-	IsDone        bool             `json:"isDone"`
-	ContractValue *decimal.Decimal `json:"contractValue"`
-	TimelineMonths int             `json:"timelineMonths"`
-	TimelineDays   int             `json:"timelineDays"`
-	CreatedAt     time.Time        `json:"createdAt"`
-	UpdatedAt     time.Time        `json:"updatedAt"`
+	ID             int32            `json:"id"`
+	UserID         int32            `json:"userId"`
+	Name           string           `json:"name"`
+	Location       *string          `json:"location"`
+	Type           ProjectType      `json:"type"`
+	IsPitching     bool             `json:"isPitching"`
+	IsDone         bool             `json:"isDone"`
+	ContractValue  *decimal.Decimal `json:"contractValue"`
+	TimelineMonths int              `json:"timelineMonths"`
+	TimelineDays   int              `json:"timelineDays"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	UpdatedAt      time.Time        `json:"updatedAt"`
 }
 
 type ProjectTeam struct {
@@ -170,7 +170,8 @@ type WorkItemProgressLog struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
-type WorkItemDetail struct {	ID               int32           `json:"id"`
+type WorkItemDetail struct {
+	ID               int32           `json:"id"`
 	WorkItemID       int32           `json:"workItemId"`
 	PriceMasterID    *int32          `json:"priceMasterId"`
 	AnalysisMasterID *int32          `json:"analysisMasterId"`

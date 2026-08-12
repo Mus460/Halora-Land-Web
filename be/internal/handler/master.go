@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/auth"
@@ -14,11 +14,11 @@ import (
 )
 
 type AnalysisMasterHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 	repo *repository.AnalysisMasterRepo
 }
 
-func NewAnalysisMasterHandler(pool *pgxpool.Pool, repo *repository.AnalysisMasterRepo) *AnalysisMasterHandler {
+func NewAnalysisMasterHandler(pool database.Pool, repo *repository.AnalysisMasterRepo) *AnalysisMasterHandler {
 	return &AnalysisMasterHandler{pool: pool, repo: repo}
 }
 
@@ -283,11 +283,11 @@ func (h *AnalysisMasterHandler) Search(w http.ResponseWriter, r *http.Request) {
 }
 
 type PriceMasterHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 	repo *repository.PriceMasterRepo
 }
 
-func NewPriceMasterHandler(pool *pgxpool.Pool, repo *repository.PriceMasterRepo) *PriceMasterHandler {
+func NewPriceMasterHandler(pool database.Pool, repo *repository.PriceMasterRepo) *PriceMasterHandler {
 	return &PriceMasterHandler{pool: pool, repo: repo}
 }
 

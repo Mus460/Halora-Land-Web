@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/auth"
@@ -19,7 +19,7 @@ import (
 )
 
 type ProjectSubHandler struct {
-	pool     *pgxpool.Pool
+	pool     database.Pool
 	projects *repository.ProjectRepo
 	recaps   *repository.RecapRepo
 	rab      *service.RABService
@@ -29,7 +29,7 @@ type ProjectSubHandler struct {
 	inv      *repository.InvoiceRepo
 }
 
-func NewProjectSubHandler(pool *pgxpool.Pool, pr *repository.ProjectRepo, rr *repository.RecapRepo, rab *service.RABService, ss *service.SnapshotService) *ProjectSubHandler {
+func NewProjectSubHandler(pool database.Pool, pr *repository.ProjectRepo, rr *repository.RecapRepo, rab *service.RABService, ss *service.SnapshotService) *ProjectSubHandler {
 	return &ProjectSubHandler{
 		pool: pool, projects: pr, recaps: rr, rab: rab, snap: ss,
 		real: repository.NewTransactionRepo(pool),
@@ -483,22 +483,22 @@ func (h *ProjectSubHandler) InvoiceUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	var in struct {
-		Date                 *string              `json:"date"`
-		DueDate              *string              `json:"dueDate"`
-		PONumber             *string              `json:"poNumber"`
-		BuyerName            *string              `json:"buyerName"`
-		BuyerAddress         *string              `json:"buyerAddress"`
-		BuyerContact         *string              `json:"buyerContact"`
-		Discount             *decimal.Decimal     `json:"discount"`
-		TaxRate              *decimal.Decimal     `json:"taxRate"`
-		PaymentBank          *string              `json:"paymentBank"`
-		PaymentAccountNumber *string              `json:"paymentAccountNumber"`
-		PaymentAccountName   *string              `json:"paymentAccountName"`
-		Notes                *string              `json:"notes"`
-		FinanceName          *string              `json:"financeName"`
+		Date                 *string               `json:"date"`
+		DueDate              *string               `json:"dueDate"`
+		PONumber             *string               `json:"poNumber"`
+		BuyerName            *string               `json:"buyerName"`
+		BuyerAddress         *string               `json:"buyerAddress"`
+		BuyerContact         *string               `json:"buyerContact"`
+		Discount             *decimal.Decimal      `json:"discount"`
+		TaxRate              *decimal.Decimal      `json:"taxRate"`
+		PaymentBank          *string               `json:"paymentBank"`
+		PaymentAccountNumber *string               `json:"paymentAccountNumber"`
+		PaymentAccountName   *string               `json:"paymentAccountName"`
+		Notes                *string               `json:"notes"`
+		FinanceName          *string               `json:"financeName"`
 		Status               *models.InvoiceStatus `json:"status"`
-		RecordExpense        bool                 `json:"recordExpense"`
-		Items                []models.InvoiceItem `json:"items"`
+		RecordExpense        bool                  `json:"recordExpense"`
+		Items                []models.InvoiceItem  `json:"items"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 )
 
 // Action constants (collapses the two parallel TS modules into one set, §3.6).
@@ -40,23 +40,32 @@ type Params struct {
 // Logger queues audit writes to a background worker (true non-blocking —
 // survives request cancellation). ARCHITECTURE.md §3.6 porting note.
 type Logger struct {
-	pool *pgxpool.Pool
-	ch   chan Params
-	wg   sync.WaitGroup
+	pool   database.Pool
+	ch     chan Params
+	wg     sync.WaitGroup
+	mu     sync.Mutex
+	closed bool
 }
 
 // New creates a Logger with a buffered queue of the given size and starts the
 // background worker. Call Close during shutdown to drain.
-func New(pool *pgxpool.Pool, bufferSize int) *Logger {
+func New(pool database.Pool, bufferSize int) *Logger {
 	l := &Logger{pool: pool, ch: make(chan Params, bufferSize)}
 	l.wg.Add(1)
 	go l.run()
 	return l
 }
 
-// Log enqueues an audit entry. Never blocks (drops on full queue so audit
-// never breaks user flows — mirrors current "swallow errors" contract, §3.6).
+// Log enqueues an audit entry. Never blocks (drops on full queue or after
+// Close so audit never breaks user flows — mirrors current "swallow errors"
+// contract, §3.6).
 func (l *Logger) Log(p Params) {
+	l.mu.Lock()
+	if l.closed {
+		l.mu.Unlock()
+		return
+	}
+	l.mu.Unlock()
 	select {
 	case l.ch <- p:
 	default:
@@ -84,6 +93,13 @@ func (l *Logger) run() {
 
 // Close drains the queue and stops the worker.
 func (l *Logger) Close() {
+	l.mu.Lock()
+	if l.closed {
+		l.mu.Unlock()
+		return
+	}
+	l.closed = true
+	l.mu.Unlock()
 	close(l.ch)
 	l.wg.Wait()
 }

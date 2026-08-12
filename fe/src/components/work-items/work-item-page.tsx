@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatCurrency, formatDuration } from "@/lib/utils";
-import { LEVEL_PEKERJAAN } from "@/lib/constants";
+import { LEVEL_PEKERJAAN, SATUAN_OPTIONS } from "@/lib/constants";
 import { useWorkItem } from "@/hooks/useWorkItem";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -370,12 +370,19 @@ function PekerjaanFormDialog({
     setAhspError("");
   };
 
-  const volume =
-    dimensi.panjang > 0 && dimensi.lebar > 0
-      ? dimensi.tinggi > 0
-        ? dimensi.panjang * dimensi.lebar * dimensi.tinggi
-        : dimensi.panjang * dimensi.lebar
-      : form.volume;
+  const volume = useMemo(() => {
+    const u = (form.unit || "").toLowerCase().trim();
+    if (u === "m3" && dimensi.panjang > 0 && dimensi.lebar > 0 && dimensi.tinggi > 0) {
+      return dimensi.panjang * dimensi.lebar * dimensi.tinggi;
+    }
+    if (u === "m2" && dimensi.panjang > 0 && dimensi.lebar > 0) {
+      return dimensi.panjang * dimensi.lebar;
+    }
+    if ((u === "m1" || u === "m" || u === "m'") && dimensi.panjang > 0) {
+      return dimensi.panjang;
+    }
+    return form.volume;
+  }, [form.unit, form.volume, dimensi]);
 
   const totalCost = volume * form.unitPrice;
 
@@ -383,6 +390,10 @@ function PekerjaanFormDialog({
     e.preventDefault();
     if (metode === "ahsp" && !item && !selectedAhsp) {
       setAhspError("Pilih item AHSP terlebih dahulu");
+      return;
+    }
+    if (!(volume > 0)) {
+      setAhspError("Volume/jumlah wajib diisi");
       return;
     }
     onSubmit({
@@ -513,11 +524,11 @@ function PekerjaanFormDialog({
           {/* Volume */}
           <VolumeInput
             label="Dimensi"
+            unit={form.unit}
             panjang={dimensi.panjang}
             lebar={dimensi.lebar}
             tinggi={dimensi.tinggi}
             onChange={setDimensi}
-            showTinggi={true}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -543,13 +554,11 @@ function PekerjaanFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["m2", "m3", "m1", "m", "unit", "kg", "ls", "set", "titik"].map(
-                    (s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    )
-                  )}
+                  {SATUAN_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

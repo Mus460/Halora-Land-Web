@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 
@@ -18,11 +18,11 @@ import (
 )
 
 type ProjectHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 	repo *repository.ProjectRepo
 }
 
-func NewProjectHandler(pool *pgxpool.Pool, repo *repository.ProjectRepo) *ProjectHandler {
+func NewProjectHandler(pool database.Pool, repo *repository.ProjectRepo) *ProjectHandler {
 	return &ProjectHandler{pool: pool, repo: repo}
 }
 

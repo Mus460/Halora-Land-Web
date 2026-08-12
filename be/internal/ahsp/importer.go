@@ -158,16 +158,18 @@ func (im *Importer) ImportSheet(ctx context.Context, items []WorkItem, prices []
 			if b.Name == "" {
 				continue
 			}
-			p, ok := priceByKode[norm(b.ReferenceCode)]
-			if !ok {
-				p, ok = priceByNameSat[norm(b.Name)+"|"+norm(b.Unit)]
-			}
-			if !ok {
-				p, ok = priceByName[norm(b.Name)]
-			}
-			hs := decimal.Zero
-			if ok {
-				hs = p.Price
+			// Price priority: inline price from the sheet's own
+			// "Harga Satuan (Rp)" column, then referenceCode lookup,
+			// then name+unit, then name alone as a last resort.
+			hs := b.UnitPrice
+			if hs.IsZero() {
+				if p, ok := priceByKode[norm(b.ReferenceCode)]; ok {
+					hs = p.Price
+				} else if p, ok := priceByNameSat[norm(b.Name)+"|"+norm(b.Unit)]; ok {
+					hs = p.Price
+				} else if p, ok := priceByName[norm(b.Name)]; ok {
+					hs = p.Price
+				}
 			}
 			jh := b.Coefficient.Mul(hs).Round(2)
 			total = total.Add(jh)

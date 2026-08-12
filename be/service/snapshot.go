@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/audit"
@@ -18,13 +18,13 @@ import (
 // SnapshotService implements the frozen-breakdown engine (ARCHITECTURE.md §2.3,
 // §3.1, §8.2). unitPrice/totalCost are decimal end-to-end (§3.7).
 type SnapshotService struct {
-	pool          *pgxpool.Pool
+	pool          database.Pool
 	work_items    *repository.WorkItemRepo
 	masterAnalisa *repository.AnalysisMasterRepo
 	audit         *audit.Logger
 }
 
-func NewSnapshotService(pool *pgxpool.Pool, pr *repository.WorkItemRepo, mr *repository.AnalysisMasterRepo, al *audit.Logger) *SnapshotService {
+func NewSnapshotService(pool database.Pool, pr *repository.WorkItemRepo, mr *repository.AnalysisMasterRepo, al *audit.Logger) *SnapshotService {
 	return &SnapshotService{pool: pool, work_items: pr, masterAnalisa: mr, audit: al}
 }
 

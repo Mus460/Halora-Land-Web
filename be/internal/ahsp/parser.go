@@ -93,21 +93,21 @@ var sectionRe = regexp.MustCompile(`^(I|II|III)\.?$`)
 var unitRe = regexp.MustCompile(`(?i)\b(m1|m2|m3|m|m'|m"|kg|ton|btg|bh|unit|buah|set|ls|liter|OH|OJ|hari|jam)\b`)
 
 const (
-	typeLabor     = "upah"
+	typeLabor     = "labor"
 	typeMaterial  = "material"
-	typeEquipment = "alat"
+	typeEquipment = "equipment"
 )
 
 // sheetLayout describes the per-item breakdown column positions, detected
 // from each item's own header row ("No | Description | Code | Sat. | Coefficient...").
 type sheetLayout struct {
-	no, description, kodeRef, unit, coefficient int
+	no, description, kodeRef, unit, coefficient, price int
 }
 
 // ParseSheet parses one Excel sheet into WorkItems. Item code lives in column
 // C (index 2); each item is followed by a header row and A/B/C sections.
 func ParseSheet(f *excelize.File, sheet string) ([]WorkItem, error) {
-	rows, err := f.GetRows(sheet)
+	rows, err := f.GetRows(sheet, excelize.Options{RawCellValue: true})
 	if err != nil {
 		return nil, fmt.Errorf("read sheet %s: %w", sheet, err)
 	}
@@ -182,15 +182,22 @@ func ParseSheet(f *excelize.File, sheet string) ([]WorkItem, error) {
 			if strings.HasPrefix(strings.ToUpper(c), "JUMLAH") || curType == "" {
 				continue
 			}
-			if !rowNoRe.MatchString(c) {
-				continue // subsection markers like "B.1"
-			}
 			brow := strings.TrimSpace(r[lay.description])
 			if brow == "" {
 				continue
 			}
-			coefficient, _ := decimal.NewFromString(normalizeNum(r[lay.coefficient]))
-			b := BreakdownRow{Type: curType, Name: brow, Unit: strings.TrimSpace(r[lay.unit]), Coefficient: coefficient}
+			coefCell := strings.TrimSpace(r[lay.coefficient])
+			unitCell := strings.TrimSpace(r[lay.unit])
+			priceCell := strings.TrimSpace(r[lay.price])
+			// A breakdown row is data if it has a row number, or any of
+			// coefficient/unit/price — otherwise it's a note/subsection
+			// marker (e.g. "catt" rows, headers like "No"/"Uraian").
+			if !rowNoRe.MatchString(c) && coefCell == "" && unitCell == "" && priceCell == "" {
+				continue
+			}
+			coefficient, _ := decimal.NewFromString(normalizeNum(coefCell))
+			unitPrice, _ := decimal.NewFromString(normalizeNum(priceCell))
+			b := BreakdownRow{Type: curType, Name: brow, Unit: unitCell, Coefficient: coefficient, UnitPrice: unitPrice}
 			if lay.kodeRef >= 0 {
 				b.ReferenceCode = strings.TrimSpace(r[lay.kodeRef])
 			}
@@ -217,7 +224,7 @@ func sectionType(marker string) string {
 // ParseIndex reads the "Daftar Harga Satuan Pekerjaan" sheet (code -> unit).
 func ParseIndex(f *excelize.File) map[string]string {
 	out := map[string]string{}
-	rows, err := f.GetRows("Daftar Harga Satuan Pekerjaan")
+	rows, err := f.GetRows("Daftar Harga Satuan Pekerjaan", excelize.Options{RawCellValue: true})
 	if err != nil {
 		return out
 	}
@@ -250,7 +257,7 @@ func normalizeKode(k string) string {
 // upah/material/alat). Rows without a numeric price are skipped.
 func ParsePriceList(f *excelize.File) ([]PriceItem, error) {
 	const sheet = "Upah & Bahan"
-	rows, err := f.GetRows(sheet)
+	rows, err := f.GetRows(sheet, excelize.Options{RawCellValue: true})
 	if err != nil {
 		return nil, fmt.Errorf("read sheet %s: %w", sheet, err)
 	}
@@ -320,7 +327,7 @@ func detectCodeCol(rows [][]string) int {
 }
 
 func defaultLayout(codeCol int) sheetLayout {
-	return sheetLayout{no: codeCol, description: 3, kodeRef: 4, unit: 5, coefficient: 6}
+	return sheetLayout{no: codeCol, description: 3, kodeRef: 4, unit: 5, coefficient: 6, price: 7}
 }
 
 func detectLayout(header []string) sheetLayout {
@@ -333,6 +340,8 @@ func detectLayout(header []string) sheetLayout {
 			lay.coefficient = i
 		case strings.HasPrefix(t, "sat"):
 			lay.unit = i
+		case strings.HasPrefix(t, "harga"):
+			lay.price = i
 		case t == "kode":
 			lay.kodeRef = i
 		case t == "uraian":
@@ -353,11 +362,27 @@ func padCols(row []string, n int) []string {
 	return out
 }
 
+// normalizeNum parses a raw cell value into a decimal string.
+//
+// The sheet stores numbers as NUMBER cells (raw values come back without
+// thousands separators, e.g. "100000", "1.6899999999999998E-2") and decimals
+// as TEXT cells using a comma as the decimal separator (e.g. "2,625" = 2.625).
+// With RawCellValue=true any remaining comma is therefore a decimal comma.
 func normalizeNum(s string) string {
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.ReplaceAll(s, " ", "")
+	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "Rp", "")
 	s = strings.ReplaceAll(s, "rp", "")
+	s = strings.ReplaceAll(s, " ", "")
+	if strings.Contains(s, ",") {
+		if strings.Contains(s, ".") {
+			// Text cell with both a thousands comma and a decimal dot
+			// (e.g. "2,625.00") — comma is the thousands separator.
+			s = strings.ReplaceAll(s, ",", "")
+		} else {
+			// Decimal comma (e.g. "2,625" = 2.625).
+			s = strings.ReplaceAll(s, ",", ".")
+		}
+	}
 	return s
 }
 

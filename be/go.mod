@@ -8,9 +8,10 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
+	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/xuri/excelize/v2 v2.9.0
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.37.0
 )
 
 require (
@@ -23,6 +24,6 @@ require (
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 )

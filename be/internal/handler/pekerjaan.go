@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/auth"
@@ -15,12 +15,12 @@ import (
 )
 
 type WorkItemHandler struct {
-	pool     *pgxpool.Pool
+	pool     database.Pool
 	repo     *repository.WorkItemRepo
 	snapshot *service.SnapshotService
 }
 
-func NewWorkItemHandler(pool *pgxpool.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService) *WorkItemHandler {
+func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService) *WorkItemHandler {
 	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss}
 }
 

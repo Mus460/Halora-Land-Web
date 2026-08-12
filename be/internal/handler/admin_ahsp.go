@@ -5,18 +5,18 @@ import (
 	"os"
 	"sort"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 
 	"github.com/halora-land/halora-be/internal/ahsp"
 )
 
 type AdminAHSPHandler struct {
-	pool     *pgxpool.Pool
+	pool     database.Pool
 	importer *ahsp.Importer
 	filePath string
 }
 
-func NewAdminAHSPHandler(pool *pgxpool.Pool, importer *ahsp.Importer, filePath string) *AdminAHSPHandler {
+func NewAdminAHSPHandler(pool database.Pool, importer *ahsp.Importer, filePath string) *AdminAHSPHandler {
 	return &AdminAHSPHandler{pool: pool, importer: importer, filePath: filePath}
 }
 
