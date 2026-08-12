@@ -135,6 +135,27 @@ func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
+func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	actor := auth.FromContext(r.Context())
+	if actor == nil || actor.Role != models.RoleAdmin {
+		writeError(w, http.StatusForbidden, "Forbidden")
+		return
+	}
+	if actor.UserID == id {
+		writeError(w, http.StatusBadRequest, "Tidak bisa menghapus akun sendiri")
+		return
+	}
+	if err := h.verifier.LocalDeleteUser(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, "Gagal menghapus user")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	if u != nil && h.audit != nil {
