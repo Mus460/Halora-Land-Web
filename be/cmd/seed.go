@@ -72,7 +72,7 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	var projectID int32
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO projects ("userId", "name", location, type, "contractValue", "timelineMonths")
-		VALUES ($1,'Pembangunan Rumah 2 Lantai','Jakarta Selatan','gedung',850000000,6)
+		VALUES ($1,'Pembangunan Rumah 2 Lantai','Jakarta Selatan','building',850000000,6)
 		RETURNING id`, budiID).Scan(&projectID); err != nil {
 		return err
 	}
@@ -83,11 +83,11 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	}{
 		{"Semen Portland", "zak", "material", "75000"},
 		{"Pasir Pasang", "m3", "material", "350000"},
-		{"Tukang Batu", "hari", "upah", "150000"},
+		{"Tukang Batu", "hari", "labor", "150000"},
 	}
 	for _, p := range prices {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO price_masters (name, unit, price, category, "isGlobal", "isSystem")
+			INSERT INTO price_masters (name, unit, price, type, "isGlobal", "isSystem")
 			VALUES ($1,$2,$3,$4,true,true)`, p.name, p.unit, p.price, p.category); err != nil {
 			return err
 		}
@@ -95,12 +95,12 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
-		VALUES ($1,'pondasi','Galian Tanah Pondasi',25.5,'m3',125000,3187500,'manual')`, projectID); err != nil {
+		VALUES ($1,'foundation','Galian Tanah Pondasi',25.5,'m3',125000,3187500,'manual')`, projectID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
-		VALUES ($1,'dinding','Pasang Bata Merah',120,'m2',185000,22200000,'ahsp')`, projectID); err != nil {
+		VALUES ($1,'wall','Pasang Bata Merah',120,'m2',185000,22200000,'ahsp')`, projectID); err != nil {
 		return err
 	}
 
