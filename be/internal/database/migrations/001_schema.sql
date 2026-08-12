@@ -279,8 +279,6 @@ CREATE TABLE IF NOT EXISTS "audit_log" (
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key"                       ON "users"("email");
 CREATE UNIQUE INDEX IF NOT EXISTS "tim_proyek_proyekId_userId_key"        ON "tim_proyek"("proyekId","userId");
-CREATE UNIQUE INDEX IF NOT EXISTS "master_analisa_kode_userId_key"        ON "master_analisa"("kode","userId");
-CREATE UNIQUE INDEX IF NOT EXISTS "master_harga_nama_userId_kategori_key" ON "master_harga"("nama","userId","kategori");
 CREATE UNIQUE INDEX IF NOT EXISTS "invoice_nomor_key"                     ON "invoice"("nomor");
 
 -- ---------------------------------------------------------------------

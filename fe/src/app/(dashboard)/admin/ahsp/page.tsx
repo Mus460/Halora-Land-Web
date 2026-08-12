@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
 import { Database, Download, CheckCircle, Circle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 
 interface ImportStatus {
   sheetName: string
-  kategori: string
+  category: string
   imported: boolean
   count: number
 }
@@ -18,6 +19,7 @@ export default function AdminAHSPPage() {
   const [status, setStatus] = useState<ImportStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState<string | null>(null)
+  const [confirmImportAll, setConfirmImportAll] = useState(false)
 
   useEffect(() => {
     fetchStatus()
@@ -72,23 +74,21 @@ export default function AdminAHSPPage() {
   }
 
   const handleImportAll = async () => {
-    const notImported = status.filter(s => !s.imported)
-    
     if (notImported.length === 0) {
-      toast.error('Semua kategori sudah di-import')
+      toast.error('Semua category sudah di-import')
       return
     }
 
-    if (!confirm(`Import ${notImported.length} kategori? Proses ini bisa memakan waktu beberapa menit.`)) {
-      return
-    }
+    setConfirmImportAll(false)
 
     for (const item of notImported) {
       await handleImport(item.sheetName)
     }
 
-    toast.success('Semua kategori berhasil di-import!')
+    toast.success('Semua category berhasil di-import!')
   }
+
+  const notImported = status.filter(s => !s.imported)
 
   const totalImported = status.filter(s => s.imported).length
   const totalCount = status.reduce((sum, s) => sum + s.count, 0)
@@ -108,7 +108,7 @@ export default function AdminAHSPPage() {
         description="Import data AHSP PUPR 2026 ke database"
         actions={
           <Button
-            onClick={handleImportAll}
+            onClick={() => setConfirmImportAll(true)}
             disabled={importing !== null}
             className="bg-amber-500 hover:bg-amber-600"
           >
@@ -118,11 +118,21 @@ export default function AdminAHSPPage() {
         }
       />
 
+      <ConfirmDialog
+        open={confirmImportAll}
+        onOpenChange={setConfirmImportAll}
+        title="Import Semua Category"
+        description={`Yakin ingin mengimport ${notImported.length} category? Proses ini bisa memakan waktu beberapa menit.`}
+        confirmText="Ya, Import"
+        onConfirm={handleImportAll}
+        loading={importing !== null}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Total Kategori
+              Total Category
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -173,7 +183,7 @@ export default function AdminAHSPPage() {
                   <div>
                     <div className="font-medium">{item.sheetName}</div>
                     <div className="text-sm text-gray-500">
-                      Kategori: {item.kategori} • {item.count} items
+                      Category: {item.category} • {item.count} items
                     </div>
                   </div>
                 </div>

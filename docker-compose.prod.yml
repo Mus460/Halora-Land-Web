@@ -1,0 +1,68 @@
+# Production stack — run on the VPS from /opt/halora:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Requires a .env file in the same directory with:
+#   JWT_SECRET=<random long secret>
+#
+# Only Caddy (80/443) is exposed publicly; be/postgres are internal.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: halora
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d halora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  be:
+    image: ghcr.io/mus460/halora-land-web/be:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/halora"
+      ALLOWED_ORIGINS: "https://halora.co.id"
+      OVERHEAD_RATE: "0.10"
+      PPN_RATE: "0.11"
+      JWT_SECRET: ${JWT_SECRET}
+
+  fe:
+    image: ghcr.io/mus460/halora-land-web/fe:latest
+    restart: unless-stopped
+    depends_on:
+      - be
+    environment:
+      NODE_ENV: production
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - fe
+
+volumes:
+  pgdata:
+    name: halora_pgdata
+  caddy_data:
+    name: halora_caddy_data
+  caddy_config:
+    name: halora_caddy_config

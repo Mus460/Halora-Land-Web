@@ -1,23 +1,24 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import { formatDuration } from "./utils";
 
 export interface RekapItem {
   id: number;
-  kategori: string;
-  uraianPekerjaan: string;
+  category: string;
+  description: string;
   volume: number;
-  satuan: string;
-  hargaSatuan: number;
-  totalBiaya: number;
-  totalWaktu: number | null;
+  unit: string;
+  unitPrice: number;
+  totalCost: number;
+  totalDuration: number | null;
 }
 
 export interface RekapData {
-  proyek?: {
+  project?: {
     id: number;
-    namaProyek: string;
-    lokasi?: string | null;
-    nilaiKontrak?: number | null;
+    name: string;
+    location?: string | null;
+    contractValue?: number | null;
   };
   grouped?: Record<string, RekapItem[]>;
   summary?: {
@@ -28,8 +29,8 @@ export interface RekapData {
     profit?: number;
     ppn?: number;
     totalPPN?: number;
-    totalAkhir?: number;
-    totalWaktu?: number;
+    totalFinal?: number;
+    totalDuration?: number;
   };
 }
 
@@ -49,13 +50,6 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     maximumFractionDigits: 2,
   }).format(value || 0);
-}
-
-function formatWaktu(value: number | null | undefined): string {
-  if (value == null || value === 0) return "-";
-  return `${new Intl.NumberFormat("id-ID", {
-    maximumFractionDigits: 1,
-  }).format(value)} jam`;
 }
 
 function formatDate(date: Date): string {
@@ -93,20 +87,20 @@ export function exportRekapPDF(data: RekapData): void {
   doc.setTextColor(30, 30, 30);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  const proyek = data.proyek;
-  doc.text(proyek?.namaProyek || "Proyek", marginX, y);
+  const project = data.project;
+  doc.text(project?.name || "Project", marginX, y);
   y += 6;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  const lokasi = proyek?.lokasi ? String(proyek.lokasi) : "-";
-  const nilaiKontrak = proyek?.nilaiKontrak
-    ? formatCurrency(Number(proyek.nilaiKontrak))
+  const location = project?.location ? String(project.location) : "-";
+  const contractValue = project?.contractValue
+    ? formatCurrency(Number(project.contractValue))
     : "-";
   doc.setTextColor(...GRAY);
-  doc.text(`Lokasi: ${lokasi}`, marginX, y);
+  doc.text(`Location: ${location}`, marginX, y);
   y += 5;
-  doc.text(`Nilai Kontrak: ${nilaiKontrak}`, marginX, y);
+  doc.text(`Nilai Kontrak: ${contractValue}`, marginX, y);
   y += 5;
   doc.text(`Dicetak: ${formatDate(new Date())}`, marginX, y);
   y += 8;
@@ -114,8 +108,8 @@ export function exportRekapPDF(data: RekapData): void {
   const grouped = data.grouped || {};
   const kategoriKeys = Object.keys(grouped);
 
-  for (const kategori of kategoriKeys) {
-    const items = grouped[kategori] || [];
+  for (const category of kategoriKeys) {
+    const items = grouped[category] || [];
     if (items.length === 0) continue;
 
     // Section header
@@ -124,7 +118,7 @@ export function exportRekapPDF(data: RekapData): void {
     doc.setTextColor(...AMBER);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text(kategori.toUpperCase().replace("_", " "), marginX + 2, y + 5.5);
+    doc.text(category.toUpperCase().replace("_", " "), marginX + 2, y + 5.5);
 
     y += 11;
 
@@ -133,11 +127,11 @@ export function exportRekapPDF(data: RekapData): void {
       margin: { left: marginX, right: marginX },
       head: [["Uraian", "Volume", "Satuan", "Harga Satuan", "Jumlah Harga"]],
       body: items.map((item) => [
-        item.uraianPekerjaan,
+        item.description,
         formatNumber(Number(item.volume)),
-        item.satuan || "-",
-        formatCurrency(Number(item.hargaSatuan)),
-        formatCurrency(Number(item.totalBiaya)),
+        item.unit || "-",
+        formatCurrency(Number(item.unitPrice)),
+        formatCurrency(Number(item.totalCost)),
       ]),
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 2.2, textColor: [50, 50, 50] },
@@ -174,7 +168,7 @@ export function exportRekapPDF(data: RekapData): void {
   const summary = data.summary || {};
   const subtotal = Number(summary.subtotal || 0);
   const margin = Number(summary.margin || 0);
-  const totalWaktu = summary.totalWaktu;
+  const totalDuration = summary.totalDuration;
 
   if (y + 40 > doc.internal.pageSize.getHeight()) {
     doc.addPage();
@@ -190,8 +184,8 @@ export function exportRekapPDF(data: RekapData): void {
   y += 11;
 
   const rows: [string, string, boolean?][] = [
-    ["Subtotal Pekerjaan", formatCurrency(subtotal)],
-    ["Estimasi Waktu", formatWaktu(totalWaktu)],
+    ["Subtotal WorkItem", formatCurrency(subtotal)],
+    ["Estimasi Waktu", formatDuration(totalDuration)],
     [
       `Subtotal + Margin (${formatNumber(margin)}%)`,
       formatCurrency(Number(summary.subtotalWithMargin || 0)),
@@ -223,7 +217,7 @@ export function exportRekapPDF(data: RekapData): void {
   autoTable(doc, {
     startY: y,
     margin: { left: marginX, right: marginX },
-    body: [["GRAND TOTAL", formatCurrency(Number(summary.totalAkhir || 0))]],
+    body: [["GRAND TOTAL", formatCurrency(Number(summary.totalFinal || 0))]],
     theme: "grid",
     styles: {
       fontSize: 12,
@@ -236,7 +230,7 @@ export function exportRekapPDF(data: RekapData): void {
   });
 
   const fileName = `Rekapitulasi-RAB-${sanitizeFileName(
-    proyek?.namaProyek || "Proyek"
+    project?.name || "Project"
   )}.pdf`;
   doc.save(fileName);
 }

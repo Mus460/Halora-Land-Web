@@ -31,7 +31,6 @@ import {
   Bath,
   Zap,
   PenTool,
-  MessageSquare,
   Settings,
   Shield,
   X,
@@ -50,7 +49,7 @@ const SIDEBAR_SECTIONS = [
     title: "Utama",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/proyek", label: "Data Proyek", icon: Building2 },
+      { href: "/projects", label: "Data Project", icon: Building2 },
       { href: "/rab", label: "RAB", icon: Calculator },
     ],
   },
@@ -58,11 +57,11 @@ const SIDEBAR_SECTIONS = [
     id: "analisa",
     title: "Analisa & Laporan",
     items: [
-      { href: "/rekap", label: "Rekapitulasi", icon: Calculator },
-      { href: "/invoice", label: "Invoice", icon: FileText },
-      { href: "/logistik", label: "Logistik", icon: Package },
-      { href: "/kurva-s", label: "Kurva S", icon: TrendingUp },
-      { href: "/realisasi", label: "Keuangan", icon: Wallet },
+      { href: "/recaps", label: "Rekapitulasi", icon: Calculator },
+      { href: "/invoices", label: "Invoice", icon: FileText },
+      { href: "/logistics", label: "Logistik", icon: Package },
+      { href: "/s-curve", label: "Kurva S", icon: TrendingUp },
+      { href: "/transactions", label: "Keuangan", icon: Wallet },
       { href: "/monitoring", label: "Progress", icon: ClipboardCheck },
     ],
   },
@@ -70,8 +69,8 @@ const SIDEBAR_SECTIONS = [
     id: "master",
     title: "Master Data",
     items: [
-      { href: "/master-harga", label: "Master Harga", icon: Tag },
-      { href: "/master-analisa", label: "Master Analisa", icon: LibraryBig },
+      { href: "/price-masters", label: "Master Harga", icon: Tag },
+      { href: "/analysis-masters", label: "Master Analisa", icon: LibraryBig },
     ],
   },
   {
@@ -79,13 +78,13 @@ const SIDEBAR_SECTIONS = [
     title: "Pekerjaan Konstruksi",
     hideOnMobile: true,
     items: [
-      { href: "/persiapan", label: "Persiapan", icon: Ruler },
-      { href: "/pondasi", label: "Pondasi", icon: Box },
-      { href: "/beton", label: "Beton Struktur", icon: Pickaxe },
-      { href: "/kanopi", label: "Kanopi", icon: Umbrella },
-      { href: "/baja", label: "Baja Struktural", icon: Construction },
-      { href: "/tangga", label: "Tangga", icon: MoveUpRight },
-      { href: "/atap", label: "Pek. Atap", icon: House },
+      { href: "/preparation", label: "Persiapan", icon: Ruler },
+      { href: "/foundation", label: "Pondasi", icon: Box },
+      { href: "/concrete", label: "Beton Struktur", icon: Pickaxe },
+      { href: "/canopy", label: "Kanopi", icon: Umbrella },
+      { href: "/steel", label: "Baja Struktural", icon: Construction },
+      { href: "/stairs", label: "Tangga", icon: MoveUpRight },
+      { href: "/roof", label: "Pek. Atap", icon: House },
     ],
   },
   {
@@ -93,13 +92,13 @@ const SIDEBAR_SECTIONS = [
     title: "Arsitektur & MEP",
     hideOnMobile: true,
     items: [
-      { href: "/dinding", label: "Pas. Dinding", icon: Grid3X3 },
-      { href: "/plesteran", label: "Plesteran", icon: Layers },
-      { href: "/acian", label: "Acian", icon: Droplet },
-      { href: "/keramik", label: "Lantai/Keramik", icon: LayoutGrid },
+      { href: "/wall", label: "Pas. Dinding", icon: Grid3X3 },
+      { href: "/plastering", label: "Plesteran", icon: Layers },
+      { href: "/finishing", label: "Acian", icon: Droplet },
+      { href: "/tiles", label: "Lantai/Keramik", icon: LayoutGrid },
       { href: "/paving", label: "Paving & Halaman", icon: Map },
-      { href: "/pengecatan", label: "Cat & Plafon", icon: Paintbrush },
-      { href: "/pintu", label: "Kusen/Pintu", icon: DoorOpen },
+      { href: "/painting", label: "Cat & Plafon", icon: Paintbrush },
+      { href: "/doors", label: "Kusen/Pintu", icon: DoorOpen },
       { href: "/interior", label: "Interior", icon: Sofa },
       { href: "/toilet", label: "Toilet/Sanitair", icon: Bath },
       { href: "/mep", label: "Instalasi MEP", icon: Zap },
@@ -110,14 +109,13 @@ const SIDEBAR_SECTIONS = [
     title: "Pekerjaan Tambahan",
     hideOnMobile: true,
     items: [
-      { href: "/pekerjaan-custom", label: "Pekerjaan Custom", icon: PenTool },
+      { href: "/custom-work", label: "Pekerjaan Custom", icon: PenTool },
     ],
   },
   {
     id: "pengaturan",
     title: "Pengaturan",
     items: [
-      { href: "/feedback", label: "Feedback & Support", icon: MessageSquare, badge: 1 },
       { href: "/profile", label: "Pengaturan Usaha", icon: Settings },
       { href: "/admin", label: "Admin Center", icon: Shield, badge: 2 },
     ],
@@ -158,7 +156,7 @@ export function Sidebar() {
                 Halora Land
               </h1>
               <p className="text-[10px] text-amber-400 font-medium">
-                V3 Pro Edition
+                V1 Edition
               </p>
             </div>
           </Link>

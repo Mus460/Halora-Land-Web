@@ -1,5 +1,0 @@
-{
-  "labels": ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"],
-  "planned": [5, 15, 30, 50, 75, 100],
-  "actual": [3, 12, 25, 42, 0, 0]
-}

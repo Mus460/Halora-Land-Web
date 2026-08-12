@@ -1,0 +1,12 @@
+# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) for halora.co.id.
+# TODO: Point DNS to the VPS in the Hostinger panel — create A records
+# for halora.co.id AND www.halora.co.id with value <VPS_IP>, and open
+# ports 80/443 on the server firewall. DNS is still on Hostinger's
+# parking page until then.
+#
+# The Next.js app serves /api/* to the BE itself (next.config.js rewrites),
+# so only fe needs to be proxied here.
+
+halora.co.id, www.halora.co.id {
+	reverse_proxy fe:3000
+}

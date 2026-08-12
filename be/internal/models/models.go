@@ -17,84 +17,99 @@ const (
 	RoleDemo  Role = "DEMO"
 )
 
-type TipeProyek string
+type ProjectType string
 
 const (
-	TipeProyekGedung TipeProyek = "gedung"
-	TipeProyekInfra  TipeProyek = "infra"
+	ProjectTypeBuilding       ProjectType = "building"
+	ProjectTypeInfrastructure ProjectType = "infrastructure"
 )
 
-type RoleTimProyek string
+type TeamRole string
 
 const (
-	TimRoleOwner  RoleTimProyek = "owner"
-	TimRoleEditor RoleTimProyek = "editor"
-	TimRoleViewer RoleTimProyek = "viewer"
+	TeamRoleOwner  TeamRole = "owner"
+	TeamRoleEditor TeamRole = "editor"
+	TeamRoleViewer TeamRole = "viewer"
 )
 
-type KategoriPekerjaan string
+type WorkCategory string
 
 const (
-	KategoriPersiapan  KategoriPekerjaan = "persiapan"
-	KategoriPondasi    KategoriPekerjaan = "pondasi"
-	KategoriBeton      KategoriPekerjaan = "beton"
-	KategoriKanopi     KategoriPekerjaan = "kanopi"
-	KategoriBaja       KategoriPekerjaan = "baja"
-	KategoriTangga     KategoriPekerjaan = "tangga"
-	KategoriAtap       KategoriPekerjaan = "atap"
-	KategoriDinding    KategoriPekerjaan = "dinding"
-	KategoriPlesteran  KategoriPekerjaan = "plesteran"
-	KategoriAcian      KategoriPekerjaan = "acian"
-	KategoriKeramik    KategoriPekerjaan = "keramik"
-	KategoriPaving     KategoriPekerjaan = "paving"
-	KategoriPengecatan KategoriPekerjaan = "pengecatan"
-	KategoriPintu      KategoriPekerjaan = "pintu"
-	KategoriInterior   KategoriPekerjaan = "interior"
-	KategoriToilet     KategoriPekerjaan = "toilet"
-	KategoriMEP        KategoriPekerjaan = "mep"
-	KategoriCustom     KategoriPekerjaan = "custom"
+	CategoryPreparation WorkCategory = "preparation"
+	CategoryFoundation  WorkCategory = "foundation"
+	CategoryConcrete    WorkCategory = "concrete"
+	CategoryCanopy      WorkCategory = "canopy"
+	CategorySteel       WorkCategory = "steel"
+	CategoryStairs      WorkCategory = "stairs"
+	CategoryRoof        WorkCategory = "roof"
+	CategoryWall        WorkCategory = "wall"
+	CategoryPlastering  WorkCategory = "plastering"
+	CategoryFinishing   WorkCategory = "finishing"
+	CategoryTiles       WorkCategory = "tiles"
+	CategoryPaving      WorkCategory = "paving"
+	CategoryPainting    WorkCategory = "painting"
+	CategoryDoors       WorkCategory = "doors"
+	CategoryInterior    WorkCategory = "interior"
+	CategoryToilet      WorkCategory = "toilet"
+	CategoryMEP         WorkCategory = "mep"
+	CategoryCustom      WorkCategory = "custom"
 )
 
-type MetodeHitung string
+type CalculationMethod string
 
 const (
-	MetodeAHSP         MetodeHitung = "ahsp"
-	MetodeManual       MetodeHitung = "manual"
-	MetodeHargaBorong  MetodeHitung = "harga_borong"
-	MetodeHargaManual  MetodeHitung = "harga_manual"
-	MetodeHargaCustom  MetodeHitung = "harga_custom"
+	MethodAHSP        CalculationMethod = "ahsp"
+	MethodManual      CalculationMethod = "manual"
+	MethodLumpSum     CalculationMethod = "lump_sum"
+	MethodManualPrice CalculationMethod = "manual_price"
+	MethodCustomPrice CalculationMethod = "custom_price"
 )
 
-type TipeKomponen string
+type ComponentType string
 
 const (
-	KomponenMaterial TipeKomponen = "material"
-	KomponenUpah     TipeKomponen = "upah"
-	KomponenAlat     TipeKomponen = "alat"
+	ComponentMaterial  ComponentType = "material"
+	ComponentLabor     ComponentType = "labor"
+	ComponentEquipment ComponentType = "equipment"
 )
 
-type StatusInvoice string
+type InvoiceStatus string
 
 const (
-	InvoiceDraft StatusInvoice = "draft"
-	InvoiceSent  StatusInvoice = "sent"
-	InvoicePaid  StatusInvoice = "paid"
+	InvoiceDraft InvoiceStatus = "draft"
+	InvoiceSent  InvoiceStatus = "sent"
+	InvoicePaid  InvoiceStatus = "paid"
 )
 
-type StatusFeedback string
+type FeedbackStatus string
 
 const (
-	FeedbackOpen       StatusFeedback = "open"
-	FeedbackInProgress StatusFeedback = "in_progress"
-	FeedbackResolved   StatusFeedback = "resolved"
-	FeedbackClosed     StatusFeedback = "closed"
+	FeedbackOpen       FeedbackStatus = "open"
+	FeedbackInProgress FeedbackStatus = "in_progress"
+	FeedbackResolved   FeedbackStatus = "resolved"
+	FeedbackClosed     FeedbackStatus = "closed"
+)
+
+type TransactionType string
+
+const (
+	TransactionExpense TransactionType = "expense"
+	TransactionIncome  TransactionType = "income"
+)
+
+type TransactionStatus string
+
+const (
+	TransactionDraft    TransactionStatus = "draft"
+	TransactionApproved TransactionStatus = "approved"
+	TransactionReverted TransactionStatus = "reverted"
 )
 
 // Tables
 
 type User struct {
 	ID          int32     `json:"id"`
-	NamaLengkap string    `json:"namaLengkap"`
+	FullName    string    `json:"fullName"`
 	Email       string    `json:"email"`
 	Role        Role      `json:"role"`
 	AccountType string    `json:"accountType"`
@@ -103,169 +118,205 @@ type User struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-type Proyek struct {
-	ID          int32            `json:"id"`
-	UserID      int32            `json:"userId"`
-	NamaProyek  string           `json:"namaProyek"`
-	Lokasi      *string          `json:"lokasi"`
-	Tipe        TipeProyek       `json:"tipe"`
-	IsPitching  bool             `json:"isPitching"`
-	NilaiKontrak *decimal.Decimal `json:"nilaiKontrak"`
-	Timeline    *string          `json:"timeline"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	UpdatedAt   time.Time        `json:"updatedAt"`
-}
-
-type TimProyek struct {
-	ID        int32          `json:"id"`
-	ProyekID  int32          `json:"proyekId"`
-	UserID    int32          `json:"userId"`
-	Role      RoleTimProyek  `json:"role"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-}
-
-type Pekerjaan struct {
-	ID              int32            `json:"id"`
-	ProyekID        int32            `json:"proyekId"`
-	Kategori        KategoriPekerjaan `json:"kategori"`
-	UraianPekerjaan string           `json:"uraianPekerjaan"`
-	Volume          decimal.Decimal  `json:"volume"`
-	Satuan          string           `json:"satuan"`
-	HargaSatuan     decimal.Decimal  `json:"hargaSatuan"`
-	TotalBiaya      decimal.Decimal  `json:"totalBiaya"`
-	MetodeHitung    MetodeHitung     `json:"metodeHitung"`
-	LevelPekerjaan  *string          `json:"levelPekerjaan"`
-	TipePekerjaan   *string          `json:"tipePekerjaan"`
-	MasterAnalisaID *int32           `json:"masterAnalisaId"`
-	Waktu           *decimal.Decimal `json:"waktu"`
-	TotalWaktu      *decimal.Decimal `json:"totalWaktu"`
-	CreatedAt       time.Time        `json:"createdAt"`
-	UpdatedAt       time.Time        `json:"updatedAt"`
-	DetailAnalisa   []DetailAnalisa  `json:"detailAnalisa,omitempty"`
-}
-
-type DetailAnalisa struct {
+type Project struct {
 	ID             int32            `json:"id"`
-	PekerjaanID    int32            `json:"pekerjaanId"`
-	MasterHargaID  *int32           `json:"masterHargaId"`
-	MasterAnalisaID *int32          `json:"masterAnalisaId"`
-	Nama           string           `json:"nama"`
-	Satuan         string           `json:"satuan"`
-	Koef           decimal.Decimal  `json:"koef"`
-	HargaSatuan    decimal.Decimal  `json:"hargaSatuan"`
-	TotalBiaya     decimal.Decimal  `json:"totalBiaya"`
-	Tipe           TipeKomponen     `json:"tipe"`
-	SnapshotAt     time.Time        `json:"snapshotAt"`
-	SourceKode     *string          `json:"sourceKode"`
-}
-
-type MasterAnalisa struct {
-	ID          int32             `json:"id"`
-	Kode        string            `json:"kode"`
-	Nama        string            `json:"nama"`
-	Level       int32             `json:"level"`
-	ParentID    *int32            `json:"parentId"`
-	Satuan      *string           `json:"satuan"`
-	HargaSatuan *decimal.Decimal  `json:"hargaSatuan"`
-	Kategori    *string           `json:"kategori"`
-	IsGlobal    bool              `json:"isGlobal"`
-	UserID      *int32            `json:"userId"`
-	IsSystem    bool              `json:"isSystem"`
-	AHSPKode    *string           `json:"ahspKode"`
-	AHSPSheet   *string           `json:"ahspSheet"`
-	BiayaUmum   decimal.Decimal   `json:"biayaUmum"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
-	Children    []MasterAnalisa   `json:"children,omitempty"`
-}
-
-type RincianAnalisa struct {
-	ID             int32            `json:"id"`
-	MasterAnalisaID int32           `json:"masterAnalisaId"`
-	KomponenID     *int32           `json:"komponenId"`
-	Koef           decimal.Decimal  `json:"koef"`
-	Tipe           TipeKomponen     `json:"tipe"`
-	Nama           *string          `json:"nama"`
-	Satuan         *string          `json:"satuan"`
-	HargaSatuan    *decimal.Decimal `json:"hargaSatuan"`
-	JumlahHarga    *decimal.Decimal `json:"jumlahHarga"`
-	KodeReferensi  *string          `json:"kodeReferensi"`
-	Waktu          *decimal.Decimal `json:"waktu"`
-	Urutan         int32            `json:"urutan"`
+	UserID         int32            `json:"userId"`
+	Name           string           `json:"name"`
+	Location       *string          `json:"location"`
+	Type           ProjectType      `json:"type"`
+	IsPitching     bool             `json:"isPitching"`
+	IsDone         bool             `json:"isDone"`
+	ContractValue  *decimal.Decimal `json:"contractValue"`
+	TimelineMonths int              `json:"timelineMonths"`
+	TimelineDays   int              `json:"timelineDays"`
 	CreatedAt      time.Time        `json:"createdAt"`
 	UpdatedAt      time.Time        `json:"updatedAt"`
 }
 
-type MasterHarga struct {
+type ProjectTeam struct {
+	ID        int32     `json:"id"`
+	ProjectID int32     `json:"projectId"`
+	UserID    int32     `json:"userId"`
+	Role      TeamRole  `json:"role"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type WorkItem struct {
+	ID                int32             `json:"id"`
+	ProjectID         int32             `json:"projectId"`
+	Category          WorkCategory      `json:"category"`
+	Description       string            `json:"description"`
+	Volume            decimal.Decimal   `json:"volume"`
+	Unit              string            `json:"unit"`
+	UnitPrice         decimal.Decimal   `json:"unitPrice"`
+	TotalCost         decimal.Decimal   `json:"totalCost"`
+	CalculationMethod CalculationMethod `json:"calculationMethod"`
+	Level             *string           `json:"level"`
+	Type              *string           `json:"type"`
+	AnalysisMasterID  *int32            `json:"analysisMasterId"`
+	Duration          *decimal.Decimal  `json:"duration"`
+	TotalDuration     *decimal.Decimal  `json:"totalDuration"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
+	ItemDetails       []WorkItemDetail  `json:"itemDetails,omitempty"`
+}
+
+type WorkItemProgressLog struct {
+	ID         int32     `json:"id"`
+	WorkItemID int32     `json:"workItemId"`
+	Progress   int       `json:"progress"`
+	Note       *string   `json:"note"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type WorkItemDetail struct {
+	ID               int32           `json:"id"`
+	WorkItemID       int32           `json:"workItemId"`
+	PriceMasterID    *int32          `json:"priceMasterId"`
+	AnalysisMasterID *int32          `json:"analysisMasterId"`
+	Name             string          `json:"name"`
+	Unit             string          `json:"unit"`
+	Coefficient      decimal.Decimal `json:"coefficient"`
+	UnitPrice        decimal.Decimal `json:"unitPrice"`
+	TotalCost        decimal.Decimal `json:"totalCost"`
+	Type             ComponentType   `json:"type"`
+	SnapshotAt       time.Time       `json:"snapshotAt"`
+	SourceCode       *string         `json:"sourceCode"`
+}
+
+type AnalysisMaster struct {
+	ID          int32            `json:"id"`
+	Code        string           `json:"code"`
+	Name        string           `json:"name"`
+	Level       int32            `json:"level"`
+	ParentID    *int32           `json:"parentId"`
+	Unit        *string          `json:"unit"`
+	UnitPrice   *decimal.Decimal `json:"unitPrice"`
+	Category    *string          `json:"category"`
+	IsGlobal    bool             `json:"isGlobal"`
+	UserID      *int32           `json:"userId"`
+	IsSystem    bool             `json:"isSystem"`
+	AHSPCode    *string          `json:"ahspCode"`
+	AHSPSheet   *string          `json:"ahspSheet"`
+	GeneralCost decimal.Decimal  `json:"generalCost"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
+	Children    []AnalysisMaster `json:"children,omitempty"`
+}
+
+type AnalysisComponent struct {
+	ID               int32            `json:"id"`
+	AnalysisMasterID int32            `json:"analysisMasterId"`
+	ComponentID      *int32           `json:"componentId"`
+	Coefficient      decimal.Decimal  `json:"coefficient"`
+	Type             ComponentType    `json:"type"`
+	Name             *string          `json:"name"`
+	Unit             *string          `json:"unit"`
+	UnitPrice        *decimal.Decimal `json:"unitPrice"`
+	TotalPrice       *decimal.Decimal `json:"totalPrice"`
+	ReferenceCode    *string          `json:"referenceCode"`
+	Duration         *decimal.Decimal `json:"duration"`
+	Sequence         int32            `json:"sequence"`
+	CreatedAt        time.Time        `json:"createdAt"`
+	UpdatedAt        time.Time        `json:"updatedAt"`
+}
+
+type PriceMaster struct {
 	ID        int32           `json:"id"`
-	Nama      string          `json:"nama"`
-	Satuan    string          `json:"satuan"`
-	Harga     decimal.Decimal `json:"harga"`
-	Kategori  TipeKomponen    `json:"kategori"`
+	Name      string          `json:"name"`
+	Unit      string          `json:"unit"`
+	Price     decimal.Decimal `json:"price"`
+	Type      ComponentType   `json:"type"`
 	IsGlobal  bool            `json:"isGlobal"`
 	UserID    *int32          `json:"userId"`
-	KodeAHSP  *string         `json:"kodeAHSP"`
+	AHSPCode  *string         `json:"ahspCode"`
 	IsSystem  bool            `json:"isSystem"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
-type Rekap struct {
-	ID        int32            `json:"id"`
-	ProyekID  int32            `json:"proyekId"`
-	Kategori  string           `json:"kategori"`
-	Uraian    string           `json:"uraian"`
-	Urutan    int32            `json:"urutan"`
-	Margin    *decimal.Decimal `json:"margin"`
-	CreatedAt time.Time        `json:"createdAt"`
-	UpdatedAt time.Time        `json:"updatedAt"`
+type Recap struct {
+	ID          int32            `json:"id"`
+	ProjectID   int32            `json:"projectId"`
+	Category    string           `json:"category"`
+	Description string           `json:"description"`
+	Sequence    int32            `json:"sequence"`
+	Margin      *decimal.Decimal `json:"margin"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
 type Invoice struct {
-	ID        int32           `json:"id"`
-	ProyekID  int32           `json:"proyekId"`
-	Nomor     string          `json:"nomor"`
-	Tanggal   time.Time       `json:"tanggal"`
-	Total     decimal.Decimal `json:"total"`
-	Status    StatusInvoice   `json:"status"`
-	CreatedAt time.Time       `json:"createdAt"`
-	UpdatedAt time.Time       `json:"updatedAt"`
+	ID                   int32           `json:"id"`
+	ProjectID            int32           `json:"projectId"`
+	Number               string          `json:"number"`
+	Date                 time.Time       `json:"date"`
+	DueDate              *time.Time      `json:"dueDate"`
+	PONumber             *string         `json:"poNumber"`
+	BuyerName            *string         `json:"buyerName"`
+	BuyerAddress         *string         `json:"buyerAddress"`
+	BuyerContact         *string         `json:"buyerContact"`
+	Discount             decimal.Decimal `json:"discount"`
+	TaxRate              decimal.Decimal `json:"taxRate"`
+	PaymentBank          *string         `json:"paymentBank"`
+	PaymentAccountNumber *string         `json:"paymentAccountNumber"`
+	PaymentAccountName   *string         `json:"paymentAccountName"`
+	Notes                *string         `json:"notes"`
+	FinanceName          *string         `json:"financeName"`
+	Total                decimal.Decimal `json:"total"`
+	Status               InvoiceStatus   `json:"status"`
+	Items                []InvoiceItem   `json:"items,omitempty"`
+	CreatedAt            time.Time       `json:"createdAt"`
+	UpdatedAt            time.Time       `json:"updatedAt"`
 }
 
-type Logistik struct {
-	ID           int32            `json:"id"`
-	ProyekID     int32            `json:"proyekId"`
-	NamaMaterial string           `json:"namaMaterial"`
-	Satuan       string           `json:"satuan"`
-	Volume       decimal.Decimal  `json:"volume"`
-	HargaSatuan  decimal.Decimal  `json:"hargaSatuan"`
-	TotalBiaya   decimal.Decimal  `json:"totalBiaya"`
-	Tanggal      *time.Time       `json:"tanggal"`
-	Keterangan   *string          `json:"keterangan"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	UpdatedAt    time.Time        `json:"updatedAt"`
+type InvoiceItem struct {
+	ID          int32           `json:"id"`
+	InvoiceID   int32           `json:"invoiceId"`
+	Description string          `json:"description"`
+	Qty         decimal.Decimal `json:"qty"`
+	Unit        string          `json:"unit"`
+	UnitPrice   decimal.Decimal `json:"unitPrice"`
 }
 
-type Realisasi struct {
-	ID         int32            `json:"id"`
-	ProyekID   int32            `json:"proyekId"`
-	Tanggal    time.Time        `json:"tanggal"`
-	Kategori   string           `json:"kategori"`
-	Jumlah     decimal.Decimal  `json:"jumlah"`
-	Keterangan *string          `json:"keterangan"`
-	CreatedAt  time.Time        `json:"createdAt"`
-	UpdatedAt  time.Time        `json:"updatedAt"`
+type Logistics struct {
+	ID           int32           `json:"id"`
+	ProjectID    int32           `json:"projectId"`
+	MaterialName string          `json:"materialName"`
+	Unit         string          `json:"unit"`
+	Volume       decimal.Decimal `json:"volume"`
+	UnitPrice    decimal.Decimal `json:"unitPrice"`
+	TotalCost    decimal.Decimal `json:"totalCost"`
+	Date         *time.Time      `json:"date"`
+	Description  *string         `json:"description"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+}
+
+type Transaction struct {
+	ID          int32             `json:"id"`
+	ProjectID   int32             `json:"projectId"`
+	Date        time.Time         `json:"date"`
+	Category    string            `json:"category"`
+	Amount      decimal.Decimal   `json:"amount"`
+	Description *string           `json:"description"`
+	Type        TransactionType   `json:"type"`
+	Status      TransactionStatus `json:"status"`
+	LogisticsID *int32            `json:"logisticsId"`
+	InvoiceID   *int32            `json:"invoiceId"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 type Feedback struct {
-	ID        int32          `json:"id"`
-	UserID    int32          `json:"userId"`
-	Subject   string         `json:"subject"`
-	Message   string         `json:"message"`
-	Status    StatusFeedback `json:"status"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID        int32           `json:"id"`
+	UserID    int32           `json:"userId"`
+	Subject   string          `json:"subject"`
+	Message   string          `json:"message"`
+	Status    FeedbackStatus  `json:"status"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
 	Replies   []FeedbackReply `json:"replies,omitempty"`
 }
 
@@ -289,8 +340,8 @@ type News struct {
 
 type AuditLog struct {
 	ID          int32           `json:"id"`
-	ProyekID    *int32          `json:"proyekId"`
-	PekerjaanID *int32          `json:"pekerjaanId"`
+	ProjectID   *int32          `json:"projectId"`
+	WorkItemID  *int32          `json:"workItemId"`
 	UserID      int32           `json:"userId"`
 	Action      string          `json:"action"`
 	EntityType  string          `json:"entityType"`

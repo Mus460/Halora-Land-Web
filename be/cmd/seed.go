@@ -31,7 +31,7 @@ func seed(cfg *env.Config) error {
 	return nil
 }
 
-// seedDB inserts the baseline seed users + a sample project + master_harga
+// seedDB inserts the baseline seed users + a sample project + price_masters
 // (port of prisma/seed.ts, ARCHITECTURE.md §5.3). All auth is local DB auth
 // (bcrypt password hashes) — no external provider required.
 func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
@@ -42,8 +42,8 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	defer tx.Rollback(ctx)
 
 	users := []struct {
-		nama, email, role, pwd string
-		isDemo                  bool
+		name, email, role, pwd string
+		isDemo                 bool
 	}{
 		{"Admin Halora", "admin@haloraland.id", "ADMIN", "admin123", false},
 		{"Budi Santoso", "budi@example.com", "USER", "password123", false},
@@ -57,10 +57,10 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 		var id int32
 		err = tx.QueryRow(ctx, `
-			INSERT INTO users ("namaLengkap", email, role, "accountType", "isDemo", "passwordHash")
+			INSERT INTO users ("fullName", email, role, "accountType", "isDemo", "passwordHash")
 			VALUES ($1,$2,$3,'free',$4,$5)
-			ON CONFLICT (email) DO UPDATE SET "namaLengkap" = EXCLUDED."namaLengkap", "passwordHash" = EXCLUDED."passwordHash"
-			RETURNING id`, u.nama, u.email, u.role, u.isDemo, string(hash)).Scan(&id)
+			ON CONFLICT (email) DO UPDATE SET "fullName" = EXCLUDED."fullName", "passwordHash" = EXCLUDED."passwordHash"
+			RETURNING id`, u.name, u.email, u.role, u.isDemo, string(hash)).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("seed user %s: %w", u.email, err)
 		}
@@ -69,17 +69,17 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 	}
 
-	var proyekID int32
+	var projectID int32
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO proyek ("userId", "namaProyek", lokasi, tipe, "nilaiKontrak", timeline)
-		VALUES ($1,'Pembangunan Rumah 2 Lantai','Jakarta Selatan','gedung',850000000,'6 bulan')
-		RETURNING id`, budiID).Scan(&proyekID); err != nil {
+		INSERT INTO projects ("userId", "name", location, type, "contractValue", "timelineMonths")
+		VALUES ($1,'Pembangunan Rumah 2 Lantai','Jakarta Selatan','gedung',850000000,6)
+		RETURNING id`, budiID).Scan(&projectID); err != nil {
 		return err
 	}
 
 	prices := []struct {
-		nama, satuan, kategori string
-		harga                  string
+		name, unit, category string
+		price                string
 	}{
 		{"Semen Portland", "zak", "material", "75000"},
 		{"Pasir Pasang", "m3", "material", "350000"},
@@ -87,20 +87,20 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	for _, p := range prices {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO master_harga (nama, satuan, harga, kategori, "isGlobal", "isSystem")
-			VALUES ($1,$2,$3,$4,true,true)`, p.nama, p.satuan, p.harga, p.kategori); err != nil {
+			INSERT INTO price_masters (name, unit, price, category, "isGlobal", "isSystem")
+			VALUES ($1,$2,$3,$4,true,true)`, p.name, p.unit, p.price, p.category); err != nil {
 			return err
 		}
 	}
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO pekerjaan ("proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya", "metodeHitung")
-		VALUES ($1,'pondasi','Galian Tanah Pondasi',25.5,'m3',125000,3187500,'manual')`, proyekID); err != nil {
+		INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
+		VALUES ($1,'pondasi','Galian Tanah Pondasi',25.5,'m3',125000,3187500,'manual')`, projectID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO pekerjaan ("proyekId", kategori, "uraianPekerjaan", volume, satuan, "hargaSatuan", "totalBiaya", "metodeHitung")
-		VALUES ($1,'dinding','Pasang Bata Merah',120,'m2',185000,22200000,'ahsp')`, proyekID); err != nil {
+		INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
+		VALUES ($1,'dinding','Pasang Bata Merah',120,'m2',185000,22200000,'ahsp')`, projectID); err != nil {
 		return err
 	}
 

@@ -7,19 +7,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-type AuditLogRepo struct{ pool *pgxpool.Pool }
+type AuditLogRepo struct{ pool database.Pool }
 
-func NewAuditLogRepo(pool *pgxpool.Pool) *AuditLogRepo { return &AuditLogRepo{pool: pool} }
+func NewAuditLogRepo(pool database.Pool) *AuditLogRepo { return &AuditLogRepo{pool: pool} }
 
 type ListAuditFilter struct {
 	UserID     *int32
-	ProyekID   *int32
+	ProjectID  *int32
 	Action     string
 	EntityType string
 	Limit      int
@@ -27,7 +27,7 @@ type ListAuditFilter struct {
 }
 
 func (r *AuditLogRepo) List(ctx context.Context, f ListAuditFilter) ([]models.AuditLog, error) {
-	q := `SELECT id, "proyekId", "pekerjaanId", "userId", action, "entityType", "entityId",
+	q := `SELECT id, "projectId", "workItemId", "userId", action, "entityType", "entityId",
 		"oldValue", "newValue", description, "ipAddress", "userAgent", "createdAt"
 		FROM audit_log WHERE 1=1`
 	var args []any
@@ -35,9 +35,9 @@ func (r *AuditLogRepo) List(ctx context.Context, f ListAuditFilter) ([]models.Au
 		args = append(args, *f.UserID)
 		q += ` AND "userId" = $` + strconv.Itoa(len(args))
 	}
-	if f.ProyekID != nil {
-		args = append(args, *f.ProyekID)
-		q += ` AND "proyekId" = $` + strconv.Itoa(len(args))
+	if f.ProjectID != nil {
+		args = append(args, *f.ProjectID)
+		q += ` AND "projectId" = $` + strconv.Itoa(len(args))
 	}
 	if f.Action != "" {
 		args = append(args, f.Action)
@@ -61,15 +61,15 @@ func (r *AuditLogRepo) List(ctx context.Context, f ListAuditFilter) ([]models.Au
 	var out []models.AuditLog
 	for rows.Next() {
 		var a models.AuditLog
-		var proyekID, pekerjaanID, entityID sql.NullInt32
+		var projectID, workItemID, entityID sql.NullInt32
 		var oldValue, newValue sql.NullString
 		var desc, ip, ua sql.NullString
-		if err := rows.Scan(&a.ID, &proyekID, &pekerjaanID, &a.UserID, &a.Action, &a.EntityType, &entityID,
+		if err := rows.Scan(&a.ID, &projectID, &workItemID, &a.UserID, &a.Action, &a.EntityType, &entityID,
 			&oldValue, &newValue, &desc, &ip, &ua, &a.CreatedAt); err != nil {
 			return nil, err
 		}
-		a.ProyekID = i32Ptr(proyekID)
-		a.PekerjaanID = i32Ptr(pekerjaanID)
+		a.ProjectID = i32Ptr(projectID)
+		a.WorkItemID = i32Ptr(workItemID)
 		a.EntityID = i32Ptr(entityID)
 		if oldValue.Valid && oldValue.String != "" {
 			a.OldValue = json.RawMessage(oldValue.String)
@@ -87,59 +87,59 @@ func (r *AuditLogRepo) List(ctx context.Context, f ListAuditFilter) ([]models.Au
 
 // DashboardStats holds the /api/dashboard/stats aggregate (§6.6).
 type DashboardStats struct {
-	TotalProyek      int32           `json:"totalProyek"`
-	ProyekAktif      int32           `json:"proyekAktif"`
-	ProyekPitching   int32           `json:"proyekPitching"`
-	TotalRAB         decimal.Decimal `json:"totalRAB"`
-	TotalPekerjaan   int32           `json:"totalPekerjaan"`
-	RecentProjects   []RecentProject `json:"recentProjects"`
+	TotalProjects    int32             `json:"totalProjects"`
+	ActiveProjects   int32             `json:"activeProjects"`
+	PitchingProjects int32             `json:"pitchingProjects"`
+	TotalRAB         decimal.Decimal   `json:"totalRAB"`
+	TotalWorkItems   int32             `json:"totalWorkItems"`
+	RecentProjects   []RecentProject   `json:"recentProjects"`
 	RecentAuditLogs  []models.AuditLog `json:"recentAuditLogs"`
 }
 
 type RecentProject struct {
-	ID         int32            `json:"id"`
-	Nama       string           `json:"nama"`
-	Lokasi     *string          `json:"lokasi"`
-	TotalRAB   decimal.Decimal  `json:"totalRAB"`
-	CreatedAt  time.Time        `json:"createdAt"`
+	ID        int32           `json:"id"`
+	Name      string          `json:"name"`
+	Location  *string         `json:"location"`
+	TotalRAB  decimal.Decimal `json:"totalRAB"`
+	CreatedAt time.Time       `json:"createdAt"`
 }
 
-type DashboardRepo struct{ pool *pgxpool.Pool }
+type DashboardRepo struct{ pool database.Pool }
 
-func NewDashboardRepo(pool *pgxpool.Pool) *DashboardRepo { return &DashboardRepo{pool: pool} }
+func NewDashboardRepo(pool database.Pool) *DashboardRepo { return &DashboardRepo{pool: pool} }
 
 func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (*DashboardStats, error) {
 	scope := ``
 	var args []any
 	if !isAdmin {
 		args = append(args, userID)
-		scope = ` AND (p."userId" = $1 OR EXISTS (SELECT 1 FROM tim_proyek tp WHERE tp."proyekId" = p.id AND tp."userId" = $1))`
+		scope = ` AND (p."userId" = $1 OR EXISTS (SELECT 1 FROM project_team tp WHERE tp."projectId" = p.id AND tp."userId" = $1))`
 	}
 	q := `SELECT
-		(SELECT count(*) FROM proyek p WHERE 1=1` + scope + `),
-		(SELECT count(*) FROM proyek p WHERE p."isPitching" = false` + scope + `),
-		(SELECT count(*) FROM proyek p WHERE p."isPitching" = true` + scope + `),
-		(SELECT COALESCE(SUM(pk."totalBiaya"), 0)::text FROM pekerjaan pk
-			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `),
-		(SELECT count(*) FROM pekerjaan pk
-			JOIN proyek p ON p.id = pk."proyekId" WHERE 1=1` + scope + `)`
-	var totalProyek, proyekAktif, proyekPitching, totalPekerjaan int32
+		(SELECT count(*) FROM projects p WHERE p."deletedAt" IS NULL` + scope + `),
+		(SELECT count(*) FROM projects p WHERE p."deletedAt" IS NULL AND p."isPitching" = false AND p."isDone" = false` + scope + `),
+		(SELECT count(*) FROM projects p WHERE p."deletedAt" IS NULL AND p."isPitching" = true` + scope + `),
+		(SELECT COALESCE(SUM(pk."totalCost"), 0)::text FROM work_items pk
+			JOIN projects p ON p.id = pk."projectId" WHERE pk."deletedAt" IS NULL AND p."deletedAt" IS NULL` + scope + `),
+		(SELECT count(*) FROM work_items pk
+			JOIN projects p ON p.id = pk."projectId" WHERE pk."deletedAt" IS NULL AND p."deletedAt" IS NULL` + scope + `)`
+	var totalProjects, activeProjects, pitchingProjects, totalWorkItems int32
 	var rabStr sql.NullString
-	if err := r.pool.QueryRow(ctx, q, args...).Scan(&totalProyek, &proyekAktif, &proyekPitching, &rabStr, &totalPekerjaan); err != nil {
+	if err := r.pool.QueryRow(ctx, q, args...).Scan(&totalProjects, &activeProjects, &pitchingProjects, &rabStr, &totalWorkItems); err != nil {
 		return nil, err
 	}
 	stats := &DashboardStats{
-		TotalProyek:    totalProyek,
-		ProyekAktif:    proyekAktif,
-		ProyekPitching: proyekPitching,
-		TotalRAB:       scanDec(rabStr.String),
-		TotalPekerjaan: totalPekerjaan,
+		TotalProjects:    totalProjects,
+		ActiveProjects:   activeProjects,
+		PitchingProjects: pitchingProjects,
+		TotalRAB:         scanDec(rabStr.String),
+		TotalWorkItems:   totalWorkItems,
 	}
 
-	rq := `SELECT p.id, p."namaProyek", p.lokasi, COALESCE(SUM(pk."totalBiaya"), 0)::text, p."createdAt"
-		FROM proyek p LEFT JOIN pekerjaan pk ON pk."proyekId" = p.id
-		WHERE 1=1` + scope + `
-		GROUP BY p.id, p."namaProyek", p.lokasi, p."createdAt" ORDER BY p."createdAt" DESC LIMIT 5`
+	rq := `SELECT p.id, p."name", p.location, COALESCE(SUM(pk."totalCost"), 0)::text, p."createdAt"
+		FROM projects p LEFT JOIN work_items pk ON pk."projectId" = p.id AND pk."deletedAt" IS NULL
+		WHERE p."deletedAt" IS NULL` + scope + `
+		GROUP BY p.id, p."name", p.location, p."createdAt" ORDER BY p."createdAt" DESC LIMIT 5`
 	rrows, err := r.pool.Query(ctx, rq, args...)
 	if err != nil {
 		return nil, err
@@ -148,12 +148,12 @@ func (r *DashboardRepo) Stats(ctx context.Context, userID int32, isAdmin bool) (
 	for rrows.Next() {
 		var rp RecentProject
 		var rab sql.NullString
-		var lokasi sql.NullString
-		if err := rrows.Scan(&rp.ID, &rp.Nama, &lokasi, &rab, &rp.CreatedAt); err != nil {
+		var location sql.NullString
+		if err := rrows.Scan(&rp.ID, &rp.Name, &location, &rab, &rp.CreatedAt); err != nil {
 			return nil, err
 		}
 		rp.TotalRAB = scanDec(rab.String)
-		rp.Lokasi = strPtr(lokasi)
+		rp.Location = strPtr(location)
 		stats.RecentProjects = append(stats.RecentProjects, rp)
 	}
 	if err := rrows.Err(); err != nil {

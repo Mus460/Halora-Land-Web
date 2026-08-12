@@ -46,7 +46,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cmd(os.Args[1],cfg)
+	cmd(os.Args[1], cfg)
 }
 
 func cmd(input string, cfg *env.Config) {

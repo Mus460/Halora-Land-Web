@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/halora-land/halora-be/internal/audit"
 	"github.com/halora-land/halora-be/internal/auth"
@@ -66,22 +67,25 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		NamaLengkap string `json:"namaLengkap"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		FullName string `json:"fullName"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	if in.Email == "" || in.Password == "" || in.NamaLengkap == "" {
-		writeError(w, http.StatusBadRequest, "namaLengkap, email, dan password wajib diisi")
+	if in.Email == "" || in.Password == "" {
+		writeError(w, http.StatusBadRequest, "email dan password wajib diisi")
 		return
 	}
 	if len(in.Password) < 6 {
 		writeError(w, http.StatusBadRequest, "Password minimal 6 karakter")
 		return
 	}
-	u, err := h.verifier.LocalRegister(r.Context(), in.NamaLengkap, in.Email, in.Password)
+	if in.FullName == "" {
+		in.FullName = strings.SplitN(in.Email, "@", 2)[0]
+	}
+	u, err := h.verifier.LocalRegister(r.Context(), in.FullName, in.Email, in.Password)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -102,17 +106,17 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPut {
 		var in struct {
-			NamaLengkap string `json:"namaLengkap"`
-			Email       string `json:"email"`
+			FullName string `json:"fullName"`
+			Email    string `json:"email"`
 		}
 		if !decodeJSON(w, r, &in) {
 			return
 		}
-		if in.NamaLengkap == "" || in.Email == "" {
-			writeError(w, http.StatusBadRequest, "namaLengkap dan email wajib diisi")
+		if in.FullName == "" || in.Email == "" {
+			writeError(w, http.StatusBadRequest, "fullName dan email wajib diisi")
 			return
 		}
-		updated, err := h.verifier.LocalUpdateProfile(r.Context(), u.UserID, in.NamaLengkap, in.Email)
+		updated, err := h.verifier.LocalUpdateProfile(r.Context(), u.UserID, in.FullName, in.Email)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -120,6 +124,15 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		u = updated
 	}
 	h.writeUser(w, http.StatusOK, u)
+}
+
+func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.verifier.LocalListUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +151,9 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Password string `json:"password"` }
+	var in struct {
+		Password string `json:"password"`
+	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
@@ -166,7 +181,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) writeUser(w http.ResponseWriter, status int, u *auth.AuthUser) {
 	writeJSON(w, status, map[string]any{"user": map[string]any{
-		"id": u.UserID, "namaLengkap": u.NamaLengkap, "email": u.Email,
+		"id": u.UserID, "fullName": u.FullName, "email": u.Email,
 		"role": u.Role, "accountType": u.AccountType, "isDemo": u.IsDemo,
 	}})
 }

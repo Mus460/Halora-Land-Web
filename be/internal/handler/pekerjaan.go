@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/auth"
@@ -13,21 +14,21 @@ import (
 	"github.com/halora-land/halora-be/service"
 )
 
-type PekerjaanHandler struct {
-	pool     *pgxpool.Pool
-	repo     *repository.PekerjaanRepo
+type WorkItemHandler struct {
+	pool     database.Pool
+	repo     *repository.WorkItemRepo
 	snapshot *service.SnapshotService
 }
 
-func NewPekerjaanHandler(pool *pgxpool.Pool, repo *repository.PekerjaanRepo, ss *service.SnapshotService) *PekerjaanHandler {
-	return &PekerjaanHandler{pool: pool, repo: repo, snapshot: ss}
+func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService) *WorkItemHandler {
+	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss}
 }
 
-func (h *PekerjaanHandler) List(w http.ResponseWriter, r *http.Request) {
-	f := repository.ListPekerjaanFilter{Kategori: r.URL.Query().Get("kategori"), Search: r.URL.Query().Get("search")}
-	if pid := r.URL.Query().Get("proyekId"); pid != "" {
+func (h *WorkItemHandler) List(w http.ResponseWriter, r *http.Request) {
+	f := repository.ListWorkItemFilter{Category: r.URL.Query().Get("category"), Search: r.URL.Query().Get("search")}
+	if pid := r.URL.Query().Get("projectId"); pid != "" {
 		if v, err := atoi32(pid); err == nil {
-			f.ProyekID = &v
+			f.ProjectID = &v
 		}
 	}
 	out, err := h.repo.List(r.Context(), f)
@@ -38,7 +39,7 @@ func (h *PekerjaanHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *PekerjaanHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -49,48 +50,56 @@ func (h *PekerjaanHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, st, msg)
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProyekID, auth.AccessView); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessView); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
 }
 
-func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ProyekID        int32             `json:"proyekId"`
-		Kategori        string            `json:"kategori"`
-		UraianPekerjaan string            `json:"uraianPekerjaan"`
-		Volume          decimal.Decimal   `json:"volume"`
-		Satuan          string            `json:"satuan"`
-		HargaSatuan     decimal.Decimal   `json:"hargaSatuan"`
-		MetodeHitung    string            `json:"metodeHitung"`
-		LevelPekerjaan  *string           `json:"levelPekerjaan"`
-		TipePekerjaan   *string           `json:"tipePekerjaan"`
-		MasterAnalisaID *int32            `json:"masterAnalisaId"`
+		ProjectID         int32           `json:"projectId"`
+		Category          string          `json:"category"`
+		Description       string          `json:"description"`
+		Volume            decimal.Decimal `json:"volume"`
+		Unit              string          `json:"unit"`
+		UnitPrice         decimal.Decimal `json:"unitPrice"`
+		CalculationMethod string          `json:"calculationMethod"`
+		Level             *string         `json:"level"`
+		Type              *string         `json:"type"`
+		AnalysisMasterID  *int32          `json:"analysisMasterId"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, in.ProyekID, auth.AccessEdit); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, in.ProjectID, auth.AccessEdit); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
-	var waktu *decimal.Decimal
-	if in.MasterAnalisaID != nil {
-		wk, err := h.repo.WaktuKoef(r.Context(), *in.MasterAnalisaID)
+	var duration *decimal.Decimal
+	if in.AnalysisMasterID != nil {
+		wk, err := h.repo.DurationCoefficient(r.Context(), *in.AnalysisMasterID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		waktu = wk
+		duration = wk
 	}
-	p, err := h.repo.Create(r.Context(), nil, repository.CreatePekerjaanInput{
-		ProyekID: in.ProyekID, Kategori: models.KategoriPekerjaan(in.Kategori),
-		UraianPekerjaan: in.UraianPekerjaan, Volume: in.Volume, Satuan: in.Satuan,
-		HargaSatuan: in.HargaSatuan, TotalBiaya: in.HargaSatuan.Mul(in.Volume), MetodeHitung: models.MetodeHitung(in.MetodeHitung),
-		LevelPekerjaan: in.LevelPekerjaan, TipePekerjaan: in.TipePekerjaan,
-		MasterAnalisaID: in.MasterAnalisaID, Waktu: waktu,
+	p, err := h.repo.Create(r.Context(), nil, repository.CreateWorkItemInput{
+		ProjectID: in.ProjectID, Category: models.WorkCategory(in.Category),
+		Description: in.Description, Volume: in.Volume, Unit: in.Unit,
+		UnitPrice: in.UnitPrice, TotalCost: in.UnitPrice.Mul(in.Volume), CalculationMethod: models.CalculationMethod(in.CalculationMethod),
+		Level: in.Level, Type: in.Type,
+		AnalysisMasterID: in.AnalysisMasterID, Duration: duration,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -99,7 +108,7 @@ func (h *PekerjaanHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, p)
 }
 
-func (h *PekerjaanHandler) Update(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -110,36 +119,40 @@ func (h *PekerjaanHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, st, msg)
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProyekID, auth.AccessEdit); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessEdit); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	var in struct {
-		Volume         *decimal.Decimal `json:"volume"`
-		HargaSatuan    *decimal.Decimal `json:"hargaSatuan"`
-		Uraian         *string          `json:"uraianPekerjaan"`
-		Satuan         *string          `json:"satuan"`
-		LevelPekerjaan *string          `json:"levelPekerjaan"`
-		TipePekerjaan  *string          `json:"tipePekerjaan"`
-		MetodeHitung   *string          `json:"metodeHitung"`
+		Volume            *decimal.Decimal `json:"volume"`
+		UnitPrice         *decimal.Decimal `json:"unitPrice"`
+		Description       *string          `json:"description"`
+		Unit              *string          `json:"unit"`
+		Level             *string          `json:"level"`
+		Type              *string          `json:"type"`
+		CalculationMethod *string          `json:"calculationMethod"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
 	var tb *decimal.Decimal
-	if in.Volume != nil && in.HargaSatuan != nil {
-		t := in.HargaSatuan.Mul(*in.Volume)
+	if in.Volume != nil && in.UnitPrice != nil {
+		t := in.UnitPrice.Mul(*in.Volume)
 		tb = &t
 	}
-	var mh *models.MetodeHitung
-	if in.MetodeHitung != nil {
-		m := models.MetodeHitung(*in.MetodeHitung)
+	var mh *models.CalculationMethod
+	if in.CalculationMethod != nil {
+		m := models.CalculationMethod(*in.CalculationMethod)
 		mh = &m
 	}
-	updated, err := h.repo.Update(r.Context(), id, repository.UpdatePekerjaanInput{
-		Volume: in.Volume, HargaSatuan: in.HargaSatuan, TotalBiaya: tb,
-		Uraian: in.Uraian, Satuan: in.Satuan, LevelPekerjaan: in.LevelPekerjaan,
-		TipePekerjaan: in.TipePekerjaan, MetodeHitung: mh,
+	updated, err := h.repo.Update(r.Context(), id, repository.UpdateWorkItemInput{
+		Volume: in.Volume, UnitPrice: in.UnitPrice, TotalCost: tb,
+		Description: in.Description, Unit: in.Unit, Level: in.Level,
+		Type: in.Type, CalculationMethod: mh,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -148,7 +161,7 @@ func (h *PekerjaanHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
-func (h *PekerjaanHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -159,8 +172,12 @@ func (h *PekerjaanHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, st, msg)
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProyekID, auth.AccessOwner); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessOwner); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	if err := h.repo.Delete(r.Context(), id); err != nil {
@@ -170,19 +187,23 @@ func (h *PekerjaanHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-func (h *PekerjaanHandler) FromAHSP(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) FromAHSP(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, pid, auth.AccessEdit); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, pid, auth.AccessEdit); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	var in struct {
-		MasterAnalisaID int32           `json:"masterAnalisaId"`
-		Volume          decimal.Decimal `json:"volume"`
-		ApplyBreakdown  *bool           `json:"applyBreakdown"`
+		AnalysisMasterID int32           `json:"analysisMasterId"`
+		Volume           decimal.Decimal `json:"volume"`
+		ApplyBreakdown   *bool           `json:"applyBreakdown"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -191,15 +212,15 @@ func (h *PekerjaanHandler) FromAHSP(w http.ResponseWriter, r *http.Request) {
 	if in.ApplyBreakdown != nil {
 		apply = *in.ApplyBreakdown
 	}
-	p, err := h.snapshot.FromAHSP(r.Context(), pid, in.MasterAnalisaID, in.Volume, apply)
+	p, err := h.snapshot.FromAHSP(r.Context(), pid, in.AnalysisMasterID, in.Volume, apply)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"success": true, "pekerjaan": p})
+	writeJSON(w, http.StatusCreated, map[string]any{"success": true, "work_items": p})
 }
 
-func (h *PekerjaanHandler) Recalculate(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) Recalculate(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -210,8 +231,12 @@ func (h *PekerjaanHandler) Recalculate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, st, msg)
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProyekID, auth.AccessEdit); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessEdit); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	u := auth.FromContext(r.Context())
@@ -223,7 +248,7 @@ func (h *PekerjaanHandler) Recalculate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *PekerjaanHandler) ValidateSnapshot(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) ValidateSnapshot(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -234,8 +259,12 @@ func (h *PekerjaanHandler) ValidateSnapshot(w http.ResponseWriter, r *http.Reque
 		writeError(w, st, msg)
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProyekID, auth.AccessView); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessView); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	res, err := h.snapshot.ValidateSnapshot(r.Context(), id)
@@ -246,12 +275,91 @@ func (h *PekerjaanHandler) ValidateSnapshot(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, res)
 }
 
-func (h *PekerjaanHandler) ListAnalisa(w http.ResponseWriter, r *http.Request) {
+func (h *WorkItemHandler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
-	out, err := h.repo.ListDetailAnalisa(r.Context(), id)
+	p, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessEdit); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
+		return
+	}
+	var in struct {
+		Progress *int    `json:"progress"`
+		Note     *string `json:"note"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if in.Progress == nil {
+		writeError(w, http.StatusBadRequest, "progress wajib diisi")
+		return
+	}
+	log, err := h.repo.RecordProgress(r.Context(), id, *in.Progress, in.Note)
+	if err != nil {
+		if errors.Is(err, repository.ErrProgressNotIncreasing) {
+			writeError(w, http.StatusBadRequest, repository.ErrProgressNotIncreasing.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "progress": clampProgress(*in.Progress), "log": log})
+}
+
+func (h *WorkItemHandler) ProgressLogs(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	p, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, p.ProjectID, auth.AccessView); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
+		return
+	}
+	out, err := h.repo.ListProgressLogs(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func clampProgress(p int) int {
+	if p < 0 {
+		return 0
+	}
+	if p > 100 {
+		return 100
+	}
+	return p
+}
+
+func (h *WorkItemHandler) ListAnalisa(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	out, err := h.repo.ListWorkItemDetail(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState({
-    namaLengkap: "",
+    fullName: "",
     email: "",
   });
   const [loading, setLoading] = useState(true);
@@ -34,7 +34,7 @@ export default function ProfilePage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setProfile({
-        namaLengkap: result.user.namaLengkap || "",
+        fullName: result.user.fullName || "",
         email: result.user.email || "",
       });
     } catch (error) {
@@ -51,7 +51,7 @@ export default function ProfilePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          namaLengkap: profile.namaLengkap,
+          fullName: profile.fullName,
           email: profile.email,
         }),
       });
@@ -122,9 +122,9 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label>Nama Lengkap</Label>
               <Input
-                value={profile.namaLengkap}
+                value={profile.fullName}
                 onChange={(e) =>
-                  setProfile({ ...profile, namaLengkap: e.target.value })
+                  setProfile({ ...profile, fullName: e.target.value })
                 }
               />
             </div>

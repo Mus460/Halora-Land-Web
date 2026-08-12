@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -8,6 +9,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Named volume persists across `docker compose down`/`up`.
+      # NEVER run `docker compose down -v` or `docker volume rm halora-land-web_pgdata`
+      # — it wipes all AHSP data (would require re-import of ahsp-2026.xlsx).
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d halora"]
@@ -19,6 +23,7 @@ services:
     build:
       context: ./be
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +48,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: "http://localhost:8080"
         API_PROXY_URL: "http://be:8080"
+    restart: unless-stopped
     depends_on:
       - be
     environment:

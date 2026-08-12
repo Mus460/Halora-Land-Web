@@ -4,77 +4,71 @@ import { useState, useEffect } from 'react'
 import { useProject } from '@/contexts/ProjectContext'
 import { Search, Plus, Calculator } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { useDebouncedValue } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDuration } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 interface SearchResult {
   id: number
-  kode: string
-  nama: string
-  satuan: string
-  hargaSatuan: number
-  kategori: string
-  ahspKode: string
+  code: string
+  name: string
+  unit: string
+  unitPrice: number
+  category: string
+  ahspCode: string
   ahspSheet: string
 }
 
 interface PekerjaanItem {
   id: number
-  kategori: string
-  uraianPekerjaan: string
+  category: string
+  description: string
   volume: number
-  satuan: string
-  hargaSatuan: number
-  totalBiaya: number
-  totalWaktu: number | null
+  unit: string
+  unitPrice: number
+  totalCost: number
+  totalDuration: number | null
 }
 
-const formatWaktu = (v: number | null | undefined) =>
-  v == null
-    ? "—"
-    : `${v.toLocaleString("id-ID", { maximumFractionDigits: 1 })} jam`
-
 export default function RABPage() {
-  const { currentProyekId: proyekId } = useProject()
+  const { currentProjectId: projectId } = useProject()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
-  const [pekerjaan, setPekerjaan] = useState<PekerjaanItem[]>([])
+  const [workItem, setPekerjaan] = useState<PekerjaanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [addingItem, setAddingItem] = useState<number | null>(null)
 
   useEffect(() => {
-    if (proyekId) {
+    if (projectId) {
       fetchPekerjaan()
     }
-  }, [proyekId])
+  }, [projectId])
+
+  const debouncedQuery = useDebouncedValue(searchQuery)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.length >= 3) {
-        performSearch()
-      } else {
-        setSearchResults([])
-      }
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+    if (debouncedQuery.trim().length >= 3) {
+      performSearch()
+    } else {
+      setSearchResults([])
+    }
+  }, [debouncedQuery])
 
   const fetchPekerjaan = async () => {
-    if (!proyekId) return
+    if (!projectId) return
     
     try {
       setLoading(true)
-      const response = await fetch(`/api/proyek/${proyekId}/rekap`)
+      const response = await fetch(`/api/projects/${projectId}/recaps`)
       if (!response.ok) throw new Error('Failed to fetch')
       
       const data = await response.json()
-      // Extract pekerjaan from grouped data
+      // Extract workItem from grouped data
       const allPekerjaan: PekerjaanItem[] = []
       if (data.grouped) {
         Object.values(data.grouped || {}).forEach((items: any) => {
@@ -83,7 +77,7 @@ export default function RABPage() {
       }
       setPekerjaan(allPekerjaan)
     } catch (error) {
-      console.error('Fetch pekerjaan error:', error)
+      console.error('Fetch workItem error:', error)
       toast.error('Gagal memuat data RAB')
     } finally {
       setLoading(false)
@@ -94,7 +88,7 @@ export default function RABPage() {
     setSearching(true)
     try {
       const response = await fetch(
-        `/api/master-analisa/search?q=${encodeURIComponent(searchQuery)}&limit=10`
+        `/api/analysis-masters/search?q=${encodeURIComponent(searchQuery)}&limit=10`
       )
       if (!response.ok) throw new Error('Search failed')
       
@@ -109,12 +103,12 @@ export default function RABPage() {
   }
 
   const handleAddItem = async (item: SearchResult) => {
-    if (!proyekId) {
-      toast.error('Pilih proyek terlebih dahulu')
+    if (!projectId) {
+      toast.error('Pilih project terlebih dahulu')
       return
     }
 
-    const volume = prompt(`Masukkan volume untuk:\n${item.nama}\n\nVolume (${item.satuan}):`)
+    const volume = prompt(`Masukkan volume untuk:\n${item.name}\n\nVolume (${item.unit}):`)
     if (!volume || parseFloat(volume) <= 0) {
       toast.error('Volume harus diisi dan lebih dari 0')
       return
@@ -123,11 +117,11 @@ export default function RABPage() {
     try {
       setAddingItem(item.id)
       
-      const response = await fetch(`/api/proyek/${proyekId}/pekerjaan/from-ahsp`, {
+      const response = await fetch(`/api/projects/${projectId}/work_items/from-ahsp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          masterAnalisaId: item.id,
+          analysisMasterId: item.id,
           volume: parseFloat(volume),
           applyBreakdown: true
         })
@@ -140,7 +134,7 @@ export default function RABPage() {
 
       toast.success('Item berhasil ditambahkan ke RAB')
       
-      // Refresh pekerjaan list
+      // Refresh workItem list
       await fetchPekerjaan()
       
       // Clear search
@@ -156,25 +150,25 @@ export default function RABPage() {
   }
 
   // Calculate totals
-  const subtotal = pekerjaan.reduce((sum, p) => sum + Number(p.totalBiaya), 0)
-  const totalWaktu = pekerjaan.reduce((sum, p) => sum + (p.totalWaktu || 0), 0)
+  const subtotal = workItem.reduce((sum, p) => sum + Number(p.totalCost), 0)
+  const totalDuration = workItem.reduce((sum, p) => sum + (p.totalDuration || 0), 0)
   const overhead = subtotal * 0.10
   const profit = (subtotal + overhead) * 0.10
   const ppn = (subtotal + overhead + profit) * 0.11
   const total = subtotal + overhead + profit + ppn
 
-  // Group by kategori
-  const grouped = pekerjaan.reduce((acc, item) => {
-    if (!acc[item.kategori]) acc[item.kategori] = []
-    acc[item.kategori].push(item)
+  // Group by category
+  const grouped = workItem.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = []
+    acc[item.category].push(item)
     return acc
   }, {} as Record<string, PekerjaanItem[]>)
 
-  if (!proyekId) {
+  if (!projectId) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <Calculator className="w-12 h-12 text-gray-300 mb-3" />
-        <p className="text-gray-600">Silakan pilih proyek terlebih dahulu</p>
+        <p className="text-gray-600">Silakan pilih project terlebih dahulu</p>
       </div>
     )
   }
@@ -189,7 +183,7 @@ export default function RABPage() {
       {/* Search Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Cari Item Pekerjaan AHSP</CardTitle>
+          <CardTitle className="text-lg">Cari Item WorkItem AHSP</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="relative">
@@ -213,13 +207,13 @@ export default function RABPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="outline" className="text-xs">
-                        {item.kategori}
+                        {item.category}
                       </Badge>
-                      <span className="text-xs text-gray-500">{item.ahspKode}</span>
+                      <span className="text-xs text-gray-500">{item.ahspCode}</span>
                     </div>
-                    <div className="font-medium text-sm">{item.nama}</div>
+                    <div className="font-medium text-sm truncate">{item.name}</div>
                     <div className="text-sm text-gray-600 mt-1">
-                      {formatCurrency(item.hargaSatuan)} / {item.satuan}
+                      {formatCurrency(item.unitPrice)} / {item.unit}
                     </div>
                   </div>
                   <Button
@@ -257,26 +251,26 @@ export default function RABPage() {
         <CardContent>
           {loading ? (
             <div className="text-center py-8 text-gray-500">Memuat data...</div>
-          ) : pekerjaan.length === 0 ? (
+          ) : workItem.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               Belum ada item pekerjaan. Cari dan tambahkan dari AHSP di atas.
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(grouped).map(([kategori, items]) => {
-                const subtotalKategori = items.reduce((sum, p) => sum + Number(p.totalBiaya), 0)
-                const waktuKategori = items.reduce((sum, p) => sum + (p.totalWaktu || 0), 0)
+              {Object.entries(grouped).map(([category, items]) => {
+                const subtotalKategori = items.reduce((sum, p) => sum + Number(p.totalCost), 0)
+                const waktuKategori = items.reduce((sum, p) => sum + (p.totalDuration || 0), 0)
                 
                 return (
-                  <div key={kategori}>
+                  <div key={category}>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-semibold text-lg capitalize">
-                        {kategori.replace('_', ' ')}
+                        {category.replace('_', ' ')}
                       </h3>
                       <div className="text-sm text-gray-600">
                         Subtotal: {formatCurrency(subtotalKategori)}
                         <span className="ml-3 text-gray-400">
-                          · {formatWaktu(waktuKategori)}
+                          · {formatDuration(waktuKategori)}
                         </span>
                       </div>
                     </div>
@@ -285,16 +279,16 @@ export default function RABPage() {
                       {items.map((item, idx) => (
                         <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{item.uraianPekerjaan}</div>
+                            <div className="font-medium text-sm truncate">{item.description}</div>
                             <div className="text-xs text-gray-500 mt-1">
-                              {item.volume} {item.satuan} × {formatCurrency(item.hargaSatuan)}
+                              {item.volume} {item.unit} × {formatCurrency(item.unitPrice)}
                             </div>
                             <div className="text-xs text-gray-400 mt-0.5">
-                              Estimasi waktu: {formatWaktu(item.totalWaktu)}
+                              Estimasi Waktu: {formatDuration(item.totalDuration)}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold">{formatCurrency(item.totalBiaya)}</div>
+                            <div className="font-semibold">{formatCurrency(item.totalCost)}</div>
                           </div>
                         </div>
                       ))}
@@ -311,7 +305,7 @@ export default function RABPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Estimasi Waktu:</span>
-                  <span className="font-medium">{formatWaktu(totalWaktu)}</span>
+                  <span className="font-medium">{formatDuration(totalDuration)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Overhead (10%):</span>

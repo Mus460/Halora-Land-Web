@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
+	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
 	"github.com/halora-land/halora-be/internal/auth"
@@ -11,18 +13,18 @@ import (
 	"github.com/halora-land/halora-be/internal/repository"
 )
 
-type MasterAnalisaHandler struct {
-	pool *pgxpool.Pool
-	repo *repository.MasterAnalisaRepo
+type AnalysisMasterHandler struct {
+	pool database.Pool
+	repo *repository.AnalysisMasterRepo
 }
 
-func NewMasterAnalisaHandler(pool *pgxpool.Pool, repo *repository.MasterAnalisaRepo) *MasterAnalisaHandler {
-	return &MasterAnalisaHandler{pool: pool, repo: repo}
+func NewAnalysisMasterHandler(pool database.Pool, repo *repository.AnalysisMasterRepo) *AnalysisMasterHandler {
+	return &AnalysisMasterHandler{pool: pool, repo: repo}
 }
 
-func (h *MasterAnalisaHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) List(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
-	f := repository.ListMasterAnalisaFilter{UserID: u.UserID, Search: r.URL.Query().Get("search")}
+	f := repository.ListAnalysisMasterFilter{UserID: u.UserID, Search: r.URL.Query().Get("search")}
 	if lvl := r.URL.Query().Get("level"); lvl != "" {
 		if v, err := atoi32(lvl); err == nil {
 			f.Level = new(int)
@@ -59,7 +61,7 @@ func (h *MasterAnalisaHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
-func (h *MasterAnalisaHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -73,14 +75,14 @@ func (h *MasterAnalisaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
-func (h *MasterAnalisaHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) Create(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	var in struct {
-		Kode     string  `json:"kode"`
-		Nama     string  `json:"nama"`
+		Code     string  `json:"code"`
+		Name     string  `json:"name"`
 		Level    int32   `json:"level"`
 		ParentID *int32  `json:"parentId"`
-		Satuan   *string `json:"satuan"`
+		Unit     *string `json:"unit"`
 		IsGlobal bool    `json:"isGlobal"`
 	}
 	if !decodeJSON(w, r, &in) {
@@ -91,9 +93,9 @@ func (h *MasterAnalisaHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := u.UserID
-	in_ := repository.CreateMasterAnalisaInput{
-		Kode: in.Kode, Nama: in.Nama, Level: in.Level, ParentID: in.ParentID,
-		Satuan: in.Satuan, IsGlobal: in.IsGlobal, UserID: &uid,
+	in_ := repository.CreateAnalysisMasterInput{
+		Code: in.Code, Name: in.Name, Level: in.Level, ParentID: in.ParentID,
+		Unit: in.Unit, IsGlobal: in.IsGlobal, UserID: &uid,
 	}
 	m, err := h.repo.Create(r.Context(), in_)
 	if err != nil {
@@ -103,7 +105,7 @@ func (h *MasterAnalisaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, m)
 }
 
-func (h *MasterAnalisaHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -124,12 +126,12 @@ func (h *MasterAnalisaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-func (h *MasterAnalisaHandler) ListRincian(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) ListComponents(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
-	out, err := h.repo.ListRincian(r.Context(), id)
+	out, err := h.repo.ListComponents(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -137,49 +139,142 @@ func (h *MasterAnalisaHandler) ListRincian(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *MasterAnalisaHandler) CreateRincian(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) CreateComponent(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
-	var in repository.CreateRincianInput
+	var in repository.CreateComponentInput
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	in.MasterAnalisaID = id
-	if err := h.repo.CreateRincian(r.Context(), in); err != nil {
+	in.AnalysisMasterID = id
+	if err := h.repo.CreateComponent(r.Context(), in); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"success": true})
 }
 
-func (h *MasterAnalisaHandler) DeleteRincian(w http.ResponseWriter, r *http.Request) {
+func (h *AnalysisMasterHandler) DeleteComponent(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
-	rid, ok := parseIntParam(w, r, "rincianId")
+	rid, ok := parseIntParam(w, r, "componentId")
 	if !ok {
 		return
 	}
-	if err := h.repo.DeleteRincian(r.Context(), id, rid); err != nil {
+	if err := h.repo.DeleteComponent(r.Context(), id, rid); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-func (h *MasterAnalisaHandler) Search(w http.ResponseWriter, r *http.Request) {
+// Copy duplicates an analysis master into a user-owned, editable row.
+func (h *AnalysisMasterHandler) Copy(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	u := auth.FromContext(r.Context())
+	var in struct {
+		Name *string `json:"name"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	name := ""
+	if in.Name != nil {
+		name = *in.Name
+	}
+	m, err := h.repo.Copy(r.Context(), id, u.UserID, name)
+	if err != nil {
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	writeJSON(w, http.StatusCreated, m)
+}
+
+func (h *AnalysisMasterHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	u := auth.FromContext(r.Context())
+	var in struct {
+		Name *string `json:"name"`
+		Unit *string `json:"unit"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	m, err := h.repo.Update(r.Context(), id, u.UserID, u.Role == models.RoleAdmin, repository.UpdateAnalysisMasterInput{Name: in.Name, Unit: in.Unit})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusForbidden, "Tidak dapat mengubah data AHSP sistem")
+			return
+		}
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
+}
+
+func (h *AnalysisMasterHandler) UpdateComponent(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIntParam(w, r, "id")
+	if !ok {
+		return
+	}
+	cid, ok := parseIntParam(w, r, "componentId")
+	if !ok {
+		return
+	}
+	u := auth.FromContext(r.Context())
+	var in struct {
+		Coefficient *decimal.Decimal `json:"coefficient"`
+		UnitPrice   *decimal.Decimal `json:"unitPrice"`
+		Unit        *string          `json:"unit"`
+		Name        *string          `json:"name"`
+		Type        *string          `json:"type"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	var ct *models.ComponentType
+	if in.Type != nil {
+		t := models.ComponentType(*in.Type)
+		ct = &t
+	}
+	comp, err := h.repo.UpdateComponent(r.Context(), u.UserID, u.Role == models.RoleAdmin, repository.UpdateComponentInput{
+		ID: cid, AnalysisMasterID: id,
+		Coefficient: in.Coefficient, UnitPrice: in.UnitPrice, Unit: in.Unit, Name: in.Name, Type: ct,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusForbidden, "Tidak dapat mengubah data AHSP sistem")
+			return
+		}
+		st, msg := mapPgErr(err)
+		writeError(w, st, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, comp)
+}
+
+func (h *AnalysisMasterHandler) Search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
-	kategori := r.URL.Query().Get("kategori")
+	category := r.URL.Query().Get("type")
 	limit := 20
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if v, err := atoi32(l); err == nil && v > 0 {
 			limit = int(v)
 		}
 	}
-	out, err := h.repo.SearchAHSP(r.Context(), q, kategori, limit)
+	out, err := h.repo.SearchAHSP(r.Context(), q, category, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -187,18 +282,18 @@ func (h *MasterAnalisaHandler) Search(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"results": out})
 }
 
-type MasterHargaHandler struct {
-	pool *pgxpool.Pool
-	repo *repository.MasterHargaRepo
+type PriceMasterHandler struct {
+	pool database.Pool
+	repo *repository.PriceMasterRepo
 }
 
-func NewMasterHargaHandler(pool *pgxpool.Pool, repo *repository.MasterHargaRepo) *MasterHargaHandler {
-	return &MasterHargaHandler{pool: pool, repo: repo}
+func NewPriceMasterHandler(pool database.Pool, repo *repository.PriceMasterRepo) *PriceMasterHandler {
+	return &PriceMasterHandler{pool: pool, repo: repo}
 }
 
-func (h *MasterHargaHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *PriceMasterHandler) List(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
-	f := repository.ListMasterHargaFilter{UserID: u.UserID, Kategori: r.URL.Query().Get("kategori"), Search: r.URL.Query().Get("search")}
+	f := repository.ListPriceMasterFilter{UserID: u.UserID, Type: r.URL.Query().Get("type"), Search: r.URL.Query().Get("search")}
 	if ig := r.URL.Query().Get("isGlobal"); ig == "true" {
 		b := true
 		f.IsGlobal = &b
@@ -208,10 +303,10 @@ func (h *MasterHargaHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"masterHarga": out})
+	writeJSON(w, http.StatusOK, map[string]any{"priceMaster": out})
 }
 
-func (h *MasterHargaHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *PriceMasterHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -225,13 +320,13 @@ func (h *MasterHargaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
-func (h *MasterHargaHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *PriceMasterHandler) Create(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	var in struct {
-		Nama     string          `json:"nama"`
-		Satuan   string          `json:"satuan"`
-		Harga    decimal.Decimal `json:"harga"`
-		Kategori string          `json:"kategori"`
+		Name     string          `json:"name"`
+		Unit     string          `json:"unit"`
+		Price    decimal.Decimal `json:"price"`
+		Type     string          `json:"type"`
 		IsGlobal bool            `json:"isGlobal"`
 	}
 	if !decodeJSON(w, r, &in) {
@@ -241,9 +336,9 @@ func (h *MasterHargaHandler) Create(w http.ResponseWriter, r *http.Request) {
 		in.IsGlobal = false
 	}
 	uid := u.UserID
-	m, err := h.repo.Create(r.Context(), repository.CreateMasterHargaInput{
-		Nama: in.Nama, Satuan: in.Satuan, Harga: in.Harga,
-		Kategori: models.TipeKomponen(in.Kategori), IsGlobal: in.IsGlobal, UserID: &uid,
+	m, err := h.repo.Create(r.Context(), repository.CreatePriceMasterInput{
+		Name: in.Name, Unit: in.Unit, Price: in.Price,
+		Type: models.ComponentType(in.Type), IsGlobal: in.IsGlobal, UserID: &uid,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -252,7 +347,7 @@ func (h *MasterHargaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, m)
 }
 
-func (h *MasterHargaHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *PriceMasterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
@@ -264,27 +359,27 @@ func (h *MasterHargaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-func (h *MasterHargaHandler) Update(w http.ResponseWriter, r *http.Request) {
+func (h *PriceMasterHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(w, r, "id")
 	if !ok {
 		return
 	}
 	var in struct {
-		Nama     *string          `json:"nama"`
-		Satuan   *string          `json:"satuan"`
-		Harga    *decimal.Decimal `json:"harga"`
-		Kategori *string          `json:"kategori"`
+		Name  *string          `json:"name"`
+		Unit  *string          `json:"unit"`
+		Price *decimal.Decimal `json:"price"`
+		Type  *string          `json:"type"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	var kat *models.TipeKomponen
-	if in.Kategori != nil {
-		k := models.TipeKomponen(*in.Kategori)
+	var kat *models.ComponentType
+	if in.Type != nil {
+		k := models.ComponentType(*in.Type)
 		kat = &k
 	}
-	m, err := h.repo.Update(r.Context(), id, repository.UpdateMasterHargaInput{
-		Nama: in.Nama, Satuan: in.Satuan, Harga: in.Harga, Kategori: kat,
+	m, err := h.repo.Update(r.Context(), id, repository.UpdatePriceMasterInput{
+		Name: in.Name, Unit: in.Unit, Price: in.Price, Type: kat,
 	})
 	if err != nil {
 		st, msg := mapPgErr(err)

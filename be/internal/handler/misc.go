@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/halora-land/halora-be/internal/database"
 
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/models"
@@ -12,11 +13,11 @@ import (
 )
 
 type DashboardHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 	repo *repository.DashboardRepo
 }
 
-func NewDashboardHandler(pool *pgxpool.Pool, repo *repository.DashboardRepo) *DashboardHandler {
+func NewDashboardHandler(pool database.Pool, repo *repository.DashboardRepo) *DashboardHandler {
 	return &DashboardHandler{pool: pool, repo: repo}
 }
 
@@ -83,9 +84,9 @@ func (h *AuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	if !f.IsAdmin {
 		f.UserID = &u.UserID
 	}
-	if pid := r.URL.Query().Get("proyekId"); pid != "" {
+	if pid := r.URL.Query().Get("projectId"); pid != "" {
 		if v, err := atoi32(pid); err == nil {
-			f.ProyekID = &v
+			f.ProjectID = &v
 		}
 	}
 	out, err := h.repo.List(r.Context(), f)
@@ -172,64 +173,82 @@ func (h *NewsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 type MonitoringHandler struct {
-	pool *pgxpool.Pool
+	pool database.Pool
 }
 
-func NewMonitoringHandler(pool *pgxpool.Pool) *MonitoringHandler {
+func NewMonitoringHandler(pool database.Pool) *MonitoringHandler {
 	return &MonitoringHandler{pool: pool}
 }
 
 func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
-	pidStr := r.URL.Query().Get("proyekId")
+	pidStr := r.URL.Query().Get("projectId")
 	if pidStr == "" {
-		writeError(w, http.StatusBadRequest, "proyekId wajib diisi")
+		writeError(w, http.StatusBadRequest, "projectId wajib diisi")
 		return
 	}
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid proyekId")
+		writeError(w, http.StatusBadRequest, "invalid projectId")
 		return
 	}
-	if _, _, ok := auth.ProjectAccess(r.Context(), h.pool, int32(pid), auth.AccessView); !ok {
-		writeError(w, http.StatusForbidden, "Forbidden")
+	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, int32(pid), auth.AccessView); !ok {
+		if !found {
+			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
+		} else {
+			writeError(w, http.StatusForbidden, "Forbidden")
+		}
 		return
 	}
 	rows, err := h.pool.Query(r.Context(), `
-		SELECT id, "uraianPekerjaan", volume::text, satuan, kategori
-		FROM pekerjaan WHERE "proyekId" = $1 ORDER BY kategori, id`, pid)
+		SELECT w.id, w."description", w.volume::text, w.unit, w.category, w.progress,
+			(SELECT l."createdAt" FROM work_item_progress_logs l
+			 WHERE l."workItemId" = w.id
+			 ORDER BY l."createdAt" DESC, l.id DESC LIMIT 1) AS "lastUpdated"
+		FROM work_items w WHERE w."projectId" = $1 AND w."deletedAt" IS NULL
+		ORDER BY w.category, w.id`, pid)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	defer rows.Close()
 	type monItem struct {
-		ID       int32  `json:"id"`
-		Uraian   string `json:"uraian"`
-		Volume   string `json:"volume"`
-		Satuan   string `json:"satuan"`
-		Progress int    `json:"progress"`
+		ID          int32   `json:"id"`
+		Description string  `json:"description"`
+		Volume      string  `json:"volume"`
+		Unit        string  `json:"unit"`
+		Progress    int     `json:"progress"`
+		LastUpdated *string `json:"lastUpdated"`
 	}
 	grouped := map[string][]monItem{}
 	var order []string
 	for rows.Next() {
 		var id int32
-		var uraian, vol, satuan, kat string
-		if err := rows.Scan(&id, &uraian, &vol, &satuan, &kat); err != nil {
+		var description, vol, unit, kat string
+		var progress int
+		var lastUpdated sql.NullString
+		if err := rows.Scan(&id, &description, &vol, &unit, &kat, &progress, &lastUpdated); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		if _, exists := grouped[kat]; !exists {
 			order = append(order, kat)
 		}
-		grouped[kat] = append(grouped[kat], monItem{ID: id, Uraian: uraian, Volume: vol, Satuan: satuan, Progress: 0})
+		grouped[kat] = append(grouped[kat], monItem{
+			ID:          id,
+			Description: description,
+			Volume:      vol,
+			Unit:        unit,
+			Progress:    progress,
+			LastUpdated: nullStr(lastUpdated),
+		})
 	}
 	type monCategory struct {
-		Kategori string    `json:"kategori"`
+		Category string    `json:"category"`
 		Items    []monItem `json:"items"`
 	}
 	var out []monCategory
 	for _, k := range order {
-		out = append(out, monCategory{Kategori: k, Items: grouped[k]})
+		out = append(out, monCategory{Category: k, Items: grouped[k]})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"monitoring": out})
 }

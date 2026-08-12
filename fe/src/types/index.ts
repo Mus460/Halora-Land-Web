@@ -2,7 +2,7 @@ export type Role = "ADMIN" | "OWNER" | "USER" | "DEMO";
 
 export interface User {
   id: number;
-  namaLengkap: string;
+  fullName: string;
   email: string;
   role: Role;
   accountType: string;
@@ -11,203 +11,223 @@ export interface User {
   updatedAt: string;
 }
 
-export interface Proyek {
+export type ProjectType = "building" | "infrastructure";
+
+export interface Project {
   id: number;
   userId: number;
-  namaProyek: string;
-  lokasi: string | null;
-  tipe: "gedung" | "infra";
+  name: string;
+  location: string | null;
+  type: ProjectType;
   isPitching: boolean;
-  nilaiKontrak: number | null;
-  timeline: string | null;
+  isDone: boolean;
+  contractValue: number | null;
+  timelineMonths: number;
+  timelineDays: number;
   createdAt: string;
   updatedAt: string;
   user?: User;
-  timProyek?: TimProyek[];
-  pekerjaan?: Pekerjaan[];
+  projectTeam?: ProjectTeamMember[];
+  work_items?: ProjectWorkItem[];
   _count?: {
-    pekerjaan: number;
+    work_items: number;
+    recaps: number;
+    invoices: number;
   };
 }
 
-export interface TimProyek {
+export interface ProjectTeamMember {
   id: number;
-  proyekId: number;
+  projectId: number;
   userId: number;
   role: "owner" | "editor" | "viewer";
   createdAt: string;
   user?: User;
-  proyek?: Proyek;
+  project?: Project;
 }
 
-export type KategoriPekerjaan =
-  | "persiapan"
-  | "pondasi"
-  | "beton"
-  | "kanopi"
-  | "baja"
-  | "tangga"
-  | "atap"
-  | "dinding"
-  | "plesteran"
-  | "acian"
-  | "keramik"
+export interface ProjectWorkItem {
+  id: number;
+  description: string;
+  volume: number;
+  unit: string;
+  unitPrice: number;
+  totalCost: number;
+  category: WorkCategory;
+}
+
+export type WorkCategory =
+  | "preparation"
+  | "foundation"
+  | "concrete"
+  | "canopy"
+  | "steel"
+  | "stairs"
+  | "roof"
+  | "wall"
+  | "plastering"
+  | "finishing"
+  | "tiles"
   | "paving"
-  | "pengecatan"
-  | "pintu"
+  | "painting"
+  | "doors"
   | "interior"
   | "toilet"
   | "mep"
   | "custom";
 
-export type MetodeHitung =
+export type CalculationMethod =
   | "ahsp"
   | "manual"
-  | "harga_borong"
-  | "harga_manual"
-  | "harga_custom";
+  | "lump_sum"
+  | "manual_price"
+  | "custom_price";
 
-export type TipeKomponen = "material" | "upah" | "alat";
+export type ComponentType = "material" | "labor" | "equipment";
 
-export interface Pekerjaan {
+export interface WorkItem {
   id: number;
-  proyekId: number;
-  kategori: KategoriPekerjaan;
-  uraianPekerjaan: string;
+  projectId: number;
+  category: WorkCategory;
+  description: string;
   volume: number;
-  satuan: string;
-  hargaSatuan: number;
-  totalBiaya: number;
-  metodeHitung: MetodeHitung;
-  levelPekerjaan: string | null;
-  tipePekerjaan: string | null;
-  masterAnalisaId: number | null;
-  waktu: number | null;
-  totalWaktu: number | null;
+  unit: string;
+  unitPrice: number;
+  totalCost: number;
+  calculationMethod: CalculationMethod;
+  level: string | null;
+  type: string | null;
+  analysisMasterId: number | null;
+  duration: number | null;
+  totalDuration: number | null;
   createdAt: string;
   updatedAt: string;
-  detailAnalisa?: DetailAnalisa[];
+  itemDetails?: WorkItemDetail[];
 }
 
-export interface DetailAnalisa {
+export interface WorkItemDetail {
   id: number;
-  pekerjaanId: number;
-  masterHargaId: number | null;
-  nama: string;
-  satuan: string;
-  koef: number;
-  hargaSatuan: number;
-  totalBiaya: number;
-  tipe: TipeKomponen;
+  workItemId: number;
+  priceMasterId: number | null;
+  name: string;
+  unit: string;
+  coefficient: number;
+  unitPrice: number;
+  totalCost: number;
+  type: ComponentType;
 }
 
-export interface MasterAnalisa {
+export interface AnalysisMaster {
   id: number;
-  kode: string;
-  nama: string;
+  code: string;
+  name: string;
   level: number;
   parentId: number | null;
-  satuan: string | null;
-  hargaSatuan?: number | null;
+  unit: string | null;
+  unitPrice?: number | null;
   isGlobal: boolean;
+  isSystem?: boolean;
+  ahspCode?: string | null;
+  generalCost?: number;
   userId: number | null;
   createdAt: string;
-  children?: MasterAnalisa[];
-  rincianAnalisa?: RincianAnalisa[];
+  children?: AnalysisMaster[];
 }
 
-export interface RincianAnalisa {
+export interface AnalysisComponent {
   id: number;
-  masterAnalisaId: number;
-  komponenId: number | null;
-  koef: number;
-  tipe: TipeKomponen;
-  nama: string | null;
-  satuan: string | null;
-  hargaSatuan: number | null;
-  jumlahHarga: number | null;
-  kodeReferensi: string | null;
-  waktu: number | null;
-  urutan: number;
-  komponen?: MasterHarga;
+  analysisMasterId: number;
+  componentId: number | null;
+  coefficient: number;
+  type: ComponentType;
+  name: string | null;
+  unit: string | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  referenceCode: string | null;
+  duration: number | null;
+  sequence: number;
 }
 
-export interface MasterHarga {
+export interface PriceMaster {
   id: number;
-  nama: string;
-  satuan: string;
-  harga: number;
-  kategori: TipeKomponen;
+  name: string;
+  unit: string;
+  price: number;
+  type: ComponentType;
   isGlobal: boolean;
   userId: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Rekap {
+export interface Recap {
   id: number;
-  proyekId: number;
-  kategori: string;
-  uraian: string;
-  urutan: number;
+  projectId: number;
+  category: string;
+  description: string;
+  sequence: number;
   margin: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface InvoiceItem {
+  id?: number;
+  description: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+}
+
 export interface Invoice {
   id: number;
-  proyekId: number;
-  nomor: string;
-  tanggal: string;
+  projectId: number;
+  number: string;
+  date: string;
+  dueDate?: string | null;
+  poNumber?: string | null;
+  buyerName?: string | null;
+  buyerAddress?: string | null;
+  buyerContact?: string | null;
+  discount: number;
+  taxRate: number;
+  paymentBank?: string | null;
+  paymentAccountNumber?: string | null;
+  paymentAccountName?: string | null;
+  notes?: string | null;
+  financeName?: string | null;
   total: number;
   status: "draft" | "sent" | "paid";
+  items?: InvoiceItem[];
   createdAt: string;
 }
 
-export interface Logistik {
+export interface Logistics {
   id: number;
-  proyekId: number;
-  namaMaterial: string;
-  satuan: string;
+  projectId: number;
+  materialName: string;
+  unit: string;
   volume: number;
-  hargaSatuan: number;
-  totalBiaya: number;
-  tanggal: string | null;
-  keterangan: string | null;
+  unitPrice: number;
+  totalCost: number;
+  date: string | null;
+  description: string | null;
   createdAt: string;
 }
 
-export interface Realisasi {
+export interface Transaction {
   id: number;
-  proyekId: number;
-  tanggal: string;
-  kategori: string;
-  jumlah: number;
-  keterangan: string | null;
+  projectId: number;
+  date: string;
+  category: string;
+  amount: number;
+  description: string | null;
+  type: "expense" | "income";
+  status: "draft" | "approved" | "reverted";
+  logisticsId: number | null;
+  invoiceId: number | null;
   createdAt: string;
-}
-
-export interface Feedback {
-  id: number;
-  userId: number;
-  subject: string;
-  message: string;
-  status: "open" | "in_progress" | "resolved" | "closed";
-  createdAt: string;
-  updatedAt: string;
-  user?: User;
-  replies?: FeedbackReply[];
-}
-
-export interface FeedbackReply {
-  id: number;
-  feedbackId: number;
-  userId: number;
-  message: string;
-  isAdmin: boolean;
-  createdAt: string;
-  user?: User;
 }
 
 export interface News {
@@ -220,12 +240,12 @@ export interface News {
 
 export interface CalculationResult {
   volume: number;
-  hargaSatuan: number;
-  totalBiaya: number;
+  unitPrice: number;
+  totalCost: number;
   breakdown: {
     material: number;
-    upah: number;
-    alat: number;
+    labor: number;
+    equipment: number;
   };
 }
 
