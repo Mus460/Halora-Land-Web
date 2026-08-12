@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export default function AdminUsersPage() {
   const [data, setData] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
   const fetchData = async () => {
     try {
@@ -64,15 +66,16 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Hapus user "${name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      const response = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/users/${deleteTarget.id}`, { method: "DELETE" });
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || "Delete failed");
       }
       toast.success("User berhasil dihapus");
+      setDeleteTarget(null);
       await fetchData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal menghapus user");
@@ -129,7 +132,7 @@ export default function AdminUsersPage() {
           variant="ghost"
           size="sm"
           className="text-red-600 hover:text-red-800 hover:bg-red-50"
-          onClick={() => handleDelete(row.original.id, row.original.fullName)}
+          onClick={() => setDeleteTarget(row.original)}
         >
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -164,6 +167,16 @@ export default function AdminUsersPage() {
         open={showForm}
         onOpenChange={setShowForm}
         onSubmit={handleCreate}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={() => setDeleteTarget(null)}
+        title="Hapus User"
+        description={`Apakah Anda yakin ingin menghapus user "${deleteTarget?.fullName}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus"
+        variant="destructive"
+        onConfirm={handleDelete}
       />
     </div>
   );
