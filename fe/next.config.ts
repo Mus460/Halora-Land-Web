@@ -6,8 +6,12 @@ const nextConfig: NextConfig = {
     const proxyUrl = process.env.API_PROXY_URL || "http://localhost:8080";
     return [
       {
+        source: "/api/v1/:path*",
+        destination: `${proxyUrl}/api/v1/:path*`,
+      },
+      {
         source: "/api/:path*",
-        destination: `${proxyUrl}/api/:path*`,
+        destination: `${proxyUrl}/api/v1/:path*`,
       },
     ];
   },
