@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +64,21 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Hapus user "${name}"?`)) return;
+    try {
+      const response = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Delete failed");
+      }
+      toast.success("User berhasil dihapus");
+      await fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus user");
+    }
+  };
+
   const columns: ColumnDef<User>[] = [
     {
       accessorKey: "fullName",
@@ -105,6 +120,20 @@ export default function AdminUsersPage() {
       accessorKey: "createdAt",
       header: "Terdaftar",
       cell: ({ row }) => formatDate(row.original.createdAt),
+    },
+    {
+      id: "actions",
+      header: "Aksi",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-600 hover:text-red-800 hover:bg-red-50"
+          onClick={() => handleDelete(row.original.id, row.original.fullName)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      ),
     },
   ];
 

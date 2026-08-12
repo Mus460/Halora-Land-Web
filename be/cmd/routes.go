@@ -143,6 +143,7 @@ func (app *App) routes() http.Handler {
 				r.Use(auth.RequireRole(models.RoleAdmin))
 				r.Post("/auth/register", authH.Register)
 				r.Get("/users", authH.ListUsers)
+				r.Delete("/users/{id}", authH.DeleteUser)
 				r.Get("/admin/ahsp/import", adminH.ImportStatus)
 				r.Post("/admin/ahsp/import", adminH.Import)
 				r.Post("/news", newsH.Create)

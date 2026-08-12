@@ -190,6 +190,13 @@ func (v *Verifier) LocalUpdateProfile(ctx context.Context, userID int32, fullNam
 	}, nil
 }
 
+// LocalDeleteUser deletes a user by ID. Returns an error if the user has
+// related data (projects, etc.) that prevent deletion.
+func (v *Verifier) LocalDeleteUser(ctx context.Context, userID int32) error {
+	_, err := v.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	return err
+}
+
 // isUniqueViolation checks for a PostgreSQL unique constraint violation.
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "unique constraint")
