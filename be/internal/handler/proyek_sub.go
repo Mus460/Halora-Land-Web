@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/halora-land/halora-be/internal/database"
@@ -676,58 +677,187 @@ func (h *ProjectSubHandler) SCurve(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-var sCurveMonths = []string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
+const (
+	// hoursPerWeek converts work-item duration hours into schedule weeks
+	// (5 workdays × 8h).
+	hoursPerWeek = 40.0
+	// sCurveWeekCap keeps pathological schedules from producing huge charts.
+	sCurveWeekCap = 156
+)
 
-// sCurveSeries builds the cumulative S-curve from work item progress logs:
-// each log entry is a timestamped state change, and its cost-weighted delta
-// (progress - previous progress, % of totalCost) lands in the month the log was
-// recorded. The planned line ramps 0-100% across the project's timeline
-// (timelineMonths + timelineDays); labels run from the project start month
-// through the longer of the elapsed or planned span.
+// sCurveCategoryRank sequences work items in the actual construction flow:
+// persiapan first, then struktur, arsitektur, and finally MEP.
+var sCurveCategoryRank = map[models.WorkCategory]int{
+	models.CategoryPreparation: 1,
+	models.CategoryFoundation:  2,
+	models.CategoryConcrete:    3,
+	models.CategoryCanopy:      4,
+	models.CategorySteel:       5,
+	models.CategoryStairs:      6,
+	models.CategoryRoof:        7,
+	models.CategoryWall:        8,
+	models.CategoryPlastering:  9,
+	models.CategoryFinishing:   10,
+	models.CategoryTiles:       11,
+	models.CategoryPaving:      12,
+	models.CategoryPainting:    13,
+	models.CategoryDoors:       14,
+	models.CategoryInterior:    15,
+	models.CategoryToilet:      16,
+	models.CategoryMEP:         17,
+	models.CategoryCustom:      18,
+}
+
+type curveItem struct {
+	id    int32
+	rank  int
+	cost  decimal.Decimal
+	hours float64
+	weeks float64
+	start float64
+}
+
+// sCurveSeries builds the weekly S-curve series:
+//
+//   - Planned: work items are weighted by their cost share of the project
+//     subtotal (w_i = totalCost_i / ΣtotalCost), sequenced in construction
+//     flow order (persiapan → struktur → arsitektur → MEP), and each item
+//     occupies its estimated duration in weeks (duration_hours × volume / 40h).
+//     Items without an estimated duration receive a weight-proportional share
+//     of the schedule slack (or a 0.5-week slot when durations fill the plan).
+//     Cumulative percent is sampled at the end of every integer week.
+//   - Actual: cost-weighted progress deltas from work item logs, bucketed per
+//     week since project start.
+//
+// Both lines start at 0% at W0 (project start); labels run W0…WN where
+// N = max(scheduled weeks, weeks elapsed), capped at sCurveWeekCap.
 func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]string, []int, []int) {
 	var start time.Time
 	var tMonths, tDays int
 	if err := h.pool.QueryRow(ctx, `SELECT "createdAt", "timelineMonths", "timelineDays" FROM projects WHERE id = $1`, pid).Scan(&start, &tMonths, &tDays); err != nil {
 		return []string{}, []int{}, []int{}
 	}
-	now := time.Now()
-	elapsed := monthsBetween(start, now) + 1
-	if elapsed < 1 {
-		elapsed = 1
-	}
-	duration := float64(tMonths) + float64(tDays)/30.0
-	span := elapsed
-	if duration > 0 {
-		if want := int(math.Ceil(duration)); want > span {
-			span = want
-		}
-	}
-	labels := make([]string, span)
-	for i := 0; i < span; i++ {
-		m := start.AddDate(0, i, 0)
-		labels[i] = fmt.Sprintf("%s %02d", sCurveMonths[int(m.Month())-1], m.Year()%100)
-	}
 	rows, err := h.pool.Query(ctx, `
-		SELECT id, "totalCost"::text, "createdAt"
+		SELECT id, category, "totalCost"::text, volume::text, duration::text
 		FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL`, pid)
 	if err != nil {
-		return labels, linearPlanned(span), make([]int, span)
+		return []string{}, []int{}, []int{}
 	}
 	defer rows.Close()
-	var monthly [12]decimal.Decimal
-	var totalCost decimal.Decimal
+
+	var items []curveItem
+	totalCost := decimal.Zero
 	for rows.Next() {
-		var itemID int32
-		var costStr string
-		var itemCreated time.Time
-		if err := rows.Scan(&itemID, &costStr, &itemCreated); err != nil {
+		var it curveItem
+		var kat models.WorkCategory
+		var costStr, volStr, durStr string
+		if err := rows.Scan(&it.id, &kat, &costStr, &volStr, &durStr); err != nil {
 			continue
 		}
-		cost := decimal.RequireFromString(costStr)
+		it.rank = sCurveCategoryRank[kat]
+		if it.rank == 0 {
+			it.rank = 100
+		}
+		cost, err := decimal.NewFromString(costStr)
+		if err != nil {
+			continue
+		}
+		it.cost = cost
 		totalCost = totalCost.Add(cost)
+		vol, errV := decimal.NewFromString(volStr)
+		dur, errD := decimal.NewFromString(durStr)
+		if errV == nil && errD == nil && vol.IsPositive() && dur.IsPositive() {
+			it.hours, _ = vol.Mul(dur).Float64()
+		}
+		items = append(items, it)
+	}
+	if len(items) == 0 || !totalCost.IsPositive() {
+		return []string{}, []int{}, []int{}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].rank != items[j].rank {
+			return items[i].rank < items[j].rank
+		}
+		return items[i].id < items[j].id
+	})
+
+	// Schedule: items with an estimated duration occupy hours/40 weeks each;
+	// the plan length is at least the project timeline. Items without a
+	// duration split the slack proportional to their cost weight, or get a
+	// 0.5-week slot when durations already fill the plan.
+	durationWeeks := 0.0
+	noDurWeight := decimal.Zero
+	for i := range items {
+		if items[i].hours > 0 {
+			items[i].weeks = items[i].hours / hoursPerWeek
+			durationWeeks += items[i].weeks
+		} else {
+			noDurWeight = noDurWeight.Add(items[i].cost)
+		}
+	}
+	totalWeeks := durationWeeks
+	if tl := float64(tMonths)*4.333 + float64(tDays)/7.0; tl > totalWeeks {
+		totalWeeks = tl
+	}
+	if totalWeeks < 1 {
+		totalWeeks = 1
+	}
+	slack := totalWeeks - durationWeeks
+	if noDurWeight.IsPositive() && slack > 0.001 {
+		for i := range items {
+			if items[i].weeks == 0 {
+				items[i].weeks, _ = items[i].cost.Div(noDurWeight).Mul(decimal.NewFromFloat(slack)).Float64()
+			}
+		}
+	} else {
+		for i := range items {
+			if items[i].weeks == 0 {
+				items[i].weeks = 0.5
+			}
+		}
+	}
+
+	cum := 0.0
+	for i := range items {
+		items[i].start = cum
+		cum += items[i].weeks
+	}
+	elapsedWeeks := float64(daysBetween(start, time.Now())) / 7.0
+	if elapsedWeeks < 0 {
+		elapsedWeeks = 0
+	}
+	span := int(math.Ceil(cum))
+	if int(math.Ceil(elapsedWeeks)) > span {
+		span = int(math.Ceil(elapsedWeeks))
+	}
+	if span < 1 {
+		span = 1
+	}
+	if span > sCurveWeekCap {
+		span = sCurveWeekCap
+	}
+
+	labels := make([]string, span)
+	for i := range labels {
+		labels[i] = fmt.Sprintf("W%d", i)
+	}
+
+	planned := make([]int, span)
+	for k := 1; k < span; k++ {
+		pct := 0.0
+		for i := range items {
+			pct += itemPercent(items[i].cost, totalCost, clamp01((float64(k)-items[i].start)/items[i].weeks))
+		}
+		planned[k] = int(pct * 100)
+	}
+	planned[span-1] = 100
+
+	actual := make([]int, span)
+	monthly := make([]decimal.Decimal, span)
+	for i := range items {
 		logs, err := h.pool.Query(ctx, `
 			SELECT progress, "createdAt" FROM work_item_progress_logs
-			WHERE "workItemId" = $1 ORDER BY "createdAt" ASC, id ASC`, itemID)
+			WHERE "workItemId" = $1 ORDER BY "createdAt" ASC, id ASC`, items[i].id)
 		if err != nil {
 			continue
 		}
@@ -746,10 +876,7 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 		}
 		logs.Close()
 		if len(entries) == 0 {
-			if cost.IsZero() {
-				continue
-			}
-			entries = []logEntry{{progress: 0, at: itemCreated}}
+			entries = []logEntry{{progress: 0, at: start}}
 		}
 		prev := 0
 		for _, e := range entries {
@@ -757,8 +884,8 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 				prev = e.progress
 				continue
 			}
-			delta := cost.Mul(decimal.NewFromInt(int64(e.progress - prev))).Div(decimal.NewFromInt(100))
-			idx := monthsBetween(start, e.at)
+			delta := items[i].cost.Mul(decimal.NewFromInt(int64(e.progress - prev))).Div(decimal.NewFromInt(100))
+			idx := daysBetween(start, e.at)/7 + 1
 			if idx < 0 {
 				idx = 0
 			}
@@ -769,55 +896,39 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 			prev = e.progress
 		}
 	}
-	actual := make([]int, span)
-	if totalCost.IsPositive() {
-		cum := decimal.Zero
-		for i := 0; i < span; i++ {
-			cum = cum.Add(monthly[i])
-			pct := int(cum.Mul(decimal.NewFromInt(100)).Div(totalCost).IntPart())
-			if pct > 100 {
-				pct = 100
-			}
-			actual[i] = pct
+	cumCost := decimal.Zero
+	for i := 1; i < span; i++ {
+		cumCost = cumCost.Add(monthly[i])
+		pct := int(cumCost.Mul(decimal.NewFromInt(100)).Div(totalCost).IntPart())
+		if pct > 100 {
+			pct = 100
 		}
-	}
-	var planned []int
-	if duration > 0 {
-		planned = timelinePlanned(span, duration)
-	} else {
-		planned = linearPlanned(span)
+		actual[i] = pct
 	}
 	return labels, planned, actual
 }
 
-// timelinePlanned ramps 0-100% linearly across a fractional month duration,
-// so a 6-month-15-day timeline reaches 100% partway through the last bucket.
-func timelinePlanned(span int, duration float64) []int {
-	planned := make([]int, span)
-	for i := range planned {
-		pct := int(float64(i+1) / duration * 100)
-		if pct > 100 {
-			pct = 100
-		}
-		planned[i] = pct
+func itemPercent(cost, total decimal.Decimal, frac float64) float64 {
+	if frac <= 0 {
+		return 0
 	}
-	if span > 0 {
-		planned[span-1] = 100
+	if frac > 1 {
+		frac = 1
 	}
-	return planned
+	f, _ := cost.Div(total).Float64()
+	return f * frac
 }
 
-func linearPlanned(span int) []int {
-	planned := make([]int, span)
-	for i := range planned {
-		planned[i] = (i + 1) * (100 / span)
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
 	}
-	if span > 0 && planned[span-1] < 100 {
-		planned[span-1] = 100
+	if v > 1 {
+		return 1
 	}
-	return planned
+	return v
 }
 
-func monthsBetween(a, b time.Time) int {
-	return (b.Year()-a.Year())*12 + int(b.Month()-a.Month())
+func daysBetween(a, b time.Time) int {
+	return int(b.Sub(a).Hours() / 24)
 }
