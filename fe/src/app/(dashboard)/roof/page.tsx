@@ -16,18 +16,21 @@ export default function AtapPage() {
           name: "jenis_rangka",
           label: "Jenis Rangka",
           type: "select",
+          required: true,
           options: JENIS_RANGKA_ATAP.map((j) => ({ value: j, label: j })),
         },
         {
           name: "jenis_atap",
           label: "Jenis Atap",
           type: "select",
+          required: true,
           options: JENIS_ATAP.map((j) => ({ value: j, label: j })),
         },
         {
           name: "bentuk_atap",
           label: "Bentuk Atap",
           type: "select",
+          required: true,
           options: BENTUK_ATAP.map((b) => ({ value: b, label: b })),
         },
       ]}

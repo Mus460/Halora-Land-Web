@@ -16,6 +16,7 @@ export default function KanopiPage() {
           name: "jenis_kanopi",
           label: "Jenis Kanopi",
           type: "select",
+          required: true,
           options: JENIS_KANOPI.map((j) => ({ value: j, label: j })),
         },
       ]}

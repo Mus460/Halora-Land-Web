@@ -232,8 +232,18 @@ type PriceMaster struct {
 	UserID    *int32          `json:"userId"`
 	AHSPCode  *string         `json:"ahspCode"`
 	IsSystem  bool            `json:"isSystem"`
-	CreatedAt time.Time       `json:"createdAt"`
-	UpdatedAt time.Time       `json:"updatedAt"`
+CreatedAt time.Time        `json:"createdAt"`
+	UpdatedAt time.Time        `json:"updatedAt"`
+}
+
+type Client struct {
+	ID        int32     `json:"id"`
+	Name      string    `json:"name"`
+	Address   *string   `json:"address"`
+	Contact   *string   `json:"contact"`
+	UserID    int32     `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Recap struct {

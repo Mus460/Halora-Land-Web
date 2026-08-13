@@ -8,6 +8,7 @@ import {
   Building2,
   Calculator,
   Tag,
+  UserRound,
   Settings,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/projects", label: "Proyek", icon: Building2 },
   { href: "/rab", label: "RAB", icon: Calculator },
   { href: "/price-masters", label: "Master Harga", icon: Tag },
+  { href: "/clients", label: "Klien", icon: UserRound },
   { href: "/profile", label: "Lainnya", icon: Settings },
 ];
 

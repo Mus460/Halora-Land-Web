@@ -31,6 +31,7 @@ import {
   Bath,
   Zap,
   PenTool,
+  UserRound,
   Settings,
   Shield,
   X,
@@ -71,6 +72,7 @@ const SIDEBAR_SECTIONS = [
     items: [
       { href: "/price-masters", label: "Master Harga", icon: Tag },
       { href: "/analysis-masters", label: "Master Analisa", icon: LibraryBig },
+      { href: "/clients", label: "Master Klien", icon: UserRound },
     ],
   },
   {

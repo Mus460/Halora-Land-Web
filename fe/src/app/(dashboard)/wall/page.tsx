@@ -16,6 +16,7 @@ export default function DindingPage() {
           name: "jenis_dinding",
           label: "Jenis Dinding",
           type: "select",
+          required: true,
           options: JENIS_DINDING.map((j) => ({ value: j, label: j })),
         },
       ]}

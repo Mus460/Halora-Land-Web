@@ -16,6 +16,7 @@ export default function PersiapanPage() {
           name: "tipe_persiapan",
           label: "Tipe Persiapan",
           type: "select",
+          required: true,
           options: TIPE_PERSIAPAN.map((t) => ({ value: t, label: t })),
         },
       ]}

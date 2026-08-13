@@ -312,6 +312,7 @@ function PekerjaanFormDialog({
   const [ahspSearching, setAhspSearching] = useState(false);
   const [selectedAhsp, setSelectedAhsp] = useState<AHSPResult | null>(null);
   const [ahspError, setAhspError] = useState("");
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -319,6 +320,7 @@ function PekerjaanFormDialog({
       setAhspResults([]);
       setSelectedAhsp(null);
       setAhspError("");
+      setFormError("");
     }
   }, [open]);
 
@@ -388,6 +390,13 @@ function PekerjaanFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError("");
+    for (const field of formFields) {
+      if (field.required && !String((form as any)[field.name] || "").trim()) {
+        setFormError(`${field.label} wajib diisi`);
+        return;
+      }
+    }
     if (metode === "ahsp" && !item && !selectedAhsp) {
       setAhspError("Pilih item AHSP terlebih dahulu");
       return;
@@ -428,7 +437,10 @@ function PekerjaanFormDialog({
           {/* Dynamic form fields */}
           {formFields.map((field) => (
             <div key={field.name} className="space-y-2">
-              <Label>{field.label}</Label>
+              <Label>
+                {field.label}
+                {field.required ? " *" : ""}
+              </Label>
               {field.type === "select" && field.options && (
                 <Select
                   value={(form as any)[field.name] || ""}
@@ -675,6 +687,10 @@ function PekerjaanFormDialog({
                 </span>
               </div>
             </div>
+          )}
+
+          {formError && (
+            <p className="text-xs text-red-500">{formError}</p>
           )}
 
           <DialogFooter>

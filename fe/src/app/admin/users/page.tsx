@@ -207,11 +207,12 @@ function UserFormDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Nama Lengkap (opsional)</Label>
+            <Label>Nama Lengkap *</Label>
             <Input
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
               placeholder="Nama user"
+              required
             />
           </div>
           <div className="space-y-2">
