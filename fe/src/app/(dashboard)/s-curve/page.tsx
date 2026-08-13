@@ -62,7 +62,7 @@ export default function KurvaSPage() {
     labels: data.labels,
     datasets: [
       {
-        label: "Planned",
+        label: "Rencana",
         data: data.planned,
         borderColor: "#d97706",
         borderDash: [6, 4],
@@ -73,7 +73,7 @@ export default function KurvaSPage() {
         pointBackgroundColor: "#d97706",
       },
       {
-        label: "Actual",
+        label: "Realisasi",
         data: data.actual,
         borderColor: "#f59e0b",
         backgroundColor: "rgba(245, 158, 11, 0.05)",
@@ -134,9 +134,9 @@ export default function KurvaSPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 px-4">Bulan</th>
-                <th className="text-right py-2 px-4">Planned (%)</th>
-                <th className="text-right py-2 px-4">Actual (%)</th>
+                <th className="text-left py-2 px-4">Minggu</th>
+                <th className="text-right py-2 px-4">Rencana (%)</th>
+                <th className="text-right py-2 px-4">Realisasi (%)</th>
                 <th className="text-right py-2 px-4">Deviasi</th>
               </tr>
             </thead>
