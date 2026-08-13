@@ -3,7 +3,6 @@ import { Poppins } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PostHogProvider } from "@/lib/posthog";
-import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -46,7 +45,6 @@ export default function RootLayout({
             },
           }}
         />
-        <Analytics />
       </body>
     </html>
   );
