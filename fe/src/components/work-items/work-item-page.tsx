@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatCurrency, formatDuration } from "@/lib/utils";
+import { formatCurrency, formatDuration, formatWeight } from "@/lib/utils";
 import { LEVEL_PEKERJAAN, SATUAN_OPTIONS } from "@/lib/constants";
 import { useWorkItem } from "@/hooks/useWorkItem";
 import { useProject } from "@/contexts/ProjectContext";
@@ -138,6 +138,13 @@ export function WorkItemPage({
         <span className="font-semibold">
           {formatCurrency(row.original.totalCost)}
         </span>
+      ),
+    },
+    {
+      accessorKey: "weight",
+      header: "Bobot",
+      cell: ({ row }) => (
+        <span className="text-gray-600">{formatWeight(row.original.weight)}</span>
       ),
     },
     {

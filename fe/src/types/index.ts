@@ -101,6 +101,7 @@ export interface WorkItem {
   basePrice: number | null;
   duration: number | null;
   totalDuration: number | null;
+  weight?: number;
   createdAt: string;
   updatedAt: string;
   itemDetails?: WorkItemDetail[];

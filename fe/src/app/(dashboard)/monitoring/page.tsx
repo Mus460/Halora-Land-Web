@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
 import { EmptyProjectState } from "@/components/shared/empty-project-state";
+import { formatWeight } from "@/lib/utils";
 
 interface MonItem {
   id: number;
@@ -25,7 +26,14 @@ interface MonItem {
   volume: string;
   unit: string;
   progress: number;
+  weight: number;
   lastUpdated: string | null;
+}
+
+interface MonCategory {
+  category: string;
+  progress: number;
+  items: MonItem[];
 }
 
 interface ProgressLog {
@@ -49,7 +57,8 @@ export default function MonitoringPage() {
     );
   }
 
-  const [monitoring, setMonitoring] = useState<{ category: string; items: MonItem[] }[]>([]);
+  const [monitoring, setMonitoring] = useState<MonCategory[]>([]);
+  const [overall, setOverall] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<{ item: MonItem; value: number } | null>(null);
@@ -89,6 +98,7 @@ export default function MonitoringPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setMonitoring(result.monitoring || []);
+      setOverall(result.overall ?? 0);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Gagal memuat data');
@@ -180,13 +190,7 @@ export default function MonitoringPage() {
     (sum, cat) => sum + cat.items.filter((i) => i.progress === 100).length,
     0
   );
-  const totalProgress = monitoring.reduce(
-    (sum, cat) =>
-      sum + cat.items.reduce((s, i) => s + (Number(i.progress) || 0), 0),
-    0
-  );
-  const overallProgress =
-    totalItems > 0 ? Math.round(totalProgress / totalItems) : 0;
+  const overallProgress = overall;
 
   return (
     <div className="space-y-6">
@@ -223,15 +227,7 @@ export default function MonitoringPage() {
           const kategoriDone = category.items.filter(
             (i) => i.progress === 100
           ).length;
-          const kategoriProgress =
-            kategoriTotal > 0
-              ? Math.round(
-                  category.items.reduce(
-                    (s, i) => s + (Number(i.progress) || 0),
-                    0
-                  ) / kategoriTotal
-                )
-              : 0;
+          const kategoriProgress = category.progress;
 
           return (
             <Card key={category.category}>
@@ -260,7 +256,7 @@ export default function MonitoringPage() {
                         {item.description}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {item.volume} {item.unit}
+                        {item.volume} {item.unit} · Bobot {formatWeight(item.weight)}
                       </p>
                       {item.lastUpdated ? (
                         <p className="text-xs text-gray-400 tabular-nums">

@@ -158,6 +158,7 @@ type WorkItem struct {
 	BasePrice         *decimal.Decimal  `json:"basePrice"`
 	Duration          *decimal.Decimal  `json:"duration"`
 	TotalDuration     *decimal.Decimal  `json:"totalDuration"`
+	Weight            float64           `json:"weight,omitempty"`
 	CreatedAt         time.Time         `json:"createdAt"`
 	UpdatedAt         time.Time         `json:"updatedAt"`
 	ItemDetails       []WorkItemDetail  `json:"itemDetails,omitempty"`
