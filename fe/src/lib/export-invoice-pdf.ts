@@ -175,7 +175,7 @@ export async function exportInvoicePdf(
   autoTable(doc, {
     startY: Math.max(metaY + 6, 78),
     margin: { left: X, right: X },
-    head: [["No.", "Product", "Descriptions", "Quantity Unit", "Price per each", "Amount"]],
+    head: [["No", "Product", "Descriptions", "Quantity Unit", "Price per each", "Amount"]],
     body: items.map((item, idx) => {
       const descLines = String(item.description || buyerName).split("\n");
       const product = descLines[0];
@@ -199,12 +199,12 @@ export async function exportInvoicePdf(
     bodyStyles: { fontSize: 9, textColor: DARK },
     alternateRowStyles: { fillColor: LIGHT },
     columnStyles: {
-      0: { cellWidth: 8, halign: "center" },
-      1: { cellWidth: 45, halign: "left" },
-      2: { cellWidth: 62, halign: "left" },
+      0: { cellWidth: 10, halign: "center" },
+      1: { cellWidth: 38, halign: "left" },
+      2: { cellWidth: 54, halign: "left" },
       3: { cellWidth: 26, halign: "right" },
-      4: { cellWidth: 23, halign: "right" },
-      5: { cellWidth: 24, halign: "right", fontStyle: "bold" },
+      4: { cellWidth: 28, halign: "right" },
+      5: { cellWidth: 30, halign: "right", fontStyle: "bold" },
     },
   });
 
@@ -279,7 +279,7 @@ export async function exportInvoicePdf(
   y += Math.ceil(accounts.length / 2) * 12 + 6;
 
   // --- Accepted by ---
-  const sigY = Math.max(y, H - 52);
+  const sigY = Math.min(Math.max(y, H - 52), H - 58);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GRAY);
