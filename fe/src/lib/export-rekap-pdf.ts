@@ -1,6 +1,61 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
-import { formatDuration } from "./utils";
+
+const DARK: [number, number, number] = [31, 41, 55];
+const GRAY: [number, number, number] = [107, 114, 128];
+const AMBER: [number, number, number] = [217, 119, 6];
+const LIGHT: [number, number, number] = [249, 250, 251];
+
+const COMPANY = {
+  name: "HALORA LAND",
+  addressLine1: "Jl. Adam Malik No. 58, Ruko No.1, Cipadu Jaya, Larangan,",
+  addressLine2: "Kota Tangerang, 15155 - Indonesia.",
+  contacts: "W: land.halora.id | e: halo@halora.id | wa: +62 811 8622 225",
+};
+
+const CATEGORY_TITLES: Array<[string, string]> = [
+  ["preparation", "PEKERJAAN PERSIAPAN"],
+  ["foundation", "PEKERJAAN PONDASI"],
+  ["concrete", "PEKERJAAN BETON STRUKTUR"],
+  ["canopy", "PEKERJAAN KANOPI"],
+  ["steel", "PEKERJAAN BAJA STRUKTURAL"],
+  ["stairs", "PEKERJAAN TANGGA"],
+  ["roof", "PEKERJAAN ATAP"],
+  ["wall", "PEKERJAAN DINDING"],
+  ["plastering", "PEKERJAAN PLESTERAN"],
+  ["finishing", "PEKERJAAN ACIAN"],
+  ["tiles", "PEKERJAAN LANTAI/KERAMIK"],
+  ["paving", "PEKERJAAN PAVING & HALAMAN"],
+  ["painting", "PEKERJAAN CAT & PLAFON"],
+  ["doors", "PEKERJAAN KUSEN, PINTU & JENDELA"],
+  ["interior", "PEKERJAAN INTERIOR"],
+  ["toilet", "PEKERJAAN TOILET/SANITAIR"],
+  ["mep", "PEKERJAAN INSTALASI MEP"],
+  ["custom-work", "PEKERJAAN CUSTOM"],
+];
+
+const ROMAN: string[] = [
+  "I",
+  "II",
+  "III",
+  "IV",
+  "V",
+  "VI",
+  "VII",
+  "VIII",
+  "IX",
+  "X",
+  "XI",
+  "XII",
+  "XIII",
+  "XIV",
+  "XV",
+  "XVI",
+  "XVII",
+  "XVIII",
+  "XIX",
+  "XX",
+];
 
 export interface RekapItem {
   id: number;
@@ -11,6 +66,7 @@ export interface RekapItem {
   unitPrice: number;
   totalCost: number;
   totalDuration: number | null;
+  level?: string | null;
 }
 
 export interface RekapData {
@@ -21,6 +77,7 @@ export interface RekapData {
     contractValue?: number | null;
   };
   grouped?: Record<string, RekapItem[]>;
+  subtotals?: Record<string, number>;
   summary?: {
     subtotal?: number;
     margin?: number;
@@ -34,14 +91,13 @@ export interface RekapData {
   };
 }
 
-const AMBER: [number, number, number] = [217, 119, 6];
-const GRAY: [number, number, number] = [107, 114, 128];
+export interface RekapPdfOptions {
+  ownerName?: string;
+  area?: string;
+}
 
-function formatCurrency(value: number): string {
+function formatMoney(value: number): string {
   return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value || 0);
 }
@@ -64,170 +120,201 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "RAB";
 }
 
-export function exportRekapPDF(data: RekapData): void {
+function lastTableY(doc: jsPDF): number {
+  return (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
+    ?.finalY ?? 0;
+}
+
+export function exportRekapPDF(
+  data: RekapData,
+  options: RekapPdfOptions = {}
+): void {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const marginX = 14;
-  const contentWidth = pageWidth - marginX * 2;
-  let y = 0;
-
-  // Header band
-  doc.setFillColor(...AMBER);
-  doc.rect(0, 0, pageWidth, 30, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Halora Land", marginX, 14);
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "normal");
-  doc.text("Rekapitulasi Rencana Anggaran Biaya (RAB)", marginX, 21);
-
-  // Project info
-  y = 40;
-  doc.setTextColor(30, 30, 30);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  const project = data.project;
-  doc.text(project?.name || "Project", marginX, y);
-  y += 6;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  const location = project?.location ? String(project.location) : "-";
-  const contractValue = project?.contractValue
-    ? formatCurrency(Number(project.contractValue))
-    : "-";
-  doc.setTextColor(...GRAY);
-  doc.text(`Location: ${location}`, marginX, y);
-  y += 5;
-  doc.text(`Nilai Kontrak: ${contractValue}`, marginX, y);
-  y += 5;
-  doc.text(`Dicetak: ${formatDate(new Date())}`, marginX, y);
-  y += 8;
-
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const X = 12;
+  const XR = W - 12;
+  const contentWidth = XR - X;
   const grouped = data.grouped || {};
-  const kategoriKeys = Object.keys(grouped);
+  const project = data.project;
 
-  for (const category of kategoriKeys) {
-    const items = grouped[category] || [];
+  // --- Title ---
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...DARK);
+  doc.text("RENCANA ANGGARAN BIAYA", W / 2, 18, { align: "center" });
+
+  // --- Info block ---
+  const infoRows: Array<[string, string]> = [
+    ["PROYEK", project?.name || "-"],
+    ["PEMILIK", options.ownerName || "-"],
+    ["LOKASI PROYEK", project?.location || "-"],
+    ["LUAS BANGUNAN", options.area || "-"],
+  ];
+
+  autoTable(doc, {
+    startY: 26,
+    margin: { left: X, right: X },
+    theme: "grid",
+    head: [["", ""]],
+    body: infoRows,
+    styles: { fontSize: 9, cellPadding: 2.5, textColor: DARK },
+    headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontSize: 9 },
+    columnStyles: {
+      0: { cellWidth: 40, fontStyle: "bold", textColor: GRAY, halign: "left" },
+    },
+  });
+
+  let y = lastTableY(doc) + 6;
+
+  // --- Sectioned items ---
+  const summary = data.summary || {};
+  const subtotal =
+    Number(summary.subtotal) ||
+    Object.values(grouped).reduce(
+      (sum, items) =>
+        sum +
+        (items || []).reduce(
+          (s, it) => s + Number((it as RekapItem).totalCost || 0),
+          0
+        ),
+      0
+    );
+
+  let sectionIndex = 0;
+  for (const [category, title] of CATEGORY_TITLES) {
+    const items = (grouped[category] || []) as RekapItem[];
     if (items.length === 0) continue;
 
+    if (y + 14 > H - 34) {
+      doc.addPage();
+      y = 15;
+    }
+
     // Section header
-    doc.setFillColor(250, 250, 250);
-    doc.rect(marginX, y, contentWidth, 8, "F");
+    doc.setFillColor(...LIGHT);
+    doc.rect(X, y, contentWidth, 8, "F");
     doc.setTextColor(...AMBER);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text(category.toUpperCase().replace("_", " "), marginX + 2, y + 5.5);
+    const roman = ROMAN[sectionIndex] || String(sectionIndex + 1);
+    doc.text(`${roman}. ${title}`, X + 2, y + 5.5);
+    sectionIndex += 1;
+    y += 10;
 
-    y += 11;
+    const sectionTotal = (items as RekapItem[]).reduce(
+      (s, it) => s + Number(it.totalCost || 0),
+      0
+    );
 
     autoTable(doc, {
       startY: y,
-      margin: { left: marginX, right: marginX },
-      head: [["Uraian", "Volume", "Satuan", "Harga Satuan", "Jumlah Harga"]],
-      body: items.map((item) => [
-        item.description,
-        formatNumber(Number(item.volume)),
-        item.unit || "-",
-        formatCurrency(Number(item.unitPrice)),
-        formatCurrency(Number(item.totalCost)),
-      ]),
+      margin: { left: X, right: X },
+      head:
+        sectionIndex === 1
+          ? [["No.", "Uraian Pekerjaan", "Spesifikasi", "Sat", "Vol", "Harga Sat", "Tot Harga"]]
+          : [],
+      body: [
+        ...(items as RekapItem[]).map((item, idx) => [
+          String(idx + 1),
+          item.description,
+          item.level || "-",
+          item.unit || "-",
+          formatNumber(Number(item.volume)),
+          formatMoney(Number(item.unitPrice)),
+          formatMoney(Number(item.totalCost)),
+        ]),
+        ["", "Sub Total :", "", "", "", "", formatMoney(sectionTotal)],
+      ],
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 2.2, textColor: [50, 50, 50] },
+      styles: { fontSize: 8.5, cellPadding: 2, textColor: DARK },
       headStyles: {
-        fillColor: AMBER,
+        fillColor: DARK,
         textColor: [255, 255, 255],
         fontStyle: "bold",
-        fontSize: 9,
+        fontSize: 8.5,
       },
       columnStyles: {
-        1: { halign: "right" },
-        2: { halign: "center" },
-        3: { halign: "right" },
-        4: { halign: "right", fontStyle: "bold" },
+        0: { cellWidth: 8, halign: "center" },
+        1: { cellWidth: 62, halign: "left" },
+        2: { cellWidth: 34, halign: "left" },
+        3: { cellWidth: 14, halign: "center" },
+        4: { cellWidth: 18, halign: "right" },
+        5: { cellWidth: 24, halign: "right" },
+        6: { cellWidth: 26, halign: "right", fontStyle: "bold" },
       },
       didParseCell: (cell) => {
-        if (cell.column.index > 0 && cell.section === "body") {
-          cell.cell.styles.halign = "right";
+        if (cell.row.index === items.length) {
+          cell.cell.styles.fillColor = LIGHT;
+          cell.cell.styles.fontStyle = "bold";
+          cell.cell.styles.textColor = DARK;
         }
       },
     });
 
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = lastTableY(doc) + 8;
   }
 
-  if (kategoriKeys.length === 0) {
+  if (sectionIndex === 0) {
     doc.setTextColor(...GRAY);
     doc.setFontSize(10);
-    doc.text("Belum ada item pekerjaan di RAB.", marginX, y);
+    doc.text("Belum ada item pekerjaan di RAB.", X, y);
     y += 10;
   }
 
-  // Summary section
-  const summary = data.summary || {};
-  const subtotal = Number(summary.subtotal || 0);
-  const margin = Number(summary.margin || 0);
-  const totalDuration = summary.totalDuration;
-
-  if (y + 40 > doc.internal.pageSize.getHeight()) {
-    doc.addPage();
-    y = 20;
-  }
-
-  doc.setFillColor(250, 250, 250);
-  doc.rect(marginX, y, contentWidth, 8, "F");
-  doc.setTextColor(...AMBER);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("RINGKASAN RAB", marginX + 2, y + 5.5);
-  y += 11;
-
-  const rows: [string, string, boolean?][] = [
-    ["Subtotal WorkItem", formatCurrency(subtotal)],
-    ["Estimasi Waktu", formatDuration(totalDuration)],
-    [
-      `Subtotal + Margin (${formatNumber(margin)}%)`,
-      formatCurrency(Number(summary.subtotalWithMargin || 0)),
-    ],
-    ["Overhead (10%)", formatCurrency(Number(summary.overhead || 0))],
-    ["Profit", formatCurrency(Number(summary.profit || 0))],
-    [
-      `PPN (${formatNumber(Number(summary.ppn || 0))}%)`,
-      formatCurrency(Number(summary.totalPPN || 0)),
-    ],
+  // --- Grand totals ---
+  const totalFinal = Number(summary.totalFinal || 0);
+  const totalRows: string[][] = [
+    ["Total :", formatMoney(subtotal)],
+    ["Total keseluruhan", `Rp ${formatMoney(totalFinal)}`],
   ];
+
+  if (y + 20 > H - 34) {
+    doc.addPage();
+    y = 15;
+  }
 
   autoTable(doc, {
     startY: y,
-    margin: { left: marginX, right: marginX },
-    body: rows.map(([label, value]) => [label, value]),
-    theme: "plain",
-    styles: { fontSize: 10, cellPadding: 3, textColor: [50, 50, 50] },
-    columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+    margin: { left: XR - 100, right: X },
+    theme: "grid",
+    body: totalRows,
+    styles: { fontSize: 10, cellPadding: 3, textColor: DARK },
+    columnStyles: {
+      0: { cellWidth: 60, fontStyle: "bold" },
+      1: { cellWidth: 40, halign: "right", fontStyle: "bold" },
+    },
     didParseCell: (cell) => {
-      if (cell.column.index === 0) {
-        cell.cell.styles.textColor = [70, 70, 70];
+      if (cell.row.index === totalRows.length - 1) {
+        cell.cell.styles.fillColor = [250, 240, 225];
+        cell.cell.styles.textColor = AMBER;
       }
     },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 2;
+  // --- Footer ---
+  const footerY = H - 28;
+  doc.setDrawColor(...GRAY);
+  doc.setLineWidth(0.3);
+  doc.line(X, footerY, XR, footerY);
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: marginX, right: marginX },
-    body: [["GRAND TOTAL", formatCurrency(Number(summary.totalFinal || 0))]],
-    theme: "grid",
-    styles: {
-      fontSize: 12,
-      cellPadding: 4,
-      fontStyle: "bold",
-      fillColor: [250, 240, 225],
-      textColor: AMBER,
-    },
-    columnStyles: { 1: { halign: "right" } },
-  });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  doc.text(COMPANY.name, X, footerY + 6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  doc.text(COMPANY.addressLine1, X, footerY + 11);
+  doc.text(COMPANY.addressLine2, X, footerY + 16);
+  doc.text(COMPANY.contacts, X, footerY + 21);
+
+  doc.text(
+    `Dicetak : ${formatDate(new Date())}`,
+    XR,
+    footerY + 6,
+    { align: "right" }
+  );
 
   const fileName = `Rekapitulasi-RAB-${sanitizeFileName(
     project?.name || "Project"
