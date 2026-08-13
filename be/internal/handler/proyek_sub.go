@@ -762,76 +762,19 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 		return items[i].id < items[j].id
 	})
 
-	// Schedule: items with an estimated duration occupy hours/40 weeks each;
-	// the plan length is at least the project timeline. Items without a
-	// duration split the slack proportional to their cost weight, or get a
-	// 0.5-week slot when durations already fill the plan.
-	durationWeeks := 0.0
-	noDurWeight := decimal.Zero
-	for i := range items {
-		if items[i].hours > 0 {
-			items[i].weeks = items[i].hours / hoursPerWeek
-			durationWeeks += items[i].weeks
-		} else {
-			noDurWeight = noDurWeight.Add(items[i].cost)
-		}
-	}
-	totalWeeks := durationWeeks
-	if tl := float64(tMonths)*4.333 + float64(tDays)/7.0; tl > totalWeeks {
-		totalWeeks = tl
-	}
-	if totalWeeks < 1 {
-		totalWeeks = 1
-	}
-	slack := totalWeeks - durationWeeks
-	if noDurWeight.IsPositive() && slack > 0.001 {
-		for i := range items {
-			if items[i].weeks == 0 {
-				items[i].weeks, _ = items[i].cost.Div(noDurWeight).Mul(decimal.NewFromFloat(slack)).Float64()
-			}
-		}
-	} else {
-		for i := range items {
-			if items[i].weeks == 0 {
-				items[i].weeks = 0.5
-			}
-		}
-	}
-
-	cum := 0.0
-	for i := range items {
-		items[i].start = cum
-		cum += items[i].weeks
-	}
+	items, cum := scheduleCurveItems(items, tMonths, tDays)
 	elapsedWeeks := float64(daysBetween(start, time.Now())) / 7.0
 	if elapsedWeeks < 0 {
 		elapsedWeeks = 0
 	}
-	span := int(math.Ceil(cum))
-	if int(math.Ceil(elapsedWeeks)) > span {
-		span = int(math.Ceil(elapsedWeeks))
-	}
-	if span < 1 {
-		span = 1
-	}
-	if span > sCurveWeekCap {
-		span = sCurveWeekCap
-	}
+	span := curveSpan(cum, elapsedWeeks)
 
 	labels := make([]string, span)
 	for i := range labels {
 		labels[i] = fmt.Sprintf("W%d", i)
 	}
 
-	planned := make([]int, span)
-	for k := 1; k < span; k++ {
-		pct := 0.0
-		for i := range items {
-			pct += items[i].weight * clamp01((float64(k)-items[i].start)/items[i].weeks)
-		}
-		planned[k] = int(pct * 100)
-	}
-	planned[span-1] = 100
+	planned := plannedCurveSeries(items, span)
 
 	actual := make([]int, span)
 	monthly := make([]decimal.Decimal, span)
@@ -897,6 +840,86 @@ func clamp01(v float64) float64 {
 		return 1
 	}
 	return v
+}
+
+// scheduleCurveItems assigns each curve item its duration in weeks and start
+// week, in the order given (callers must already sort by construction flow).
+// Items with an estimated duration occupy hoursPerWeek (40h) weeks each; the
+// plan must last at least the project timeline (months + days). Items without
+// a duration split the slack proportional to their cost, or get a 0.5-week
+// slot when durations already fill the plan. Returns the items with weeks and
+// start set, plus the total scheduled weeks.
+func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, float64) {
+	durationWeeks := 0.0
+	noDurWeight := decimal.Zero
+	for i := range items {
+		if items[i].hours > 0 {
+			items[i].weeks = items[i].hours / hoursPerWeek
+			durationWeeks += items[i].weeks
+		} else {
+			noDurWeight = noDurWeight.Add(items[i].cost)
+		}
+	}
+	totalWeeks := durationWeeks
+	if tl := float64(tMonths)*4.333 + float64(tDays)/7.0; tl > totalWeeks {
+		totalWeeks = tl
+	}
+	if totalWeeks < 1 {
+		totalWeeks = 1
+	}
+	slack := totalWeeks - durationWeeks
+	if noDurWeight.IsPositive() && slack > 0.001 {
+		for i := range items {
+			if items[i].weeks == 0 {
+				items[i].weeks, _ = items[i].cost.Div(noDurWeight).Mul(decimal.NewFromFloat(slack)).Float64()
+			}
+		}
+	} else {
+		for i := range items {
+			if items[i].weeks == 0 {
+				items[i].weeks = 0.5
+			}
+		}
+	}
+	cum := 0.0
+	for i := range items {
+		items[i].start = cum
+		cum += items[i].weeks
+	}
+	return items, cum
+}
+
+// curveSpan returns the number of chart weeks: the scheduled duration,
+// extended to cover elapsed weeks, at least 1, capped at sCurveWeekCap.
+func curveSpan(cumWeeks, elapsedWeeks float64) int {
+	span := int(math.Ceil(cumWeeks))
+	if int(math.Ceil(elapsedWeeks)) > span {
+		span = int(math.Ceil(elapsedWeeks))
+	}
+	if span < 1 {
+		span = 1
+	}
+	if span > sCurveWeekCap {
+		span = sCurveWeekCap
+	}
+	return span
+}
+
+// plannedCurveSeries renders the cost-weighted planned cumulative percent for
+// each integer week [0, span). Each item contributes weight × the share of its
+// week window that has elapsed by week k. Weights are already percent and sum
+// to 100, so the series never exceeds 100; planned[span-1] lands at ~100 when
+// every item's window fits within span.
+func plannedCurveSeries(items []curveItem, span int) []int {
+	planned := make([]int, span)
+	for k := 1; k < span; k++ {
+		pct := 0.0
+		for i := range items {
+			pct += items[i].weight * clamp01((float64(k)-items[i].start)/items[i].weeks)
+		}
+		planned[k] = int(math.Round(pct))
+	}
+	return planned
 }
 
 func daysBetween(a, b time.Time) int {

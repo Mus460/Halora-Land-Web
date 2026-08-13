@@ -162,4 +162,76 @@ func TestSortedCategories(t *testing.T) {
 	if SortedCategoryes(nil) == nil {
 		t.Error("nil map should produce empty (non-nil) slice")
 	}
+	if got := SortedCategoryes(map[string]decimal.Decimal{}); len(got) != 0 {
+		t.Errorf("empty map = %v, want empty slice", got)
+	}
+}
+
+func rabComputeWith(t *testing.T, margin string, overhead, ppn decimal.Decimal) *RecapResult {
+	t.Helper()
+	m := newPool(t)
+	pid := int32(1)
+	m.ExpectQuery(`FROM work_items WHERE "deletedAt" IS NULL AND "projectId"`).WithArgs(pid).
+		WillReturnRows(pgxmock.NewRows(workItemRow()).
+			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "1", "m3", "1000000", "1000000", models.MethodAHSP, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+	m.ExpectQuery(`SELECT margin::text FROM recaps`).WithArgs(pid).
+		WillReturnRows(pgxmock.NewRows([]string{"margin"}).AddRow(margin))
+	s := NewRABService(m, repository.NewWorkItemRepo(m), repository.NewRecapRepo(m), overhead, ppn)
+	res, err := s.Compute(context.Background(), pid, nil)
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	return res
+}
+
+func TestRABComputeZeroRates(t *testing.T) {
+	res := rabComputeWith(t, "0", decimal.Zero, decimal.Zero)
+	if !res.Summary.Subtotal.Equal(decimal.NewFromInt(1000000)) {
+		t.Errorf("subtotal = %s, want 1000000", res.Summary.Subtotal)
+	}
+	if !res.Summary.SubtotalWithMargin.Equal(decimal.NewFromInt(1000000)) {
+		t.Errorf("subtotalWithMargin = %s, want 1000000", res.Summary.SubtotalWithMargin)
+	}
+	if !res.Summary.Overhead.IsZero() || !res.Summary.TotalPPN.IsZero() {
+		t.Errorf("overhead/ppn = %s/%s, want 0/0", res.Summary.Overhead, res.Summary.TotalPPN)
+	}
+	if !res.Summary.TotalAkhir.Equal(decimal.NewFromInt(1000000)) {
+		t.Errorf("totalFinal = %s, want 1000000", res.Summary.TotalAkhir)
+	}
+	if !res.Summary.PPNPct.IsZero() {
+		t.Errorf("ppnPct = %s, want 0", res.Summary.PPNPct)
+	}
+}
+
+func TestRABComputeFractionalMargin(t *testing.T) {
+	res := rabComputeWith(t, "12.5", decimal.RequireFromString("0.10"), decimal.RequireFromString("0.11"))
+	// 1M × 1.125 = 1.125M; overhead 112500; before tax 1.2375M; ppn 136125
+	if !res.Summary.SubtotalWithMargin.Equal(decimal.RequireFromString("1125000")) {
+		t.Errorf("subtotalWithMargin = %s", res.Summary.SubtotalWithMargin)
+	}
+	if !res.Summary.TotalPPN.Equal(decimal.RequireFromString("136125")) {
+		t.Errorf("totalPPN = %s", res.Summary.TotalPPN)
+	}
+}
+
+func TestRABComputeMarginMinusHundredWipesOut(t *testing.T) {
+	res := rabComputeWith(t, "-100", decimal.RequireFromString("0.10"), decimal.RequireFromString("0.11"))
+	if !res.Summary.SubtotalWithMargin.IsZero() {
+		t.Errorf("subtotalWithMargin = %s, want 0", res.Summary.SubtotalWithMargin)
+	}
+	if !res.Summary.TotalAkhir.IsZero() {
+		t.Errorf("totalFinal = %s, want 0", res.Summary.TotalAkhir)
+	}
+}
+
+func TestRABComputeMarginBelowMinusHundredGoesNegative(t *testing.T) {
+	// Extreme input: the math is not clamped, so the summary turns negative.
+	// Documented behaviour — validation at the API layer is the guard.
+	res := rabComputeWith(t, "-150", decimal.RequireFromString("0.10"), decimal.RequireFromString("0.11"))
+	if !res.Summary.SubtotalWithMargin.Equal(decimal.RequireFromString("-500000")) {
+		t.Errorf("subtotalWithMargin = %s, want -500000", res.Summary.SubtotalWithMargin)
+	}
+	if !res.Summary.Overhead.Equal(decimal.RequireFromString("-50000")) {
+		t.Errorf("overhead = %s, want -50000", res.Summary.Overhead)
+	}
 }
