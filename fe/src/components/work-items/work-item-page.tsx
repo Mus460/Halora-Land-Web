@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,13 @@ import { LEVEL_PEKERJAAN, SATUAN_OPTIONS } from "@/lib/constants";
 import { useWorkItem } from "@/hooks/useWorkItem";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDebouncedValue } from "@/hooks/use-debounce";
-import type { WorkItem, WorkCategory, CalculationMethod } from "@/types";
+import { apiClient } from "@/lib/api";
+import type {
+  WorkItem,
+  WorkCategory,
+  CalculationMethod,
+  ComponentType,
+} from "@/types";
 import type { LucideIcon } from "lucide-react";
 import {
   Dialog,
@@ -52,6 +59,16 @@ interface AHSPResult {
   unitPrice: number | null;
   ahspCode: string | null;
   ahspSheet: string | null;
+}
+
+interface BreakdownRow {
+  id?: number;
+  name: string;
+  unit: string;
+  coefficient: number;
+  unitPrice: number;
+  type: ComponentType;
+  sourceCode?: string | null;
 }
 
 interface WorkItemPageProps {
@@ -184,19 +201,41 @@ export function WorkItemPage({
     }
   };
 
-  const handleSubmit = async (formData: Partial<WorkItem>) => {
+  const handleSubmit = async (
+    formData: Partial<WorkItem>,
+    details?: BreakdownRow[]
+  ) => {
+    if (editItem && details && details.length > 0) {
+      try {
+        await apiClient.put(`/work-items/${editItem.id}/details`, {
+          details: details.map((d) => ({
+            id: d.id || 0,
+            name: d.name,
+            unit: d.unit,
+            coefficient: d.coefficient,
+            unitPrice: d.unitPrice,
+            type: d.type,
+            sourceCode: d.sourceCode ?? null,
+          })),
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal menyimpan rincian biaya");
+        return false;
+      }
+    }
+
     let success = false;
-    
     if (editItem) {
       success = await updatePekerjaan(editItem.id, formData);
     } else {
       success = await createPekerjaan(formData);
     }
-    
+
     if (success) {
       setEditItem(null);
       setShowForm(false);
     }
+    return success;
   };
 
   return (
@@ -288,7 +327,7 @@ function PekerjaanFormDialog({
   showLevelPekerjaan: boolean;
   showTipePekerjaan: boolean;
   tipeOptions: string[];
-  onSubmit: (data: Partial<WorkItem>) => void;
+  onSubmit: (data: Partial<WorkItem>, details?: BreakdownRow[]) => Promise<boolean>;
 }) {
   const [metode, setMetode] = useState<CalculationMethod>(
     item?.calculationMethod || "ahsp"
@@ -313,6 +352,9 @@ function PekerjaanFormDialog({
   const [selectedAhsp, setSelectedAhsp] = useState<AHSPResult | null>(null);
   const [ahspError, setAhspError] = useState("");
   const [formError, setFormError] = useState("");
+  const [details, setDetails] = useState<BreakdownRow[]>([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [hadDetails, setHadDetails] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -321,8 +363,49 @@ function PekerjaanFormDialog({
       setSelectedAhsp(null);
       setAhspError("");
       setFormError("");
+      setDetails([]);
+      setDetailsLoading(false);
+      setHadDetails(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !item || item.calculationMethod !== "ahsp") {
+      setDetails([]);
+      setHadDetails(false);
+      return;
+    }
+    let cancelled = false;
+    setDetailsLoading(true);
+    fetch(`/api/work-items/${item.id}/analysis`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows) => {
+        if (cancelled) return;
+        const mapped: BreakdownRow[] = (rows || []).map((d: any) => ({
+          id: d.id,
+          name: d.name || "",
+          unit: d.unit || "",
+          coefficient: Number(d.coefficient) || 0,
+          unitPrice: Number(d.unitPrice) || 0,
+          type: d.type || "material",
+          sourceCode: d.sourceCode ?? null,
+        }));
+        setDetails(mapped);
+        setHadDetails(mapped.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDetails([]);
+          setHadDetails(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item]);
 
   const debouncedAhspQuery = useDebouncedValue(ahspQuery);
 
@@ -386,9 +469,32 @@ function PekerjaanFormDialog({
     return form.volume;
   }, [form.unit, form.volume, dimensi]);
 
-  const totalCost = volume * form.unitPrice;
+  const breakdownTotal = useMemo(
+    () => details.reduce((sum, d) => sum + d.coefficient * d.unitPrice, 0),
+    [details]
+  );
+  const hasBreakdown = item?.calculationMethod === "ahsp" && details.length > 0;
+  const effectiveUnitPrice = hasBreakdown ? breakdownTotal : form.unitPrice;
+  const totalCost = volume * effectiveUnitPrice;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const updateDetail = (index: number, patch: Partial<BreakdownRow>) => {
+    setDetails((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, ...patch } : d))
+    );
+  };
+
+  const removeDetail = (index: number) => {
+    setDetails((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addDetail = () => {
+    setDetails((prev) => [
+      ...prev,
+      { name: "", unit: "", coefficient: 1, unitPrice: 0, type: "material" },
+    ]);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     for (const field of formFields) {
@@ -405,14 +511,24 @@ function PekerjaanFormDialog({
       setAhspError("Volume/jumlah wajib diisi");
       return;
     }
-    onSubmit({
-      ...form,
-      volume,
-      totalCost,
-      calculationMethod: metode,
-      analysisMasterId: selectedAhsp?.id ?? null,
-    });
-    onOpenChange(false);
+    if (hadDetails && details.length === 0) {
+      setFormError("Rincian biaya minimal 1 komponen");
+      return;
+    }
+    const ok = await onSubmit(
+      {
+        ...form,
+        volume,
+        unitPrice: effectiveUnitPrice,
+        totalCost,
+        calculationMethod: metode,
+        analysisMasterId: selectedAhsp?.id ?? null,
+      },
+      details
+    );
+    if (ok) {
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -657,6 +773,124 @@ function PekerjaanFormDialog({
             </div>
           )}
 
+          {item?.calculationMethod === "ahsp" && (
+            <div className="space-y-2">
+              <Label>Rincian Biaya Komponen</Label>
+              {detailsLoading ? (
+                <p className="text-xs text-gray-500">Memuat rincian...</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[1fr_110px_80px_90px_110px_90px_28px] gap-2 text-xs font-medium text-gray-500">
+                    <span>Komponen</span>
+                    <span>Tipe</span>
+                    <span>Satuan</span>
+                    <span>Koefisien</span>
+                    <span>Harga Satuan</span>
+                    <span className="text-right">Total</span>
+                    <span />
+                  </div>
+                  {details.map((row, i) => (
+                    <div
+                      key={row.id ?? `new-${i}`}
+                      className="grid grid-cols-[1fr_110px_80px_90px_110px_90px_28px] gap-2 items-center"
+                    >
+                      <Input
+                        value={row.name}
+                        onChange={(e) =>
+                          updateDetail(i, { name: e.target.value })
+                        }
+                        placeholder="Nama komponen"
+                      />
+                      <Select
+                        value={row.type}
+                        onValueChange={(v) =>
+                          updateDetail(i, { type: v as ComponentType })
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="material">Material</SelectItem>
+                          <SelectItem value="labor">Tenaga</SelectItem>
+                          <SelectItem value="equipment">Alat</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={row.unit}
+                        onChange={(e) =>
+                          updateDetail(i, { unit: e.target.value })
+                        }
+                        placeholder="Unit"
+                        className="h-8 text-xs"
+                      />
+                      <Input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={row.coefficient || ""}
+                        onChange={(e) =>
+                          updateDetail(i, {
+                            coefficient: Number(e.target.value) || 0,
+                          })
+                        }
+                        placeholder="0"
+                        className="h-8 text-xs"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={row.unitPrice || ""}
+                        onChange={(e) =>
+                          updateDetail(i, {
+                            unitPrice: Number(e.target.value) || 0,
+                          })
+                        }
+                        placeholder="0"
+                        className="h-8 text-xs"
+                      />
+                      <span className="text-right text-sm tabular-nums">
+                        {formatCurrency(row.coefficient * row.unitPrice)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        onClick={() => removeDetail(i)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addDetail}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Tambah Komponen
+                  </Button>
+                  {details.length > 0 && (
+                    <div className="flex justify-between text-sm font-semibold border-t pt-2">
+                      <span>Total Rincian (Harga Satuan)</span>
+                      <span className="text-amber-600">
+                        {formatCurrency(breakdownTotal)}
+                      </span>
+                    </div>
+                  )}
+                  {item.basePrice != null && (
+                    <p className="text-xs text-gray-500">
+                      Harga dasar AHSP: {formatCurrency(item.basePrice)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {metode === "manual" && (
             <CurrencyInput
               label="Harga Satuan"
@@ -677,9 +911,14 @@ function PekerjaanFormDialog({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Price Unit</span>
                 <span className="font-medium">
-                  {formatCurrency(form.unitPrice)}
+                  {formatCurrency(effectiveUnitPrice)}
                 </span>
               </div>
+              {hasBreakdown && (
+                <p className="text-[11px] text-gray-500">
+                  Harga satuan mengikuti total rincian biaya di atas
+                </p>
+              )}
               <div className="flex justify-between text-sm font-bold border-t pt-1">
                 <span>Total Biaya</span>
                 <span className="text-amber-600">

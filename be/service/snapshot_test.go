@@ -30,7 +30,7 @@ func detailRow() []string {
 
 func workItemRowSvc() []string {
 	return []string{"id", "projectId", "category", "description", "volume", "unit", "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", "duration", "totalDuration", "createdAt", "updatedAt"}
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", "duration", "totalDuration", "createdAt", "updatedAt"}
 }
 
 func snapshotService(m pgxmock.PgxPoolIface) *SnapshotService {
@@ -49,10 +49,10 @@ func TestSnapshotFromAHSPHappyPath(t *testing.T) {
 	lvl := "2"
 	m.ExpectQuery(`INSERT INTO work_items`).
 		WithArgs(int32(1), models.CategoryRoof, "Rangka Atap", "10", "m2", "522451.64", "5224516.4",
-			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(9), "3.5").
+			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(9), "522451.64", "3.5").
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(7), int32(1), models.CategoryRoof, "Rangka Atap", "10", "m2", "522451.64", "5224516.4",
-				models.MethodAHSP, "2", nil, int32(9), "3.5", "35", time.Now(), time.Now()))
+				models.MethodAHSP, "2", nil, int32(9), nil, "3.5", "35", time.Now(), time.Now()))
 	m.ExpectQuery(`FROM analysis_components WHERE`).WithArgs(int32(9)).
 		WillReturnRows(pgxmock.NewRows(componentRow()).
 			AddRow(int32(1), int32(9), int32(20), "0.2", models.ComponentLabor, "Tukang", "OH", "145000", "29000", "L.02", "2", 1, time.Now(), time.Now()).
@@ -67,13 +67,13 @@ func TestSnapshotFromAHSPHappyPath(t *testing.T) {
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(7), int32(1), models.CategoryRoof, "Rangka Atap", "10", "m2", "522451.64", "5224516.4",
-				models.MethodAHSP, "2", nil, int32(9), "3.5", "35", time.Now(), time.Now()))
+				models.MethodAHSP, "2", nil, int32(9), nil, "3.5", "35", time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), int32(9), "Tukang", "OH", "0.2", "145000", "290000", models.ComponentLabor, time.Now(), "L.02"))
 
 	s := snapshotService(m)
-	it, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(10), true)
+	it, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(10), true, nil)
 	if err != nil {
 		t.Fatalf("FromAHSP: %v", err)
 	}
@@ -109,20 +109,20 @@ func TestSnapshotFromAHSPWithoutBreakdown(t *testing.T) {
 	lvl := "1"
 	m.ExpectQuery(`INSERT INTO work_items`).
 		WithArgs(int32(1), models.CategoryPreparation, "Pembersihan", "2", "m'", "100000", "200000",
-			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(9), nil).
+			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(9), "100000", nil).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(8), int32(1), models.CategoryPreparation, "Pembersihan", "2", "m'", "100000", "200000",
-				models.MethodAHSP, "1", nil, int32(9), nil, nil, time.Now(), time.Now()))
+				models.MethodAHSP, "1", nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectCommit()
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(8)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(8), int32(1), models.CategoryPreparation, "Pembersihan", "2", "m'", "100000", "200000",
-				models.MethodAHSP, "1", nil, int32(9), nil, nil, time.Now(), time.Now()))
+				models.MethodAHSP, "1", nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(8)).
 		WillReturnRows(pgxmock.NewRows(detailRow()))
 
 	s := snapshotService(m)
-	it, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(2), false)
+	it, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(2), false, nil)
 	if err != nil {
 		t.Fatalf("FromAHSP: %v", err)
 	}
@@ -145,20 +145,20 @@ func TestSnapshotFromAHSPNilMasterFields(t *testing.T) {
 	lvl := "3"
 	m.ExpectQuery(`INSERT INTO work_items`).
 		WithArgs(int32(1), models.CategoryCustom, "Custom", "5", "unit", "0", "0",
-			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(5), "1").
+			models.MethodAHSP, &lvl, (*string)(nil), int32Ptr(5), nil, "1").
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(5), int32(1), models.CategoryCustom, "Custom", "5", "unit", "0", "0",
-				models.MethodAHSP, "3", nil, int32(5), "1", "5", time.Now(), time.Now()))
+				models.MethodAHSP, "3", nil, int32(5), nil, "1", "5", time.Now(), time.Now()))
 	m.ExpectCommit()
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(5)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
 			AddRow(int32(5), int32(1), models.CategoryCustom, "Custom", "5", "unit", "0", "0",
-				models.MethodAHSP, "3", nil, int32(5), "1", "5", time.Now(), time.Now()))
+				models.MethodAHSP, "3", nil, int32(5), nil, "1", "5", time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(5)).
 		WillReturnRows(pgxmock.NewRows(detailRow()))
 
 	s := snapshotService(m)
-	it, err := s.FromAHSP(context.Background(), 1, 5, decimal.NewFromInt(5), false)
+	it, err := s.FromAHSP(context.Background(), 1, 5, decimal.NewFromInt(5), false, nil)
 	if err != nil {
 		t.Fatalf("FromAHSP: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestSnapshotFromAHSPErrors(t *testing.T) {
 				m.ExpectQuery(`FROM analysis_components WHERE`).WithArgs(int32(9)).
 					WillReturnRows(pgxmock.NewRows([]string{"s"}).AddRow(nil))
 				m.ExpectBegin()
-				m.ExpectQuery(`INSERT INTO work_items`).WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+				m.ExpectQuery(`INSERT INTO work_items`).WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 					WillReturnError(context.Canceled)
 			},
 			wantErr: true,
@@ -217,9 +217,9 @@ func TestSnapshotFromAHSPErrors(t *testing.T) {
 					WillReturnRows(pgxmock.NewRows([]string{"s"}).AddRow(nil))
 				m.ExpectBegin()
 				m.ExpectQuery(`INSERT INTO work_items`).
-					WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+					WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 					WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-						AddRow(int32(7), int32(1), models.CategoryPreparation, "Pembersihan", "2", "m'", "100000", "200000", models.MethodAHSP, "1", nil, int32(9), nil, nil, time.Now(), time.Now()))
+						AddRow(int32(7), int32(1), models.CategoryPreparation, "Pembersihan", "2", "m'", "100000", "200000", models.MethodAHSP, "1", nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 				m.ExpectQuery(`FROM analysis_components WHERE`).WithArgs(int32(9)).WillReturnError(context.Canceled)
 			},
 			wantErr: true,
@@ -230,7 +230,7 @@ func TestSnapshotFromAHSPErrors(t *testing.T) {
 			m := newPool(t)
 			tc.setup(m)
 			s := snapshotService(m)
-			_, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(2), true)
+			_, err := s.FromAHSP(context.Background(), 1, 9, decimal.NewFromInt(2), true, nil)
 			if tc.wantErr && err == nil {
 				t.Fatal("expected error")
 			}
@@ -242,7 +242,7 @@ func TestSnapshotValidateNoDrift(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), int32(9), "Semen", "kg", "420", "1750", "735000", models.ComponentMaterial, time.Now(), "M.10"))
@@ -263,7 +263,7 @@ func TestSnapshotValidateDetectsDrift(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), int32(9), "Semen", "kg", "420", "1000", "420000", models.ComponentMaterial, time.Now(), "M.10").
@@ -302,7 +302,7 @@ func TestSnapshotValidateNoDetails(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()))
 	s := snapshotService(m)
@@ -328,10 +328,14 @@ func TestSnapshotRecalculate(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), int32(9), "Semen", "kg", "420", "1750", "735000", models.ComponentMaterial, time.Now(), "M.10"))
+	m.ExpectQuery(`FROM analysis_masters WHERE id =`).WithArgs(int32(9)).
+		WillReturnRows(pgxmock.NewRows(analisaRow()).
+			AddRow(int32(9), "2.1.1.1", "Rangka Atap", 2, nil, "m2", "522451.64", "roof",
+				true, nil, true, "2.1.1.1", "Atap", "0", time.Now(), time.Now()))
 	m.ExpectQuery(`FROM analysis_components WHERE`).WithArgs(int32(9)).
 		WillReturnRows(pgxmock.NewRows(componentRow()).
 			AddRow(int32(1), int32(9), int32(20), "0.2", models.ComponentLabor, "Tukang", "OH", "145000", "29000", "L.02", "2", 1, time.Now(), time.Now()).
@@ -352,10 +356,12 @@ func TestSnapshotRecalculate(t *testing.T) {
 	m.ExpectExec(`UPDATE work_items SET "unitPrice"`).
 		WithArgs(int32(7), "30840", "308400").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	m.ExpectExec(`UPDATE work_items SET "basePrice"`).WithArgs(int32(7), "522451.64").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	m.ExpectCommit()
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "30840", "308400", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "30840", "308400", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()))
 
@@ -376,7 +382,7 @@ func TestSnapshotRecalculateRejectsNonAHSP(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
 	s := snapshotService(m)
 	if _, err := s.Recalculate(context.Background(), 7, nil); err == nil {
 		t.Fatal("expected error")
@@ -387,7 +393,7 @@ func TestSnapshotRecalculateNoLineage(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), nil, "Semen", "kg", "420", "1750", "735000", models.ComponentMaterial, time.Now(), "M.10"))
@@ -401,16 +407,20 @@ func TestSnapshotRecalculateAll(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM work_items WHERE "deletedAt" IS NULL AND "projectId"`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()).
-			AddRow(int32(8), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()).
+			AddRow(int32(8), int32(1), models.CategorySteel, "Manual", "1", "ls", "1000", "1000", models.MethodManual, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
 
 	// Recalculate for item 7 only
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800000", "8000000", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(1), int32(7), int32(20), int32(9), "Semen", "kg", "420", "1750", "735000", models.ComponentMaterial, time.Now(), "M.10"))
+	m.ExpectQuery(`FROM analysis_masters WHERE id =`).WithArgs(int32(9)).
+		WillReturnRows(pgxmock.NewRows(analisaRow()).
+			AddRow(int32(9), "2.1.1.1", "Rangka Atap", 2, nil, "m2", "522451.64", "roof",
+				true, nil, true, "2.1.1.1", "Atap", "0", time.Now(), time.Now()))
 	m.ExpectQuery(`FROM analysis_components WHERE`).WithArgs(int32(9)).
 		WillReturnRows(pgxmock.NewRows(componentRow()).
 			AddRow(int32(1), int32(9), int32(20), "1", models.ComponentMaterial, "Semen", "kg", "800", "800", "M.10", nil, 1, time.Now(), time.Now()))
@@ -425,10 +435,12 @@ func TestSnapshotRecalculateAll(t *testing.T) {
 	m.ExpectExec(`UPDATE work_items SET "unitPrice"`).
 		WithArgs(int32(7), "800", "8000").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	m.ExpectExec(`UPDATE work_items SET "basePrice"`).WithArgs(int32(7), "522451.64").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	m.ExpectCommit()
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(workItemRowSvc()).
-			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800", "8000", models.MethodAHSP, nil, nil, int32(9), nil, nil, time.Now(), time.Now()))
+			AddRow(int32(7), int32(1), models.CategoryConcrete, "Beton", "10", "m3", "800", "8000", models.MethodAHSP, nil, nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(7)).
 		WillReturnRows(pgxmock.NewRows(detailRow()))
 

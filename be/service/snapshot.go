@@ -30,7 +30,9 @@ func NewSnapshotService(pool database.Pool, pr *repository.WorkItemRepo, mr *rep
 
 // FromAHSP creates a WorkItem from a AnalysisMaster catalog item and copies the
 // components template into frozen work_item_details rows (§2.3). One transaction.
-func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMasterID int32, volume decimal.Decimal, applyBreakdown bool) (*models.WorkItem, error) {
+// A non-nil category overrides the master's category (used by the per-category
+// work item pages); nil falls back to the master's own category.
+func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMasterID int32, volume decimal.Decimal, applyBreakdown bool, category *models.WorkCategory) (*models.WorkItem, error) {
 	ma, err := s.masterAnalisa.Get(ctx, analysisMasterID)
 	if err != nil {
 		return nil, fmt.Errorf("load master analisa: %w", err)
@@ -43,7 +45,9 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMaste
 	totalCost := hs.Mul(volume)
 
 	kat := models.CategoryCustom
-	if ma.Category != nil {
+	if category != nil {
+		kat = *category
+	} else if ma.Category != nil {
 		kat = models.WorkCategory(*ma.Category)
 	}
 	unit := "unit"
@@ -74,6 +78,7 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMaste
 		CalculationMethod: models.MethodAHSP,
 		Level:             &levelStr,
 		AnalysisMasterID:  &analysisMasterID,
+		BasePrice:         ma.UnitPrice,
 		Duration:          duration,
 	})
 	if err != nil {
@@ -81,43 +86,8 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMaste
 	}
 
 	if applyBreakdown {
-		components, err := s.masterAnalisa.ListComponents(ctx, analysisMasterID)
-		if err != nil {
+		if err := s.applyBreakdown(ctx, tx, p.ID, analysisMasterID, volume); err != nil {
 			return nil, err
-		}
-		for _, r := range components {
-			name := ""
-			if r.Name != nil {
-				name = *r.Name
-			}
-			sat := ""
-			if r.Unit != nil {
-				sat = *r.Unit
-			}
-			dhs := decimal.Zero
-			if r.UnitPrice != nil {
-				dhs = *r.UnitPrice
-			}
-			jh := decimal.Zero
-			if r.TotalPrice != nil {
-				jh = *r.TotalPrice
-			}
-			detailTotal := jh.Mul(volume)
-			maID := analysisMasterID
-			if err := s.work_items.CreateDetail(ctx, tx, repository.CreateDetailInput{
-				WorkItemID:       p.ID,
-				PriceMasterID:    r.ComponentID,
-				AnalysisMasterID: &maID,
-				Name:             name,
-				Unit:             sat,
-				Coefficient:      r.Coefficient,
-				UnitPrice:        dhs,
-				TotalCost:        detailTotal,
-				Type:             r.Type,
-				SourceCode:       r.ReferenceCode,
-			}); err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -125,6 +95,50 @@ func (s *SnapshotService) FromAHSP(ctx context.Context, projectID, analysisMaste
 		return nil, err
 	}
 	return s.work_items.Get(ctx, p.ID)
+}
+
+// applyBreakdown copies the master's components into frozen work_item_details
+// rows for a work item (used by FromAHSP and Create).
+func (s *SnapshotService) applyBreakdown(ctx context.Context, tx pgx.Tx, workItemID, analysisMasterID int32, volume decimal.Decimal) error {
+	components, err := s.masterAnalisa.ListComponents(ctx, analysisMasterID)
+	if err != nil {
+		return err
+	}
+	for _, r := range components {
+		name := ""
+		if r.Name != nil {
+			name = *r.Name
+		}
+		sat := ""
+		if r.Unit != nil {
+			sat = *r.Unit
+		}
+		dhs := decimal.Zero
+		if r.UnitPrice != nil {
+			dhs = *r.UnitPrice
+		}
+		jh := decimal.Zero
+		if r.TotalPrice != nil {
+			jh = *r.TotalPrice
+		}
+		detailTotal := jh.Mul(volume)
+		maID := analysisMasterID
+		if err := s.work_items.CreateDetail(ctx, tx, repository.CreateDetailInput{
+			WorkItemID:       workItemID,
+			PriceMasterID:    r.ComponentID,
+			AnalysisMasterID: &maID,
+			Name:             name,
+			Unit:             sat,
+			Coefficient:      r.Coefficient,
+			UnitPrice:        dhs,
+			TotalCost:        detailTotal,
+			Type:             r.Type,
+			SourceCode:       r.ReferenceCode,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DriftChange is one component's price drift between snapshot and live master.
@@ -224,6 +238,11 @@ func (s *SnapshotService) Recalculate(ctx context.Context, workItemID int32, u *
 		return nil, errors.New("work_items has no master analisa lineage")
 	}
 
+	ma, err := s.masterAnalisa.Get(ctx, *analysisMasterID)
+	if err != nil {
+		return nil, err
+	}
+
 	components, err := s.masterAnalisa.ListComponents(ctx, *analysisMasterID)
 	if err != nil {
 		return nil, err
@@ -302,6 +321,9 @@ func (s *SnapshotService) Recalculate(ctx context.Context, workItemID int32, u *
 	}
 
 	if err := s.work_items.SetTotal(ctx, tx, workItemID, newHS, newTotal); err != nil {
+		return nil, err
+	}
+	if err := s.work_items.SetBasePrice(ctx, tx, workItemID, ma.UnitPrice); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

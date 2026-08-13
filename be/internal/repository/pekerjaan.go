@@ -28,7 +28,7 @@ type ListWorkItemFilter struct {
 
 func (r *WorkItemRepo) List(ctx context.Context, f ListWorkItemFilter) ([]models.WorkItem, error) {
 	q := `SELECT id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", duration, (duration * volume) AS "totalDuration",
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 		"createdAt", "updatedAt"
 		FROM work_items WHERE "deletedAt" IS NULL`
 	var args []any
@@ -66,10 +66,10 @@ func argPlaceholder(i int) string { return strconv.Itoa(i) }
 func scanWorkItem(s rowScanner) (*models.WorkItem, error) {
 	var p models.WorkItem
 	var vol, hs, tb string
-	var level, wtype, duration, totalDuration sql.NullString
+	var level, wtype, basePrice, duration, totalDuration sql.NullString
 	var maID sql.NullInt32
 	if err := s.Scan(&p.ID, &p.ProjectID, &p.Category, &p.Description, &vol, &p.Unit, &hs, &tb,
-		&p.CalculationMethod, &level, &wtype, &maID, &duration, &totalDuration, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		&p.CalculationMethod, &level, &wtype, &maID, &basePrice, &duration, &totalDuration, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, err
 	}
 	p.Volume = scanDec(vol)
@@ -78,6 +78,7 @@ func scanWorkItem(s rowScanner) (*models.WorkItem, error) {
 	p.Level = strPtr(level)
 	p.Type = strPtr(wtype)
 	p.AnalysisMasterID = i32Ptr(maID)
+	p.BasePrice = scanDecPtr(basePrice)
 	p.Duration = scanDecPtr(duration)
 	p.TotalDuration = scanDecPtr(totalDuration)
 	return &p, nil
@@ -86,7 +87,7 @@ func scanWorkItem(s rowScanner) (*models.WorkItem, error) {
 func (r *WorkItemRepo) Get(ctx context.Context, id int32) (*models.WorkItem, error) {
 	p, err := scanWorkItem(r.pool.QueryRow(ctx, `
 		SELECT id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", duration, (duration * volume) AS "totalDuration",
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 		"createdAt", "updatedAt"
 		FROM work_items WHERE id = $1 AND "deletedAt" IS NULL`, id))
 	if err != nil {
@@ -103,7 +104,7 @@ func (r *WorkItemRepo) Get(ctx context.Context, id int32) (*models.WorkItem, err
 func (r *WorkItemRepo) GetByID(ctx context.Context, id int32) (*models.WorkItem, error) {
 	p, err := scanWorkItem(r.pool.QueryRow(ctx, `
 		SELECT id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", duration, (duration * volume) AS "totalDuration",
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 		"createdAt", "updatedAt"
 		FROM work_items WHERE id = $1 AND "deletedAt" IS NULL`, id))
 	if err != nil {
@@ -136,6 +137,7 @@ type CreateWorkItemInput struct {
 	Level             *string
 	Type              *string
 	AnalysisMasterID  *int32
+	BasePrice         *decimal.Decimal
 	Duration          *decimal.Decimal
 }
 
@@ -143,13 +145,13 @@ func (r *WorkItemRepo) Create(ctx context.Context, tx pgx.Tx, in CreateWorkItemI
 	exec := r.execer(tx)
 	row := exec.QueryRow(ctx, `
 		INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-			"calculationMethod", "level", "type", "analysisMasterId", duration)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-			"calculationMethod", "level", "type", "analysisMasterId", duration, (duration * volume) AS "totalDuration",
+			"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 			"createdAt", "updatedAt"`,
 		in.ProjectID, in.Category, in.Description, decArg(in.Volume), in.Unit, decArg(in.UnitPrice), decArg(in.TotalCost),
-		in.CalculationMethod, in.Level, in.Type, in.AnalysisMasterID, decPtrArg(in.Duration))
+		in.CalculationMethod, in.Level, in.Type, in.AnalysisMasterID, decPtrArg(in.BasePrice), decPtrArg(in.Duration))
 	return scanWorkItem(row)
 }
 
@@ -178,7 +180,7 @@ func (r *WorkItemRepo) Update(ctx context.Context, id int32, in UpdateWorkItemIn
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
-			"calculationMethod", "level", "type", "analysisMasterId", duration, (duration * volume) AS "totalDuration",
+			"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 			"createdAt", "updatedAt"`,
 		id, decPtrArg(in.Volume), decPtrArg(in.UnitPrice), decPtrArg(in.TotalCost),
 		in.Description, in.Unit, in.Level, in.Type, in.CalculationMethod)
@@ -343,6 +345,48 @@ func scanDetail(s rowScanner) (*models.WorkItemDetail, error) {
 func (r *WorkItemRepo) DeleteDetails(ctx context.Context, tx pgx.Tx, workItemID int32) error {
 	exec := r.execer(tx)
 	_, err := exec.Exec(ctx, `DELETE FROM work_item_details WHERE "workItemId" = $1`, workItemID)
+	return err
+}
+
+type UpdateDetailInput struct {
+	ID          int32
+	WorkItemID  int32
+	Name        string
+	Unit        string
+	Coefficient decimal.Decimal
+	UnitPrice   decimal.Decimal
+	TotalCost   decimal.Decimal
+	Type        models.ComponentType
+}
+
+// UpdateDetail edits an existing local breakdown row in place (keeps its
+// sourceCode/priceMasterId/analysisMasterId lineage).
+func (r *WorkItemRepo) UpdateDetail(ctx context.Context, tx pgx.Tx, in UpdateDetailInput) error {
+	exec := r.execer(tx)
+	_, err := exec.Exec(ctx, `
+		UPDATE work_item_details SET
+			name = $3, unit = $4, coefficient = $5, "unitPrice" = $6, "totalCost" = $7, type = $8
+		WHERE id = $1 AND "workItemId" = $2`,
+		in.ID, in.WorkItemID, in.Name, in.Unit, decArg(in.Coefficient), decArg(in.UnitPrice), decArg(in.TotalCost), in.Type)
+	return err
+}
+
+// DeleteDetailsNotIn removes local breakdown rows not present in keepIDs
+// (bulk-replace semantics). Empty keepIDs clears the whole set.
+func (r *WorkItemRepo) DeleteDetailsNotIn(ctx context.Context, tx pgx.Tx, workItemID int32, keepIDs []int32) error {
+	exec := r.execer(tx)
+	if len(keepIDs) == 0 {
+		_, err := exec.Exec(ctx, `DELETE FROM work_item_details WHERE "workItemId" = $1`, workItemID)
+		return err
+	}
+	_, err := exec.Exec(ctx, `DELETE FROM work_item_details WHERE "workItemId" = $1 AND NOT (id = ANY($2))`, workItemID, keepIDs)
+	return err
+}
+
+// SetBasePrice stores the master reference price (used by recalculate).
+func (r *WorkItemRepo) SetBasePrice(ctx context.Context, tx pgx.Tx, id int32, base *decimal.Decimal) error {
+	exec := r.execer(tx)
+	_, err := exec.Exec(ctx, `UPDATE work_items SET "basePrice" = $2, "updatedAt" = NOW() WHERE id = $1`, id, decPtrArg(base))
 	return err
 }
 

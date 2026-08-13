@@ -25,7 +25,7 @@ func newPool(t *testing.T) pgxmock.PgxPoolIface {
 
 func workItemRow() []string {
 	return []string{"id", "projectId", "category", "description", "volume", "unit", "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", "duration", "totalDuration", "createdAt", "updatedAt"}
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", "duration", "totalDuration", "createdAt", "updatedAt"}
 }
 
 func TestWorkItemListWithProjectFilter(t *testing.T) {
@@ -35,7 +35,7 @@ func TestWorkItemListWithProjectFilter(t *testing.T) {
 		WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
 			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "12.5", "m3", "850000", "10625000",
-				models.MethodAHSP, "2.1.1", nil, int32(3), "4", "50", time.Now(), time.Now()))
+				models.MethodAHSP, "2.1.1", nil, int32(3), nil, "4", "50", time.Now(), time.Now()))
 
 	r := NewWorkItemRepo(m)
 	items, err := r.List(context.Background(), ListWorkItemFilter{ProjectID: &pid})
@@ -90,7 +90,7 @@ func TestWorkItemGetIncludesDetails(t *testing.T) {
 	m.ExpectQuery(`FROM work_items WHERE id =`).WithArgs(int32(5)).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
 			AddRow(int32(5), int32(1), models.CategoryConcrete, "Beton", "1", "m3", "928002", "928002",
-				models.MethodAHSP, "2.2.1.4.1", nil, int32(9), nil, nil, time.Now(), time.Now()))
+				models.MethodAHSP, "2.2.1.4.1", nil, int32(9), nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM work_item_details WHERE "workItemId"`).WithArgs(int32(5)).
 		WillReturnRows(pgxmock.NewRows(detailRow()).
 			AddRow(int32(11), int32(5), int32(20), int32(9), "Semen", "kg", "420", "1750", "735000", models.ComponentMaterial, time.Now(), "M.10"))
@@ -158,10 +158,10 @@ func TestWorkItemCreate(t *testing.T) {
 	dur := decimal.NewFromInt(3)
 	m.ExpectQuery(`INSERT INTO work_items`).
 		WithArgs(int32(1), models.CategoryRoof, "Rangka atap", "10", "m2", "522451", "5224510",
-			models.MethodAHSP, &level, (*string)(nil), (*int32)(nil), "3").
+			models.MethodAHSP, &level, (*string)(nil), (*int32)(nil), nil, "3").
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
 			AddRow(int32(2), int32(1), models.CategoryRoof, "Rangka atap", "10", "m2", "522451", "5224510",
-				models.MethodAHSP, "2.1.1.1", nil, nil, "3", "30", time.Now(), time.Now()))
+				models.MethodAHSP, "2.1.1.1", nil, nil, nil, "3", "30", time.Now(), time.Now()))
 	r := NewWorkItemRepo(m)
 	it, err := r.Create(context.Background(), nil, CreateWorkItemInput{
 		ProjectID: 1, Category: models.CategoryRoof, Description: "Rangka atap",
@@ -185,7 +185,7 @@ func TestWorkItemUpdate(t *testing.T) {
 		WithArgs(int32(2), "20", nil, nil, &desc, (*string)(nil), (*string)(nil), (*string)(nil), (*models.CalculationMethod)(nil)).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
 			AddRow(int32(2), int32(1), models.CategoryRoof, "Updated", "20", "m2", "522451", "10449020",
-				models.MethodAHSP, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+				models.MethodAHSP, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
 	r := NewWorkItemRepo(m)
 	it, err := r.Update(context.Background(), 2, UpdateWorkItemInput{Volume: &vol, Description: &desc})
 	if err != nil {
