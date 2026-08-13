@@ -38,6 +38,14 @@ export default function RekapPage() {
   const [exporting, setExporting] = useState(false);
   const [showMargin, setShowMargin] = useState(false);
   const [margin, setMargin] = useState(10);
+  const [ownerName, setOwnerName] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((res) => setOwnerName(res?.user?.fullName || ""))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (projectId) {
@@ -103,7 +111,7 @@ export default function RekapPage() {
     try {
       setExporting(true);
       const { exportRekapPDF } = await import("@/lib/export-rekap-pdf");
-      exportRekapPDF(data);
+      exportRekapPDF(data, { ownerName });
       toast.success('PDF berhasil diunduh');
     } catch (error) {
       console.error('Export PDF error:', error);
