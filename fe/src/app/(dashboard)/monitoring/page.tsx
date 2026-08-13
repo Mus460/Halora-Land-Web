@@ -256,7 +256,7 @@ export default function MonitoringPage() {
                         {item.description}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {item.volume} {item.unit} · Bobot {formatWeight(item.weight)}
+                        {item.volume} {item.unit}
                       </p>
                       {item.lastUpdated ? (
                         <p className="text-xs text-gray-400 tabular-nums">
@@ -269,6 +269,9 @@ export default function MonitoringPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-gray-500">
+                        Bobot {formatWeight(item.weight)}
+                      </span>
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
