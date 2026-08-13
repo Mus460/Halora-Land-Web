@@ -16,6 +16,7 @@ export default function KeramikPage() {
           name: "jenis_keramik",
           label: "Jenis/Ukuran Keramik",
           type: "select",
+          required: true,
           options: JENIS_KERAMIK.map((j) => ({ value: j, label: j })),
         },
       ]}

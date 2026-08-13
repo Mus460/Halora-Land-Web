@@ -27,6 +27,7 @@ func (app *App) routes() http.Handler {
 	maRepo := repository.NewAnalysisMasterRepo(app.pool)
 	mhRepo := repository.NewPriceMasterRepo(app.pool)
 	rekapRepo := repository.NewRecapRepo(app.pool)
+	clientRepo := repository.NewClientRepo(app.pool)
 	dashRepo := repository.NewDashboardRepo(app.pool)
 	auditRepo := repository.NewAuditLogRepo(app.pool)
 	feedbackRepo := repository.NewFeedbackRepo(app.pool)
@@ -44,6 +45,7 @@ func (app *App) routes() http.Handler {
 	subH := handler.NewProjectSubHandler(app.pool, proyekRepo, rekapRepo, rab, snap)
 	maH := handler.NewAnalysisMasterHandler(app.pool, maRepo)
 	mhH := handler.NewPriceMasterHandler(app.pool, mhRepo)
+	clientH := handler.NewClientHandler(clientRepo)
 	dashH := handler.NewDashboardHandler(app.pool, dashRepo)
 	feedbackH := handler.NewFeedbackHandler(feedbackRepo)
 	auditH := handler.NewAuditLogHandler(auditRepo)
@@ -130,6 +132,11 @@ func (app *App) routes() http.Handler {
 			r.Get("/price-masters/{id}", mhH.Get)
 			r.Put("/price-masters/{id}", mhH.Update)
 			r.Delete("/price-masters/{id}", mhH.Delete)
+
+			r.Get("/clients", clientH.List)
+			r.Post("/clients", clientH.Create)
+			r.Put("/clients/{id}", clientH.Update)
+			r.Delete("/clients/{id}", clientH.Delete)
 
 			r.Get("/dashboard/stats", dashH.Stats)
 			r.Get("/audit-log", auditH.List)

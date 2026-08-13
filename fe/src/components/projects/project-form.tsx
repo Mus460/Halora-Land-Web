@@ -103,12 +103,13 @@ export function ProjectForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="location">Lokasi</Label>
+            <Label htmlFor="location">Lokasi *</Label>
             <Input
               id="location"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
               placeholder="Alamat proyek"
+              required
             />
           </div>
           <div className="space-y-2">

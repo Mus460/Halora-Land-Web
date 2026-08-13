@@ -19,6 +19,7 @@ export default function BetonPage() {
           name: "mutu_beton",
           label: "Muti Beton",
           type: "select",
+          required: true,
           options: MUTU_BETON.map((m) => ({ value: m, label: m })),
         },
       ]}

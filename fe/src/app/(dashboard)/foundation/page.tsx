@@ -16,6 +16,7 @@ export default function PondasiPage() {
           name: "tipe_pondasi",
           label: "Tipe Pondasi",
           type: "select",
+          required: true,
           options: TIPE_PONDASI.map((t) => ({
             value: t,
             label: t.replace("_", " ").toUpperCase(),

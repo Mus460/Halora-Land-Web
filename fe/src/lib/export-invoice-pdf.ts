@@ -16,11 +16,6 @@ const COMPANY = {
   tagline: '"Business is about Trust and Value"',
 };
 
-const DEFAULT_ACCOUNTS: Array<{ bank: string; number: string; name: string }> = [
-  { bank: "BSI", number: "1101101009", name: "Rangga Donyta Putra" },
-  { bank: "BCA", number: "3450223963", name: "Rangga Donyta Putra" },
-];
-
 function rupiah(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -217,15 +212,13 @@ export function exportInvoicePdf(
   y += (terbilangLines as string[]).length * 4 + 8;
 
   // --- Rekening block ---
-  const accounts = inv.paymentBank
-    ? [
-        {
-          bank: inv.paymentBank,
-          number: inv.paymentAccountNumber || "-",
-          name: inv.paymentAccountName || "-",
-        },
-      ]
-    : DEFAULT_ACCOUNTS;
+  const accounts = [
+    {
+      bank: inv.paymentBank || "-",
+      number: inv.paymentAccountNumber || "-",
+      name: inv.paymentAccountName || "-",
+    },
+  ];
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
@@ -260,7 +253,7 @@ export function exportInvoicePdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...DARK);
-  doc.text(inv.financeName || "Rangga", XR, sigY + 21, { align: "right" });
+  doc.text(inv.financeName || "-", XR, sigY + 21, { align: "right" });
 
   // --- Footer: company block + tagline ---
   const footerY = H - 28;
