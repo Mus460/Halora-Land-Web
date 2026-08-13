@@ -189,8 +189,8 @@ func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "projectId wajib diisi")
 		return
 	}
-	pid, err := strconv.Atoi(pidStr)
-	if err != nil {
+	pid, err := strconv.ParseInt(pidStr, 10, 32)
+	if err != nil || pid <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid projectId")
 		return
 	}

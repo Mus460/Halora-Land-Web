@@ -508,6 +508,6 @@ func (h *WorkItemHandler) ListAnalisa(w http.ResponseWriter, r *http.Request) {
 }
 
 func atoi32(s string) (int32, error) {
-	v, err := strconv.Atoi(s)
+	v, err := strconv.ParseInt(s, 10, 32)
 	return int32(v), err
 }

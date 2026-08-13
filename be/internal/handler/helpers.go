@@ -42,10 +42,10 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 // parseIntParam reads a chi URL param as int32. Writes 400 and returns ok=false
-// when missing or non-numeric.
+// when missing, non-numeric, out of int32 range, or <= 0.
 func parseIntParam(w http.ResponseWriter, r *http.Request, name string) (int32, bool) {
 	raw := URLParam(r, name)
-	v, err := strconv.Atoi(raw)
+	v, err := strconv.ParseInt(raw, 10, 32)
 	if err != nil || v <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid "+name)
 		return 0, false
