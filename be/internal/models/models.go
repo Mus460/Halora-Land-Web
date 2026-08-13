@@ -155,6 +155,7 @@ type WorkItem struct {
 	Level             *string           `json:"level"`
 	Type              *string           `json:"type"`
 	AnalysisMasterID  *int32            `json:"analysisMasterId"`
+	BasePrice         *decimal.Decimal  `json:"basePrice"`
 	Duration          *decimal.Decimal  `json:"duration"`
 	TotalDuration     *decimal.Decimal  `json:"totalDuration"`
 	CreatedAt         time.Time         `json:"createdAt"`

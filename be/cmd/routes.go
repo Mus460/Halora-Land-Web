@@ -110,6 +110,7 @@ func (app *App) routes() http.Handler {
 			r.Put("/work-items/{id}", pekerjaanH.Update)
 			r.Delete("/work-items/{id}", pekerjaanH.Delete)
 			r.Get("/work-items/{id}/analysis", pekerjaanH.ListAnalisa)
+			r.Put("/work-items/{id}/details", pekerjaanH.UpdateDetails)
 			r.Post("/work-items/{id}/recalculate", pekerjaanH.Recalculate)
 			r.Put("/work-items/{id}/progress", pekerjaanH.UpdateProgress)
 			r.Get("/work-items/{id}/progress-logs", pekerjaanH.ProgressLogs)

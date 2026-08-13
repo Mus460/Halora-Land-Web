@@ -24,7 +24,7 @@ func newPool(t *testing.T) pgxmock.PgxPoolIface {
 
 func workItemRow() []string {
 	return []string{"id", "projectId", "category", "description", "volume", "unit", "unitPrice", "totalCost",
-		"calculationMethod", "level", "type", "analysisMasterId", "duration", "totalDuration", "createdAt", "updatedAt"}
+		"calculationMethod", "level", "type", "analysisMasterId", "basePrice", "duration", "totalDuration", "createdAt", "updatedAt"}
 }
 
 func TestRABComputeRollup(t *testing.T) {
@@ -32,9 +32,9 @@ func TestRABComputeRollup(t *testing.T) {
 	pid := int32(1)
 	m.ExpectQuery(`FROM work_items WHERE "deletedAt" IS NULL AND "projectId"`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
-			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "10", "m3", "1000000", "10000000", models.MethodAHSP, "2", nil, nil, nil, nil, time.Now(), time.Now()).
-			AddRow(int32(2), pid, models.CategoryRoof, "Atap", "20", "m2", "500000", "10000000", models.MethodManual, "3", nil, nil, nil, nil, time.Now(), time.Now()).
-			AddRow(int32(3), pid, models.CategoryRoof, "Rangka", "5", "m2", "2000000", "10000000", models.MethodAHSP, "3", nil, nil, "2", "10", time.Now(), time.Now()))
+			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "10", "m3", "1000000", "10000000", models.MethodAHSP, "2", nil, nil, nil, nil, nil, time.Now(), time.Now()).
+			AddRow(int32(2), pid, models.CategoryRoof, "Atap", "20", "m2", "500000", "10000000", models.MethodManual, "3", nil, nil, nil, nil, nil, time.Now(), time.Now()).
+			AddRow(int32(3), pid, models.CategoryRoof, "Rangka", "5", "m2", "2000000", "10000000", models.MethodAHSP, "3", nil, nil, nil, "2", "10", time.Now(), time.Now()))
 	m.ExpectQuery(`SELECT margin::text FROM recaps`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows([]string{"margin"}).AddRow("15"))
 
@@ -136,7 +136,7 @@ func TestRABComputeNegativeMargin(t *testing.T) {
 	pid := int32(1)
 	m.ExpectQuery(`FROM work_items WHERE "deletedAt" IS NULL AND "projectId"`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
-			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "1", "m3", "1000000", "1000000", models.MethodAHSP, nil, nil, nil, nil, nil, time.Now(), time.Now()))
+			AddRow(int32(1), pid, models.CategoryFoundation, "Pondasi", "1", "m3", "1000000", "1000000", models.MethodAHSP, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))
 	m.ExpectQuery(`SELECT margin::text FROM recaps`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows([]string{"margin"}).AddRow("-5"))
 

@@ -98,6 +98,7 @@ export interface WorkItem {
   level: string | null;
   type: string | null;
   analysisMasterId: number | null;
+  basePrice: number | null;
   duration: number | null;
   totalDuration: number | null;
   createdAt: string;
