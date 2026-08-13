@@ -201,21 +201,6 @@ export function Sidebar() {
             ))}
           </nav>
         </ScrollArea>
-
-        {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-              B
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                Budi Kontraktor
-              </p>
-              <p className="text-xs text-gray-400 truncate">budi@example.com</p>
-            </div>
-          </div>
-        </div>
       </aside>
     </>
   );
