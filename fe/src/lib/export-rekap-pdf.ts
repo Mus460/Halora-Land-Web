@@ -13,6 +13,30 @@ const COMPANY = {
   contacts: "W: land.halora.id | e: halo@halora.id | wa: +62 811 8622 225",
 };
 
+const LOGO_RAB = "/halora_land_gold.jpeg";
+
+const logoCache = new Map<string, Promise<string>>();
+
+function loadLogo(src: string): Promise<string> {
+  if (!logoCache.has(src)) {
+    logoCache.set(
+      src,
+      fetch(src)
+        .then((res) => res.blob())
+        .then(
+          (blob) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            })
+        )
+    );
+  }
+  return logoCache.get(src)!;
+}
+
 const CATEGORY_TITLES: Array<[string, string]> = [
   ["preparation", "PEKERJAAN PERSIAPAN"],
   ["foundation", "PEKERJAAN PONDASI"],
@@ -125,10 +149,10 @@ function lastTableY(doc: jsPDF): number {
     ?.finalY ?? 0;
 }
 
-export function exportRekapPDF(
+export async function exportRekapPDF(
   data: RekapData,
   options: RekapPdfOptions = {}
-): void {
+): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -137,6 +161,11 @@ export function exportRekapPDF(
   const contentWidth = XR - X;
   const grouped = data.grouped || {};
   const project = data.project;
+
+  const logo = await loadLogo(LOGO_RAB).catch(() => null);
+  if (logo) {
+    doc.addImage(logo, "JPEG", 134.5, 21.5, 38.5, 22.3);
+  }
 
   // --- Title ---
   doc.setFont("helvetica", "bold");
@@ -153,7 +182,7 @@ export function exportRekapPDF(
   ];
 
   autoTable(doc, {
-    startY: 26,
+    startY: 46,
     margin: { left: X, right: X },
     theme: "grid",
     head: [["", ""]],

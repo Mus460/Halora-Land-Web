@@ -16,6 +16,31 @@ const COMPANY = {
   tagline: '"Business is about Trust and Value"',
 };
 
+const LOGO_LEFT = "/halora_land_supply_nicer.jpeg";
+const LOGO_RIGHT = "/halora_land_blue.jpeg";
+
+const logoCache = new Map<string, Promise<string>>();
+
+function loadLogo(src: string): Promise<string> {
+  if (!logoCache.has(src)) {
+    logoCache.set(
+      src,
+      fetch(src)
+        .then((res) => res.blob())
+        .then(
+          (blob) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            })
+        )
+    );
+  }
+  return logoCache.get(src)!;
+}
+
 function rupiah(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -47,15 +72,27 @@ function lastTableY(doc: jsPDF): number {
     ?.finalY ?? 0;
 }
 
-export function exportInvoicePdf(
+export async function exportInvoicePdf(
   inv: Invoice,
   project?: { name?: string; location?: string | null }
-): void {
+): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const X = 12;
   const XR = W - 12;
+
+  const [logoLeft, logoRight] = await Promise.all([
+    loadLogo(LOGO_LEFT).catch(() => null),
+    loadLogo(LOGO_RIGHT).catch(() => null),
+  ]);
+
+  if (logoLeft) {
+    doc.addImage(logoLeft, "JPEG", 21.4, 23.5, 24.3, 13.1);
+  }
+  if (logoRight) {
+    doc.addImage(logoRight, "JPEG", 157.9, 21.4, 28.7, 18.2);
+  }
 
   const buyerName = inv.buyerName || project?.name || `Proyek #${inv.projectId}`;
   const buyerAddress = inv.buyerAddress || project?.location || null;
@@ -88,24 +125,24 @@ export function exportInvoicePdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
   doc.setTextColor(...DARK);
-  doc.text("INVOICE", XR, 22, { align: "right" });
+  doc.text("INVOICE", XR, 46, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GRAY);
-  doc.text(`No. ${inv.number || ""}`, XR, 28, { align: "right" });
+  doc.text(`No. ${inv.number || ""}`, XR, 52, { align: "right" });
 
   // --- Meta: customer (left) + date/valid date (right) ---
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(...GRAY);
-  doc.text("Customer :", X, 40);
+  doc.text("Customer :", X, 62);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...DARK);
-  doc.text(buyerName, X, 46);
+  doc.text(buyerName, X, 68);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  let metaY = 51;
+  let metaY = 73;
   if (buyerAddress) {
     doc.setTextColor(...GRAY);
     doc.text(String(buyerAddress), X, metaY);
@@ -123,7 +160,7 @@ export function exportInvoicePdf(
   ];
   if (inv.poNumber) dateRows.push(["No. PO", inv.poNumber]);
   autoTable(doc, {
-    startY: 36,
+    startY: 58,
     margin: { left: XR - 78, right: 12 },
     theme: "plain",
     body: dateRows,
@@ -136,7 +173,7 @@ export function exportInvoicePdf(
 
   // --- Items table ---
   autoTable(doc, {
-    startY: Math.max(metaY + 6, 60),
+    startY: Math.max(metaY + 6, 78),
     margin: { left: X, right: X },
     head: [["No.", "Product", "Descriptions", "Quantity Unit", "Price per each", "Amount"]],
     body: items.map((item, idx) => {
