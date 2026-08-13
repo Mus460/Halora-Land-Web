@@ -19,10 +19,11 @@ type WorkItemHandler struct {
 	pool     database.Pool
 	repo     *repository.WorkItemRepo
 	snapshot *service.SnapshotService
+	progress *service.ProgressService
 }
 
-func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService) *WorkItemHandler {
-	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss}
+func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService, progress *service.ProgressService) *WorkItemHandler {
+	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss, progress: progress}
 }
 
 func (h *WorkItemHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +37,20 @@ func (h *WorkItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if f.ProjectID != nil {
+		items, _, err := h.progress.Items(r.Context(), *f.ProjectID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		weights := make(map[int32]float64, len(items))
+		for i := range items {
+			weights[items[i].ID] = items[i].Weight
+		}
+		for i := range out {
+			out[i].Weight = weights[out[i].ID]
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }

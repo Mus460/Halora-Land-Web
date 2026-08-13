@@ -36,13 +36,14 @@ func (app *App) routes() http.Handler {
 	// Services
 	snap := service.NewSnapshotService(app.pool, pekerjaanRepo, maRepo, app.audit)
 	rab := service.NewRABService(app.pool, pekerjaanRepo, rekapRepo, app.cfg.OverheadRate, app.cfg.PPNRate)
+	progress := service.NewProgressService(app.pool)
 	importer := ahsp.NewImporter(app.pool)
 
 	// Handlers
 	authH := handler.NewAuthHandler(app.cfg, app.verifier, app.audit)
 	proyekH := handler.NewProjectHandler(app.pool, proyekRepo)
-	pekerjaanH := handler.NewWorkItemHandler(app.pool, pekerjaanRepo, snap)
-	subH := handler.NewProjectSubHandler(app.pool, proyekRepo, rekapRepo, rab, snap)
+	pekerjaanH := handler.NewWorkItemHandler(app.pool, pekerjaanRepo, snap, progress)
+	subH := handler.NewProjectSubHandler(app.pool, proyekRepo, rekapRepo, rab, snap, progress)
 	maH := handler.NewAnalysisMasterHandler(app.pool, maRepo)
 	mhH := handler.NewPriceMasterHandler(app.pool, mhRepo)
 	clientH := handler.NewClientHandler(clientRepo)
@@ -51,7 +52,7 @@ func (app *App) routes() http.Handler {
 	auditH := handler.NewAuditLogHandler(auditRepo)
 	newsH := handler.NewNewsHandler(newsRepo)
 	adminH := handler.NewAdminAHSPHandler(app.pool, importer, app.ahspPath)
-	monH := handler.NewMonitoringHandler(app.pool)
+	monH := handler.NewMonitoringHandler(app.pool, progress)
 
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)

@@ -18,6 +18,14 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID").format(value);
 }
 
+// formatWeight renders a work-item cost weight (% of project subtotal).
+export function formatWeight(value: number | null | undefined): string {
+  if (value == null) return "—";
+  if (value <= 0) return "0%";
+  if (value < 0.1) return "<0.1%";
+  return `${value.toFixed(1)}%`;
+}
+
 export function formatTimeline(months: number, days: number): string {
   const parts: string[] = [];
   if (months > 0) parts.push(`${months} bulan`);

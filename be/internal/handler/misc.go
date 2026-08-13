@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/halora-land/halora-be/internal/auth"
 	"github.com/halora-land/halora-be/internal/models"
 	"github.com/halora-land/halora-be/internal/repository"
+	"github.com/halora-land/halora-be/service"
 )
 
 type DashboardHandler struct {
@@ -173,11 +175,12 @@ func (h *NewsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 type MonitoringHandler struct {
-	pool database.Pool
+	pool     database.Pool
+	progress *service.ProgressService
 }
 
-func NewMonitoringHandler(pool database.Pool) *MonitoringHandler {
-	return &MonitoringHandler{pool: pool}
+func NewMonitoringHandler(pool database.Pool, progress *service.ProgressService) *MonitoringHandler {
+	return &MonitoringHandler{pool: pool, progress: progress}
 }
 
 func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -199,56 +202,91 @@ func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	rows, err := h.pool.Query(r.Context(), `
-		SELECT w.id, w."description", w.volume::text, w.unit, w.category, w.progress,
-			(SELECT l."createdAt" FROM work_item_progress_logs l
-			 WHERE l."workItemId" = w.id
-			 ORDER BY l."createdAt" DESC, l.id DESC LIMIT 1) AS "lastUpdated"
-		FROM work_items w WHERE w."projectId" = $1 AND w."deletedAt" IS NULL
-		ORDER BY w.category, w.id`, pid)
+	items, _, err := h.progress.Items(r.Context(), int32(pid))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer rows.Close()
+	if len(items) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"overall": 0, "monitoring": []any{}})
+		return
+	}
+
+	// Last update per item in a single query.
+	ids := make([]int32, len(items))
+	for i := range items {
+		ids[i] = items[i].ID
+	}
+	lastUpdated := map[int32]*string{}
+	rows, err := h.pool.Query(r.Context(), `
+		SELECT DISTINCT ON ("workItemId") "workItemId", "createdAt"::text
+		FROM work_item_progress_logs
+		WHERE "workItemId" = ANY($1)
+		ORDER BY "workItemId", "createdAt" DESC, id DESC`, ids)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for rows.Next() {
+		var id int32
+		var at sql.NullString
+		if err := rows.Scan(&id, &at); err != nil {
+			break
+		}
+		lastUpdated[id] = nullStr(at)
+	}
+	rows.Close()
+
 	type monItem struct {
 		ID          int32   `json:"id"`
 		Description string  `json:"description"`
 		Volume      string  `json:"volume"`
 		Unit        string  `json:"unit"`
 		Progress    int     `json:"progress"`
+		Weight      float64 `json:"weight"`
 		LastUpdated *string `json:"lastUpdated"`
-	}
-	grouped := map[string][]monItem{}
-	var order []string
-	for rows.Next() {
-		var id int32
-		var description, vol, unit, kat string
-		var progress int
-		var lastUpdated sql.NullString
-		if err := rows.Scan(&id, &description, &vol, &unit, &kat, &progress, &lastUpdated); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if _, exists := grouped[kat]; !exists {
-			order = append(order, kat)
-		}
-		grouped[kat] = append(grouped[kat], monItem{
-			ID:          id,
-			Description: description,
-			Volume:      vol,
-			Unit:        unit,
-			Progress:    progress,
-			LastUpdated: nullStr(lastUpdated),
-		})
 	}
 	type monCategory struct {
 		Category string    `json:"category"`
+		Progress int       `json:"progress"`
 		Items    []monItem `json:"items"`
+	}
+	grouped := map[string]*monCategory{}
+	var order []string
+	overallPct := 0.0
+	for i := range items {
+		it := &items[i]
+		kat := string(it.Category)
+		cat, ok := grouped[kat]
+		if !ok {
+			cat = &monCategory{Category: kat}
+			grouped[kat] = cat
+			order = append(order, kat)
+		}
+		cat.Items = append(cat.Items, monItem{
+			ID:          it.ID,
+			Description: it.Description,
+			Volume:      it.Volume,
+			Unit:        it.Unit,
+			Progress:    it.Progress,
+			Weight:      it.Weight,
+			LastUpdated: lastUpdated[it.ID],
+		})
+		overallPct += it.Weight * float64(it.Progress) / 100.0
 	}
 	var out []monCategory
 	for _, k := range order {
-		out = append(out, monCategory{Category: k, Items: grouped[k]})
+		cat := grouped[k]
+		ws := 0.0
+		acc := 0.0
+		for _, it := range cat.Items {
+			ws += it.Weight
+			acc += it.Weight * float64(it.Progress) / 100.0
+		}
+		if ws > 0 {
+			cat.Progress = int(math.Round(acc / ws * 100))
+		}
+		out = append(out, *cat)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"monitoring": out})
+	writeJSON(w, http.StatusOK, map[string]any{"overall": int(math.Round(overallPct)), "monitoring": out})
 }

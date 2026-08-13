@@ -21,6 +21,8 @@ import (
 
 	"github.com/halora-land/halora-be/internal/repository"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/halora-land/halora-be/service"
 )
 
 func newPool(t *testing.T) pgxmock.PgxPoolIface {
@@ -322,7 +324,7 @@ func TestHandlerNewsUpdateDelete(t *testing.T) {
 
 func TestHandlerMonitoringRequiresAccess(t *testing.T) {
 	m := newPool(t)
-	h := NewMonitoringHandler(m)
+	h := NewMonitoringHandler(m, service.NewProgressService(m))
 	w := doReq(t, h.List, http.MethodGet, "/api/v1/monitoring", "", nil)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("missing projectId status = %d", w.Code)

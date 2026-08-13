@@ -25,14 +25,15 @@ type ProjectSubHandler struct {
 	recaps   *repository.RecapRepo
 	rab      *service.RABService
 	snap     *service.SnapshotService
+	progress *service.ProgressService
 	real     *repository.TransactionRepo
 	log      *repository.LogisticsRepo
 	inv      *repository.InvoiceRepo
 }
 
-func NewProjectSubHandler(pool database.Pool, pr *repository.ProjectRepo, rr *repository.RecapRepo, rab *service.RABService, ss *service.SnapshotService) *ProjectSubHandler {
+func NewProjectSubHandler(pool database.Pool, pr *repository.ProjectRepo, rr *repository.RecapRepo, rab *service.RABService, ss *service.SnapshotService, progress *service.ProgressService) *ProjectSubHandler {
 	return &ProjectSubHandler{
-		pool: pool, projects: pr, recaps: rr, rab: rab, snap: ss,
+		pool: pool, projects: pr, recaps: rr, rab: rab, snap: ss, progress: progress,
 		real: repository.NewTransactionRepo(pool),
 		log:  repository.NewLogisticsRepo(pool),
 		inv:  repository.NewInvoiceRepo(pool),
@@ -709,12 +710,13 @@ var sCurveCategoryRank = map[models.WorkCategory]int{
 }
 
 type curveItem struct {
-	id    int32
-	rank  int
-	cost  decimal.Decimal
-	hours float64
-	weeks float64
-	start float64
+	id     int32
+	rank   int
+	cost   decimal.Decimal
+	weight float64
+	hours  float64
+	weeks  float64
+	start  float64
 }
 
 // sCurveSeries builds the weekly S-curve series:
@@ -737,39 +739,18 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 	if err := h.pool.QueryRow(ctx, `SELECT "createdAt", "timelineMonths", "timelineDays" FROM projects WHERE id = $1`, pid).Scan(&start, &tMonths, &tDays); err != nil {
 		return []string{}, []int{}, []int{}
 	}
-	rows, err := h.pool.Query(ctx, `
-		SELECT id, category, "totalCost"::text, volume::text, duration::text
-		FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL`, pid)
+	weighted, totalCost, err := h.progress.Items(ctx, pid)
 	if err != nil {
 		return []string{}, []int{}, []int{}
 	}
-	defer rows.Close()
-
-	var items []curveItem
-	totalCost := decimal.Zero
-	for rows.Next() {
-		var it curveItem
-		var kat models.WorkCategory
-		var costStr, volStr, durStr string
-		if err := rows.Scan(&it.id, &kat, &costStr, &volStr, &durStr); err != nil {
-			continue
+	items := make([]curveItem, 0, len(weighted))
+	for i := range weighted {
+		w := &weighted[i]
+		rank := sCurveCategoryRank[w.Category]
+		if rank == 0 {
+			rank = 100
 		}
-		it.rank = sCurveCategoryRank[kat]
-		if it.rank == 0 {
-			it.rank = 100
-		}
-		cost, err := decimal.NewFromString(costStr)
-		if err != nil {
-			continue
-		}
-		it.cost = cost
-		totalCost = totalCost.Add(cost)
-		vol, errV := decimal.NewFromString(volStr)
-		dur, errD := decimal.NewFromString(durStr)
-		if errV == nil && errD == nil && vol.IsPositive() && dur.IsPositive() {
-			it.hours, _ = vol.Mul(dur).Float64()
-		}
-		items = append(items, it)
+		items = append(items, curveItem{id: w.ID, rank: rank, cost: w.Cost, weight: w.Weight, hours: w.Hours})
 	}
 	if len(items) == 0 || !totalCost.IsPositive() {
 		return []string{}, []int{}, []int{}
@@ -846,7 +827,7 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 	for k := 1; k < span; k++ {
 		pct := 0.0
 		for i := range items {
-			pct += itemPercent(items[i].cost, totalCost, clamp01((float64(k)-items[i].start)/items[i].weeks))
+			pct += items[i].weight * clamp01((float64(k)-items[i].start)/items[i].weeks)
 		}
 		planned[k] = int(pct * 100)
 	}
@@ -906,17 +887,6 @@ func (h *ProjectSubHandler) sCurveSeries(ctx context.Context, pid int32) ([]stri
 		actual[i] = pct
 	}
 	return labels, planned, actual
-}
-
-func itemPercent(cost, total decimal.Decimal, frac float64) float64 {
-	if frac <= 0 {
-		return 0
-	}
-	if frac > 1 {
-		frac = 1
-	}
-	f, _ := cost.Div(total).Float64()
-	return f * frac
 }
 
 func clamp01(v float64) float64 {
