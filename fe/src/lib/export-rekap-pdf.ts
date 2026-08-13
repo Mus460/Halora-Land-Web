@@ -100,6 +100,12 @@ export interface RekapData {
     location?: string | null;
     contractValue?: number | null;
   };
+  projects?: {
+    id: number;
+    name: string;
+    location?: string | null;
+    contractValue?: number | null;
+  };
   grouped?: Record<string, RekapItem[]>;
   subtotals?: Record<string, number>;
   summary?: {
@@ -160,7 +166,7 @@ export async function exportRekapPDF(
   const XR = W - 12;
   const contentWidth = XR - X;
   const grouped = data.grouped || {};
-  const project = data.project;
+  const project = data.project || data.projects;
 
   const logo = await loadLogo(LOGO_RAB).catch(() => null);
   if (logo) {
@@ -185,7 +191,6 @@ export async function exportRekapPDF(
     startY: 46,
     margin: { left: X, right: X },
     theme: "grid",
-    head: [["", ""]],
     body: infoRows,
     styles: { fontSize: 9, cellPadding: 2.5, textColor: DARK },
     headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontSize: 9 },
@@ -239,10 +244,7 @@ export async function exportRekapPDF(
     autoTable(doc, {
       startY: y,
       margin: { left: X, right: X },
-      head:
-        sectionIndex === 1
-          ? [["No.", "Uraian Pekerjaan", "Spesifikasi", "Sat", "Vol", "Harga Sat", "Tot Harga"]]
-          : [],
+      head: [["No", "Uraian Pekerjaan", "Spesifikasi", "Sat", "Vol", "Harga Sat", "Tot Harga"]],
       body: [
         ...(items as RekapItem[]).map((item, idx) => [
           String(idx + 1),
@@ -264,8 +266,8 @@ export async function exportRekapPDF(
         fontSize: 8.5,
       },
       columnStyles: {
-        0: { cellWidth: 8, halign: "center" },
-        1: { cellWidth: 62, halign: "left" },
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 60, halign: "left" },
         2: { cellWidth: 34, halign: "left" },
         3: { cellWidth: 14, halign: "center" },
         4: { cellWidth: 18, halign: "right" },
@@ -293,12 +295,18 @@ export async function exportRekapPDF(
 
   // --- Grand totals ---
   const totalFinal = Number(summary.totalFinal || 0);
+  const marginPct = Number(summary.margin || 0);
+  const ppnPct = Number(summary.ppn || 0);
+  const profit = Number(summary.subtotalWithMargin || 0) - subtotal;
   const totalRows: string[][] = [
-    ["Total :", formatMoney(subtotal)],
-    ["Total keseluruhan", `Rp ${formatMoney(totalFinal)}`],
+    ["Sub Total :", formatMoney(subtotal)],
+    [`Profit (Margin ${formatNumber(marginPct)}%) :`, formatMoney(profit)],
+    ["Overhead :", formatMoney(Number(summary.overhead || 0))],
+    [`PPN (${formatNumber(ppnPct)}%) :`, formatMoney(Number(summary.totalPPN || 0))],
+    ["Total Keseluruhan :", `Rp ${formatMoney(totalFinal)}`],
   ];
 
-  if (y + 20 > H - 34) {
+  if (y + 50 > H - 34) {
     doc.addPage();
     y = 15;
   }
