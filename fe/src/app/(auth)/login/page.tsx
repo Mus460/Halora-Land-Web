@@ -168,23 +168,27 @@ export default function LoginPage() {
                 {isResending ? "Mengirim..." : "Kirim Ulang Email Verifikasi"}
               </Button>
             )}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Atau</span>
-              </div>
-            </div>
-            <Button 
-              type="button"
-              variant="outline" 
-              className="w-full h-11"
-              onClick={handleDemoLogin}
-              disabled={isLoading}
-            >
-              Masuk sebagai Demo
-            </Button>
+            {process.env.NODE_ENV !== "production" && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-gray-500">Atau</span>
+                  </div>
+                </div>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full h-11"
+                  onClick={handleDemoLogin}
+                  disabled={isLoading}
+                >
+                  Masuk sebagai Demo
+                </Button>
+              </>
+            )}
           </CardContent>
         </form>
       </Card>
