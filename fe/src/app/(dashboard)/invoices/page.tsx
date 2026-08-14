@@ -96,6 +96,10 @@ export default function InvoicePage() {
     }
   }, [projectId]);
 
+  useEffect(() => {
+    import("@/lib/export-invoice-pdf").catch(() => {});
+  }, []);
+
   if (proyekLoading) return <div className="p-8 text-center">Memuat data...</div>;
   if (projectList.length === 0) {
     return (
@@ -131,16 +135,17 @@ export default function InvoicePage() {
   };
 
   const handlePrint = async (inv: Invoice) => {
+    const toastId = toast.loading("Menyiapkan PDF…");
     try {
       const project = projectList.find((p) => p.id === projectId);
       const { exportInvoicePdf } = await import("@/lib/export-invoice-pdf");
-      exportInvoicePdf(inv, {
+      await exportInvoicePdf(inv, {
         name: project?.name,
         location: project?.location,
       });
-      toast.success("Invoice dicetak");
+      toast.success("Invoice dicetak", { id: toastId });
     } catch (error) {
-      toast.error("Gagal mencetak invoice");
+      toast.error("Gagal mencetak invoice", { id: toastId });
       console.error(error);
     }
   };
