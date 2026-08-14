@@ -1,4 +1,4 @@
-import { Shield, Users, FileSpreadsheet, Newspaper } from "lucide-react";
+import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import Link from "next/link";
@@ -9,18 +9,6 @@ const adminMenus = [
     title: "Kelola User",
     description: "Manajemen pengguna dan role",
     icon: Users,
-  },
-  {
-    href: "/admin/ahsp-import",
-    title: "Import AHSP",
-    description: "Import database AHSP dari Excel",
-    icon: FileSpreadsheet,
-  },
-  {
-    href: "/admin/news",
-    title: "Kelola Berita",
-    description: "Kelola pengumuman untuk user",
-    icon: Newspaper,
   },
 ];
 

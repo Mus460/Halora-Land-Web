@@ -104,9 +104,5 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	if _, err := tx.Exec(ctx, `INSERT INTO news (title, content, "isActive") VALUES ('Selamat datang di Halora Land','Aplikasi estimasi RAB berbasis AHSP PUPR 2026.',true)`); err != nil {
-		return err
-	}
-
 	return tx.Commit(ctx)
 }

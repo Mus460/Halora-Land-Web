@@ -342,15 +342,6 @@ type FeedbackReply struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
-type News struct {
-	ID        int32     `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	IsActive  bool      `json:"isActive"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
 type AuditLog struct {
 	ID          int32           `json:"id"`
 	ProjectID   *int32          `json:"projectId"`

@@ -247,16 +247,6 @@ CREATE TABLE IF NOT EXISTS "feedback_reply" (
     CONSTRAINT "feedback_reply_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE IF NOT EXISTS "news" (
-    "id"        SERIAL NOT NULL,
-    "title"     TEXT    NOT NULL,
-    "content"   TEXT    NOT NULL,
-    "isActive"  BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "news_pkey" PRIMARY KEY ("id")
-);
-
 CREATE TABLE IF NOT EXISTS "audit_log" (
     "id"          SERIAL NOT NULL,
     "proyekId"    INTEGER,

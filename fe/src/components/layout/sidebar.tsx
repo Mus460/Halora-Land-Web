@@ -119,7 +119,7 @@ const SIDEBAR_SECTIONS = [
     title: "Pengaturan",
     items: [
       { href: "/profile", label: "Pengaturan Usaha", icon: Settings },
-      { href: "/admin", label: "Admin Center", icon: Shield, badge: 2 },
+      { href: "/admin", label: "Admin Center", icon: Shield, badge: 1 },
     ],
   },
 ];
