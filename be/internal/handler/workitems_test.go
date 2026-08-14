@@ -49,7 +49,7 @@ func TestWorkItemListMergesWeightsWithProjectFilter(t *testing.T) {
 			wiRow(1, pid, models.CategoryFoundation, "Pondasi", "40000"),
 			wiRow(2, pid, models.CategoryFoundation, "Besi", "60000")))
 	// progress service weights: 40k/100k = 40, 60k/100k = 60
-	m.ExpectQuery(`SELECT id, category, description, volume::text`).WithArgs(pid).
+	m.ExpectQuery(`SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "category", "description", "volume", "unit",
 			"totalCost", "progress", "duration"}).
 			AddRow(int32(1), "foundation", "Pondasi", "1", "bh", "40000", 50, "8").
@@ -96,7 +96,7 @@ func TestWorkItemListProjectFilterNoMatches(t *testing.T) {
 	pid := int32(9)
 	m.ExpectQuery(workItemsSQL + ` AND "projectId" = \$1`).WithArgs(pid).
 		WillReturnRows(workItemListRows())
-	m.ExpectQuery(`SELECT id, category, description, volume::text`).WithArgs(pid).
+	m.ExpectQuery(`SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "category", "description", "volume", "unit",
 			"totalCost", "progress", "duration"}))
 	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m))

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
@@ -9,19 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { EmptyState } from "@/components/shared/empty-state";
-import { formatCurrency, formatDuration, formatWeight } from "@/lib/utils";
+import { formatCurrency, formatDuration, formatVolume, formatWeight } from "@/lib/utils";
 import { LEVEL_PEKERJAAN, SATUAN_OPTIONS } from "@/lib/constants";
 import { useWorkItem } from "@/hooks/useWorkItem";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDebouncedValue } from "@/hooks/use-debounce";
-import { apiClient } from "@/lib/api";
-import type {
-  WorkItem,
-  WorkCategory,
-  CalculationMethod,
-  ComponentType,
-} from "@/types";
+import type { WorkItem, WorkCategory, CalculationMethod } from "@/types";
 import type { LucideIcon } from "lucide-react";
 import {
   Dialog,
@@ -40,8 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/shared/currency-input";
-import { VolumeInput } from "@/components/shared/volume-input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FormField {
   name: string;
@@ -59,16 +51,6 @@ interface AHSPResult {
   unitPrice: number | null;
   ahspCode: string | null;
   ahspSheet: string | null;
-}
-
-interface BreakdownRow {
-  id?: number;
-  name: string;
-  unit: string;
-  coefficient: number;
-  unitPrice: number;
-  type: ComponentType;
-  sourceCode?: string | null;
 }
 
 interface WorkItemPageProps {
@@ -122,7 +104,7 @@ export function WorkItemPage({
       header: "Volume",
       cell: ({ row }) => (
         <span>
-          {row.original.volume} {row.original.unit}
+          {formatVolume(row.original.volume)} {row.original.unit}
         </span>
       ),
     },
@@ -208,29 +190,7 @@ export function WorkItemPage({
     }
   };
 
-  const handleSubmit = async (
-    formData: Partial<WorkItem>,
-    details?: BreakdownRow[]
-  ) => {
-    if (editItem && details && details.length > 0) {
-      try {
-        await apiClient.put(`/work-items/${editItem.id}/details`, {
-          details: details.map((d) => ({
-            id: d.id || 0,
-            name: d.name,
-            unit: d.unit,
-            coefficient: d.coefficient,
-            unitPrice: d.unitPrice,
-            type: d.type,
-            sourceCode: d.sourceCode ?? null,
-          })),
-        });
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Gagal menyimpan rincian biaya");
-        return false;
-      }
-    }
-
+  const handleSubmit = async (formData: Partial<WorkItem>) => {
     let success = false;
     if (editItem) {
       success = await updatePekerjaan(editItem.id, formData);
@@ -334,24 +294,17 @@ function PekerjaanFormDialog({
   showLevelPekerjaan: boolean;
   showTipePekerjaan: boolean;
   tipeOptions: string[];
-  onSubmit: (data: Partial<WorkItem>, details?: BreakdownRow[]) => Promise<boolean>;
+  onSubmit: (data: Partial<WorkItem>) => Promise<boolean>;
 }) {
-  const [metode, setMetode] = useState<CalculationMethod>(
-    item?.calculationMethod || "ahsp"
-  );
+  const [metode, setMetode] = useState<CalculationMethod>("ahsp");
   const [form, setForm] = useState({
-    description: item?.description || "",
-    volume: item?.volume || 0,
-    unit: item?.unit || "m2",
-    unitPrice: item?.unitPrice || 0,
-    level: item?.level || "",
-    type: item?.type || "",
-    calculationMethod: item?.calculationMethod || "ahsp",
-  });
-  const [dimensi, setDimensi] = useState({
-    panjang: 0,
-    lebar: 0,
-    tinggi: 0,
+    description: "",
+    volume: 0,
+    unit: "m2",
+    unitPrice: 0,
+    level: "",
+    type: "",
+    calculationMethod: "ahsp" as CalculationMethod,
   });
   const [ahspQuery, setAhspQuery] = useState("");
   const [ahspResults, setAhspResults] = useState<AHSPResult[]>([]);
@@ -359,59 +312,24 @@ function PekerjaanFormDialog({
   const [selectedAhsp, setSelectedAhsp] = useState<AHSPResult | null>(null);
   const [ahspError, setAhspError] = useState("");
   const [formError, setFormError] = useState("");
-  const [details, setDetails] = useState<BreakdownRow[]>([]);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [hadDetails, setHadDetails] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      setAhspQuery("");
-      setAhspResults([]);
-      setSelectedAhsp(null);
-      setAhspError("");
-      setFormError("");
-      setDetails([]);
-      setDetailsLoading(false);
-      setHadDetails(false);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !item || item.calculationMethod !== "ahsp") {
-      setDetails([]);
-      setHadDetails(false);
-      return;
-    }
-    let cancelled = false;
-    setDetailsLoading(true);
-    fetch(`/api/work-items/${item.id}/analysis`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((rows) => {
-        if (cancelled) return;
-        const mapped: BreakdownRow[] = (rows || []).map((d: any) => ({
-          id: d.id,
-          name: d.name || "",
-          unit: d.unit || "",
-          coefficient: Number(d.coefficient) || 0,
-          unitPrice: Number(d.unitPrice) || 0,
-          type: d.type || "material",
-          sourceCode: d.sourceCode ?? null,
-        }));
-        setDetails(mapped);
-        setHadDetails(mapped.length > 0);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDetails([]);
-          setHadDetails(false);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setDetailsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (!open) return;
+    setMetode(item?.calculationMethod || "ahsp");
+    setForm({
+      description: item?.description || "",
+      volume: item?.volume || 0,
+      unit: item?.unit || "m2",
+      unitPrice: item?.unitPrice || 0,
+      level: item?.level || "",
+      type: item?.type || "",
+      calculationMethod: item?.calculationMethod || "ahsp",
+    });
+    setAhspQuery("");
+    setAhspResults([]);
+    setSelectedAhsp(null);
+    setAhspError("");
+    setFormError("");
   }, [open, item]);
 
   const debouncedAhspQuery = useDebouncedValue(ahspQuery);
@@ -462,44 +380,8 @@ function PekerjaanFormDialog({
     setAhspError("");
   };
 
-  const volume = useMemo(() => {
-    const u = (form.unit || "").toLowerCase().trim();
-    if (u === "m3" && dimensi.panjang > 0 && dimensi.lebar > 0 && dimensi.tinggi > 0) {
-      return dimensi.panjang * dimensi.lebar * dimensi.tinggi;
-    }
-    if (u === "m2" && dimensi.panjang > 0 && dimensi.lebar > 0) {
-      return dimensi.panjang * dimensi.lebar;
-    }
-    if ((u === "m1" || u === "m" || u === "m'") && dimensi.panjang > 0) {
-      return dimensi.panjang;
-    }
-    return form.volume;
-  }, [form.unit, form.volume, dimensi]);
-
-  const breakdownTotal = useMemo(
-    () => details.reduce((sum, d) => sum + d.coefficient * d.unitPrice, 0),
-    [details]
-  );
-  const hasBreakdown = item?.calculationMethod === "ahsp" && details.length > 0;
-  const effectiveUnitPrice = hasBreakdown ? breakdownTotal : form.unitPrice;
-  const totalCost = volume * effectiveUnitPrice;
-
-  const updateDetail = (index: number, patch: Partial<BreakdownRow>) => {
-    setDetails((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, ...patch } : d))
-    );
-  };
-
-  const removeDetail = (index: number) => {
-    setDetails((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addDetail = () => {
-    setDetails((prev) => [
-      ...prev,
-      { name: "", unit: "", coefficient: 1, unitPrice: 0, type: "material" },
-    ]);
-  };
+  const volume = form.volume;
+  const totalCost = volume * form.unitPrice;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -518,21 +400,14 @@ function PekerjaanFormDialog({
       setAhspError("Volume/jumlah wajib diisi");
       return;
     }
-    if (hadDetails && details.length === 0) {
-      setFormError("Rincian biaya minimal 1 komponen");
-      return;
-    }
-    const ok = await onSubmit(
-      {
-        ...form,
-        volume,
-        unitPrice: effectiveUnitPrice,
-        totalCost,
-        calculationMethod: metode,
-        analysisMasterId: selectedAhsp?.id ?? null,
-      },
-      details
-    );
+    const ok = await onSubmit({
+      ...form,
+      volume,
+      unitPrice: form.unitPrice,
+      totalCost,
+      calculationMethod: metode,
+      analysisMasterId: item ? undefined : (selectedAhsp?.id ?? null),
+    });
     if (ok) {
       onOpenChange(false);
     }
@@ -657,15 +532,6 @@ function PekerjaanFormDialog({
           </div>
 
           {/* Volume */}
-          <VolumeInput
-            label="Dimensi"
-            unit={form.unit}
-            panjang={dimensi.panjang}
-            lebar={dimensi.lebar}
-            tinggi={dimensi.tinggi}
-            onChange={setDimensi}
-          />
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Volume</Label>
@@ -699,7 +565,7 @@ function PekerjaanFormDialog({
             </div>
           </div>
 
-          {metode === "ahsp" && (
+          {metode === "ahsp" && !item && (
             <div className="space-y-2">
               <Label>Item AHSP</Label>
               {selectedAhsp ? (
@@ -780,130 +646,19 @@ function PekerjaanFormDialog({
             </div>
           )}
 
-          {item?.calculationMethod === "ahsp" && (
+          {(metode === "manual" || item) && (
             <div className="space-y-2">
-              <Label>Rincian Biaya Komponen</Label>
-              {detailsLoading ? (
-                <p className="text-xs text-gray-500">Memuat rincian...</p>
-              ) : (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_110px_80px_90px_110px_90px_28px] gap-2 text-xs font-medium text-gray-500">
-                    <span>Komponen</span>
-                    <span>Tipe</span>
-                    <span>Satuan</span>
-                    <span>Koefisien</span>
-                    <span>Harga Satuan</span>
-                    <span className="text-right">Total</span>
-                    <span />
-                  </div>
-                  {details.map((row, i) => (
-                    <div
-                      key={row.id ?? `new-${i}`}
-                      className="grid grid-cols-[1fr_110px_80px_90px_110px_90px_28px] gap-2 items-center"
-                    >
-                      <Input
-                        value={row.name}
-                        onChange={(e) =>
-                          updateDetail(i, { name: e.target.value })
-                        }
-                        placeholder="Nama komponen"
-                      />
-                      <Select
-                        value={row.type}
-                        onValueChange={(v) =>
-                          updateDetail(i, { type: v as ComponentType })
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="material">Material</SelectItem>
-                          <SelectItem value="labor">Tenaga</SelectItem>
-                          <SelectItem value="equipment">Alat</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={row.unit}
-                        onChange={(e) =>
-                          updateDetail(i, { unit: e.target.value })
-                        }
-                        placeholder="Unit"
-                        className="h-8 text-xs"
-                      />
-                      <Input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={row.coefficient || ""}
-                        onChange={(e) =>
-                          updateDetail(i, {
-                            coefficient: Number(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0"
-                        className="h-8 text-xs"
-                      />
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={row.unitPrice || ""}
-                        onChange={(e) =>
-                          updateDetail(i, {
-                            unitPrice: Number(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0"
-                        className="h-8 text-xs"
-                      />
-                      <span className="text-right text-sm tabular-nums">
-                        {formatCurrency(row.coefficient * row.unitPrice)}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-500 hover:text-red-600"
-                        onClick={() => removeDetail(i)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addDetail}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Tambah Komponen
-                  </Button>
-                  {details.length > 0 && (
-                    <div className="flex justify-between text-sm font-semibold border-t pt-2">
-                      <span>Total Rincian (Harga Satuan)</span>
-                      <span className="text-amber-600">
-                        {formatCurrency(breakdownTotal)}
-                      </span>
-                    </div>
-                  )}
-                  {item.basePrice != null && (
-                    <p className="text-xs text-gray-500">
-                      Harga dasar AHSP: {formatCurrency(item.basePrice)}
-                    </p>
-                  )}
-                </div>
+              <CurrencyInput
+                label="Harga Satuan"
+                value={form.unitPrice}
+                onChange={(value) => setForm({ ...form, unitPrice: value })}
+              />
+              {item && item.calculationMethod === "ahsp" && (
+                <p className="text-xs text-gray-500">
+                  Harga satuan diinput manual, rincian AHSP tidak diubah.
+                </p>
               )}
             </div>
-          )}
-
-          {metode === "manual" && (
-            <CurrencyInput
-              label="Harga Satuan"
-              value={form.unitPrice}
-              onChange={(value) => setForm({ ...form, unitPrice: value })}
-            />
           )}
 
           {/* Summary */}
@@ -918,14 +673,9 @@ function PekerjaanFormDialog({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Price Unit</span>
                 <span className="font-medium">
-                  {formatCurrency(effectiveUnitPrice)}
+                  {formatCurrency(form.unitPrice)}
                 </span>
               </div>
-              {hasBreakdown && (
-                <p className="text-[11px] text-gray-500">
-                  Harga satuan mengikuti total rincian biaya di atas
-                </p>
-              )}
               <div className="flex justify-between text-sm font-bold border-t pt-1">
                 <span>Total Biaya</span>
                 <span className="text-amber-600">

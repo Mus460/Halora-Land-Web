@@ -210,9 +210,17 @@ function NewsFormDialog({
   onSubmit: (data: Partial<News>) => void;
 }) {
   const [form, setForm] = useState({
-    title: item?.title || "",
-    content: item?.content || "",
+    title: "",
+    content: "",
   });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      title: item?.title || "",
+      content: item?.content || "",
+    });
+  }, [open, item]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

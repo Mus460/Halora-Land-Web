@@ -56,6 +56,7 @@ type projectSummary struct {
 	Name          string           `json:"name"`
 	Location      *string          `json:"location"`
 	ContractValue *decimal.Decimal `json:"contractValue"`
+	BuildingArea  *decimal.Decimal `json:"buildingArea"`
 }
 
 type rabSummary struct {
@@ -139,6 +140,7 @@ func (s *RABService) Compute(ctx context.Context, projectID int32, projects *rep
 		res.Project = projectSummary{
 			ID: projects.ID, Name: projects.Name,
 			Location: projects.Location, ContractValue: projects.ContractValue,
+			BuildingArea: projects.BuildingArea,
 		}
 	}
 	return res, nil

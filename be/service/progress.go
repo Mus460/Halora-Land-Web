@@ -43,7 +43,7 @@ func NewProgressService(pool database.Pool) *ProgressService {
 // when the subtotal is positive.
 func (s *ProgressService) Items(ctx context.Context, projectID int32) ([]WeightedItem, decimal.Decimal, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, category, description, volume::text, unit, "totalCost"::text, progress,
+		SELECT id, category, description, trim_scale(ROUND(volume, 2))::text, unit, "totalCost"::text, progress,
 			duration::text
 		FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL
 		ORDER BY category, id`, projectID)

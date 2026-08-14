@@ -110,12 +110,14 @@ export interface RekapData {
     name: string;
     location?: string | null;
     contractValue?: number | null;
+    buildingArea?: number | null;
   };
   projects?: {
     id: number;
     name: string;
     location?: string | null;
     contractValue?: number | null;
+    buildingArea?: number | null;
   };
   grouped?: Record<string, RekapItem[]>;
   subtotals?: Record<string, number>;
@@ -147,6 +149,23 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     maximumFractionDigits: 2,
   }).format(value || 0);
+}
+
+type ProjectInfo = {
+  buildingArea?: number | string | null;
+};
+
+// rabAreaValue resolves the "LUAS BANGUNAN" header value: an explicit PDF
+// option wins, otherwise the project's stored buildingArea (m²) is used.
+export function rabAreaValue(
+  project: ProjectInfo | undefined,
+  area?: string
+): string {
+  if (area) return area;
+  if (project?.buildingArea) {
+    return `${formatNumber(Number(project.buildingArea))} m²`;
+  }
+  return "-";
 }
 
 function sanitizeFileName(name: string): string {
@@ -249,7 +268,10 @@ export async function exportRekapPDF(
     { label: "PROYEK", value: project?.name || "-" },
     { label: "PEMILIK", value: options.ownerName || "-" },
     { label: "LOKASI PROYEK", value: project?.location || "-" },
-    { label: "LUAS BANGUNAN", value: options.area || "-" },
+    {
+      label: "LUAS BANGUNAN",
+      value: rabAreaValue(project, options.area),
+    },
   ];
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);

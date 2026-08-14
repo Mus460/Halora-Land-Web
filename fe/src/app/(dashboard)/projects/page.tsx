@@ -201,6 +201,7 @@ export default function ProjectPage() {
         fd.append("location", (data as any).location || "");
         fd.append("type", (data as any).type || "building");
         fd.append("contractValue", String((data as any).contractValue || 0));
+        fd.append("buildingArea", String((data as any).buildingArea || 0));
         fd.append("timelineMonths", String((data as any).timelineMonths || 0));
         fd.append("timelineDays", String((data as any).timelineDays || 0));
 

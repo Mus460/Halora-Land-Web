@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatVolume } from "@/lib/utils";
 import toast from "react-hot-toast";
 import {
   Dialog,
@@ -62,7 +62,7 @@ export default function RekapPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setData(result);
-      if (result?.summary?.margin) {
+      if (result?.summary?.margin != null) {
         setMargin(Number(result.summary.margin));
       }
     } catch (error) {
@@ -189,14 +189,15 @@ export default function RekapPage() {
                         <tr key={item.id} className="border-b last:border-0">
                           <td className="px-4 py-2 max-w-[320px]">
                             <p className="font-medium truncate">{item.description}</p>
-                            {item.level && (
-                              <p className="text-xs text-gray-500">
-                                {item.level}
-                              </p>
-                            )}
+														{/* {item.level && (
+                            //   <p className="text-xs text-gray-500">
+                            //     {item.level}
+                            //   </p>
+                            // )}
+													  */}
                           </td>
                           <td className="text-right px-4 py-2 text-gray-600">
-                            {item.volume} {item.unit}
+                            {formatVolume(item.volume)} {item.unit}
                           </td>
                           <td className="text-right px-4 py-2 text-gray-600">
                             {formatCurrency(Number(item.unitPrice))}
