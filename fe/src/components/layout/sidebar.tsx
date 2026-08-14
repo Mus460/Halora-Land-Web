@@ -141,7 +141,7 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-full z-50 w-70 bg-gray-800 border-r border-gray-700",
+          "fixed left-0 top-0 h-full z-50 w-70 bg-gray-800 border-r border-gray-700 flex flex-col",
           "transition-transform duration-200 ease-in-out",
           "lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -182,7 +182,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <ScrollArea className="h-[calc(100vh-10rem)] custom-scrollbar">
+        <ScrollArea className="flex-1 min-h-0 custom-scrollbar">
           <nav className="px-2 py-3 space-y-4">
             {SIDEBAR_SECTIONS.map((section) => (
               <SidebarSection
