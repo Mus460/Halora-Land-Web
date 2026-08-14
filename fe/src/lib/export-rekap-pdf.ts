@@ -203,7 +203,7 @@ export async function exportRekapPDF(
     doc.addImage(logo, "PNG", M + 0.8, M, 28, 13.5);
   }
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold");
   doc.setFontSize(17);
   doc.setTextColor(...NAVY);
   doc.text("RENCANA ANGGARAN BIAYA", 52.5, 30.5);
@@ -211,7 +211,7 @@ export async function exportRekapPDF(
   doc.setTextColor(...TEAL);
   doc.text(COMPANY.type, 52.5, 35.2);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("times", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
   doc.text(COMPANY.addressLine1, XR, 31.5, { align: "right" });
@@ -223,13 +223,13 @@ export async function exportRekapPDF(
   ): void => {
     const widths: number[] = [];
     parts.forEach(([text, bold]) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFont("times", bold ? "bold" : "normal");
       widths.push(doc.getTextWidth(text));
     });
     const total = widths.reduce((s, w) => s + w, 0);
     let x = XR - total;
     parts.forEach(([text, bold], i) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFont("times", bold ? "bold" : "normal");
       doc.text(text, x, y);
       x += widths[i];
     });
@@ -273,10 +273,10 @@ export async function exportRekapPDF(
       value: rabAreaValue(project, options.area),
     },
   ];
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold");
   doc.setFontSize(10);
   const valueLines = info.map(
-    (it) => doc.splitTextToSize(String(it.value), 70) as string[]
+    (it) => doc.splitTextToSize(String(it.value), 68) as string[]
   );
   const rowHs = [
     Math.max(
@@ -302,12 +302,12 @@ export async function exportRekapPDF(
     const col = i % 2;
     const row = Math.floor(i / 2);
     const lx = 12 + col * 92.4;
-    const vx = lx + 21;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    const vx = lx + 23.5;
+    doc.setFont("times", "bold");
+    doc.setFontSize(7.5);
     doc.setTextColor(...TEAL);
     doc.text(label, lx, vy + 3.4);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.setFontSize(9.5);
     doc.setTextColor(...TEXT);
     valueLines[i].forEach((l, j) => doc.text(l, vx, vy + 3.4 + j * lineH));
@@ -409,6 +409,7 @@ export async function exportRekapPDF(
     body,
     theme: "plain",
     headStyles: {
+      font: "times",
       fillColor: NAVY,
       textColor: WHITE,
       fontStyle: "bold",
@@ -417,6 +418,7 @@ export async function exportRekapPDF(
       cellPadding: { top: 1.6, bottom: 1.6, left: 2.2, right: 2.2 },
     },
     styles: {
+      font: "times",
       fontSize: 8,
       textColor: TEXT,
       cellPadding: { top: 1.4, bottom: 1.4, left: 2.2, right: 2.2 },
@@ -426,14 +428,14 @@ export async function exportRekapPDF(
       1: { halign: "left" },
       2: { cellWidth: 31, halign: "left" },
       3: { cellWidth: 8.5, halign: "center" },
-      4: { cellWidth: 9.5, halign: "right" },
+      4: { cellWidth: 13, halign: "right" },
       5: { cellWidth: 19.5, halign: "right" },
       6: { cellWidth: 20, halign: "right", fontStyle: "bold" },
     },
   });
 
   if (!hasItems) {
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.setFontSize(9);
     doc.setTextColor(...MUTED);
     doc.text(
@@ -452,7 +454,7 @@ export async function exportRekapPDF(
   }
   doc.setFillColor(...NAVY);
   doc.roundedRect(M, ty, CW, 13, 2.5, 2.5, "F");
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...WHITE);
   doc.text("TOTAL KESELURUHAN", M + 5.5, ty + 8.6);
@@ -463,7 +465,7 @@ export async function exportRekapPDF(
 
   // --- Footer note ---
   const noteY = Math.min(ty + 17, H - 15);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("times", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
   doc.text(
@@ -481,7 +483,7 @@ export async function exportRekapPDF(
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.12);
     doc.line(M, H - 13, XR, H - 13);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
     doc.text(COMPANY.short, M, H - 8);
