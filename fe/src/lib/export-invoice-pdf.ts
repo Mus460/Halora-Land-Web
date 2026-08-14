@@ -1,15 +1,13 @@
 import { jsPDF } from "jspdf";
-import { autoTable } from "jspdf-autotable";
 import type { Invoice } from "@/types";
 import { terbilang } from "./terbilang";
 
 const NAVY: [number, number, number] = [16, 42, 67];
 const TEAL: [number, number, number] = [23, 126, 137];
 const GOLD: [number, number, number] = [232, 163, 23];
+const GREEN: [number, number, number] = [34, 139, 90];
 const LIGHT_NAVY: [number, number, number] = [238, 243, 247];
 const LIGHT_GOLD: [number, number, number] = [255, 245, 222];
-const GOLD_BORDER: [number, number, number] = [244, 214, 151];
-const GREEN: [number, number, number] = [34, 139, 90];
 const TEXT: [number, number, number] = [36, 55, 70];
 const MUTED: [number, number, number] = [113, 128, 140];
 const LINE: [number, number, number] = [215, 224, 230];
@@ -18,17 +16,19 @@ const WHITE75: [number, number, number] = [191, 191, 191];
 
 const COMPANY = {
   name: "HALORA LAND",
-  tagline: '"Business is about Trust and Value"',
+  billing: "INVOICE / PROJECT BILLING",
+  tagline: "Tagihan pekerjaan / material",
+  subtitle: "Dokumen tagihan resmi HALORA LAND.",
   address:
     "Jl. Adam Malik No. 58, Ruko No.1, Cipadu Jaya, Larangan, Kota Tangerang, 15155 - Indonesia.",
   website: "land.halora.id",
   email: "halo@halora.id",
   wa: "+62 811 8622 225",
-  contacts: "land.halora.id | halo@halora.id | +62 811 8622 225",
+  quote: "Business is about Trust and Value",
 };
 
-const LOGO_LEFT = "/halora-galona.png";
-const LOGO_RIGHT = "/halora-land.png";
+const LOGO_GALONA = "/halora-galona.png";
+const LOGO_LAND = "/halora-land.png";
 
 const logoCache = new Map<string, Promise<string>>();
 
@@ -52,111 +52,51 @@ function loadLogo(src: string): Promise<string> {
   return logoCache.get(src)!;
 }
 
-function rupiah(value: number): string {
+function num(value: number): string {
   return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value || 0);
 }
 
-function formatNumber(value: number): string {
+function numDec(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     maximumFractionDigits: 2,
   }).format(value || 0);
+}
+
+function rupiah(value: number): string {
+  return `Rp ${num(value)}`;
 }
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return "—";
   const d = new Date(date);
   if (isNaN(d.getTime())) return date;
-  return new Intl.DateTimeFormat("id-ID", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
   }).format(d);
 }
 
-function lastTableY(doc: jsPDF): number {
-  return (doc as unknown as { lastAutoTable?: { finalY: number } })
-    .lastAutoTable?.finalY ?? 0;
-}
-
-function drawCard(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill: [number, number, number],
-  border: [number, number, number],
-  radius = 1.8
-): void {
-  doc.setFillColor(...fill);
-  doc.setDrawColor(...border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(x, y, w, h, radius, radius, "FD");
-}
+const MM = 13.5; // template geometry margin
+const A4_W = 210;
+const CR = A4_W - MM; // content right edge
+const PAGE_BOTTOM = 262; // keep clear of the footer strip + foot rule
 
 export async function exportInvoicePdf(
   inv: Invoice,
   project?: { name?: string; location?: string | null }
 ): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const M = 13.5;
-  const XR = W - M;
-  const CW = XR - M;
 
-  const [logoLeft, logoRight] = await Promise.all([
-    loadLogo(LOGO_LEFT).catch(() => null),
-    loadLogo(LOGO_RIGHT).catch(() => null),
+  const [galona, land] = await Promise.all([
+    loadLogo(LOGO_GALONA).catch(() => null),
+    loadLogo(LOGO_LAND).catch(() => null),
   ]);
 
-  // --- Top accent bands ---
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, W, 2.2, "F");
-  doc.setFillColor(...GOLD);
-  doc.rect(0, 2.2, W, 0.8, "F");
-
-  // --- Header: logos + company block ---
-  if (logoLeft) {
-    doc.addImage(logoLeft, "PNG", M + 2, 15, 22.5, 12.5);
-  }
-  if (logoRight) {
-    doc.addImage(logoRight, "PNG", XR - 31, 15, 28, 13.5);
-  }
-
-  const cx = 49;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED);
-  doc.text("INVOICE / PROJECT BILLING", cx, 18.5);
-  doc.setFontSize(18);
-  doc.setTextColor(...NAVY);
-  doc.text(COMPANY.name, cx, 23.7);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED);
-  const addressLines = doc.splitTextToSize(COMPANY.address, 110) as string[];
-  addressLines.forEach((line, i) => {
-    doc.text(line, cx, 28.2 + i * 3.2);
-  });
-  doc.text(
-    COMPANY.contacts,
-    cx,
-    28.2 + addressLines.length * 3.2 + 0.6
-  );
-
-  // --- Divider ---
-  doc.setDrawColor(...LINE);
-  doc.setLineWidth(0.21);
-  doc.line(M, 38.5, XR, 38.5);
-
-  const buyerName = inv.buyerName || project?.name || `Proyek #${inv.projectId}`;
-  const buyerAddress = inv.buyerAddress || project?.location || null;
+  const buyerName =
+    inv.buyerName || project?.name || `Proyek #${inv.projectId}`;
 
   const items =
     inv.items && inv.items.length > 0
@@ -178,340 +118,439 @@ export async function exportInvoicePdf(
   const tax = (Math.max(subtotal - discount, 0) * taxRate) / 100;
   const grandTotal =
     Number(inv.total) || Math.max(subtotal - discount + tax, 0);
-  const isPaid = inv.status === "paid";
-  const isDraft = inv.status === "draft";
-  const paidSoFar = isPaid ? grandTotal : 0;
+  const paidSoFar = inv.status === "paid" ? grandTotal : 0;
   const remaining = Math.max(grandTotal - paidSoFar, 0);
-  const statusText = isPaid ? "LUNAS" : "REQUEST PEMBAYARAN 100%";
+  const statusLabel =
+    inv.status === "paid" ? "LUNAS" : "REQUEST PEMBAYARAN 100%";
 
-  // --- Title + meta card ---
+  // ============================================================
+  // TOP ACCENT BANDS
+  // ============================================================
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, A4_W, 2.2, "F");
+  doc.setFillColor(...GOLD);
+  doc.rect(0, 2.2, A4_W, 0.8, "F");
+
+  // ============================================================
+  // HEADER
+  // ============================================================
+  if (galona) doc.addImage(galona, "PNG", MM, 4.2, 27, 15);
+  if (land) doc.addImage(land, "PNG", CR - 30, 4.6, 30, 14.4);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...MUTED);
+  doc.text(COMPANY.billing, 46, 6.6);
+
+  doc.setFontSize(18);
+  doc.setTextColor(...NAVY);
+  doc.text(COMPANY.name, 46, 12.8);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...MUTED);
+  const addrLines = doc.splitTextToSize(COMPANY.address, 116) as string[];
+  addrLines.forEach((l, i) => doc.text(l, 46, 18 + i * 2.7));
+  doc.text(
+    `${COMPANY.website}  |  ${COMPANY.email}  |  ${COMPANY.wa}`,
+    46,
+    addrLines.length * 2.7 + 17.5
+  );
+
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.21);
+  doc.line(MM, 26.2, CR, 26.2);
+
+  // ============================================================
+  // TITLE + STATUS CARD
+  // ============================================================
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
   doc.setTextColor(...NAVY);
-  doc.text("INVOICE", M, 50);
+  doc.text("INVOICE", MM, 38);
+
   doc.setFontSize(10);
   doc.setTextColor(...TEAL);
-  doc.text("Tagihan pekerjaan / material", M, 55.5);
+  doc.text(COMPANY.tagline, MM, 43.4);
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...MUTED);
-  doc.text("Dokumen tagihan resmi HALORA LAND.", M, 60);
+  doc.text(COMPANY.subtitle, MM, 47.6);
 
-  const cardX = XR - 62;
-  drawCard(doc, cardX, 42, 62, 26, LIGHT_GOLD, GOLD_BORDER, 2.5);
+  const cardX = 122;
+  const cardW = CR - cardX;
+  doc.setFillColor(...LIGHT_GOLD);
+  doc.setDrawColor(245, 212, 151);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cardX, 29.5, cardW, 24, 2.2, 2.2, "FD");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
-  doc.text("NO. INVOICE", cardX + 8, 49);
+  doc.text("NO. INVOICE", cardX + 5, 34.5);
   doc.setFontSize(10);
   doc.setTextColor(...TEXT);
-  doc.text(
-    String(inv.number || `INV-${inv.id}`),
-    cardX + 8,
-    55,
-    { maxWidth: 46 }
-  );
+  const invNo = String(inv.number || `INV-${inv.id}`);
+  const noLines = doc.splitTextToSize(invNo, cardW - 12) as string[];
+  noLines.forEach((l, i) => doc.text(l, cardX + 5, 40 + i * 4.2));
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
-  doc.text("STATUS", cardX + 8, 60.5);
-  doc.setFontSize(9);
-  doc.setTextColor(...(isPaid ? GREEN : GOLD));
-  doc.text(statusText, cardX + 8, 65.5);
+  doc.text("STATUS", cardX + 5, 47);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...GOLD);
+  doc.text(statusLabel, cardX + 5, 51.2);
 
-  if (isPaid || isDraft) {
-    const chip = isPaid ? "PAID" : "DRAFT";
-    const chipColor = isPaid ? GREEN : MUTED;
-    doc.setFillColor(...chipColor);
-    doc.roundedRect(cardX + 46, 46, 12, 5.5, 2.75, 2.75, "F");
+  // ============================================================
+  // CUSTOMER + DATE CARDS
+  // ============================================================
+  const cardTop = 58.5;
+  const cardH = 15;
+  const cardW3 = (CR - MM - 5) / 3;
+  const cardXs = [MM, MM + cardW3 + 2.5, MM + 2 * (cardW3 + 2.5)];
+  const cardData: Array<{ label: string; value: string; size: number }> = [
+    { label: "CUSTOMER", value: buyerName, size: 12 },
+    { label: "INVOICE DATE", value: formatDate(inv.date), size: 8.5 },
+    { label: "VALID DATE", value: formatDate(inv.dueDate), size: 8.5 },
+  ];
+  cardData.forEach((c, i) => {
+    doc.setFillColor(...LIGHT_NAVY);
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(cardXs[i], cardTop, cardW3, cardH, 2.2, 2.2, "FD");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.5);
-    doc.setTextColor(...WHITE);
-    doc.text(chip, cardX + 52, 49.9, { align: "center" });
-  }
-
-  // --- Customer / date cards ---
-  const cardsY = 69;
-  const cardsH = 23;
-  const cardW = 58;
-  const gaps = (CW - 3 * cardW) / 2;
-  drawCard(doc, M, cardsY, cardW, cardsH, LIGHT_NAVY, LINE);
-  drawCard(doc, M + cardW + gaps, cardsY, cardW, cardsH, LIGHT_NAVY, LINE);
-  drawCard(
-    doc,
-    M + 2 * (cardW + gaps),
-    cardsY,
-    cardW,
-    cardsH,
-    LIGHT_NAVY,
-    LINE
-  );
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  doc.setTextColor(...MUTED);
-  doc.text("CUSTOMER", M + 7, cardsY + 7.5);
-  doc.setFontSize(12);
-  doc.setTextColor(...NAVY);
-  doc.text(buyerName, M + 7, cardsY + 13.5, { maxWidth: cardW - 14 });
-  if (buyerAddress) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
     doc.setTextColor(...MUTED);
-    const addrLines = doc.splitTextToSize(
-      String(buyerAddress),
-      cardW - 14
-    ) as string[];
-    addrLines.slice(0, 2).forEach((line, i) => {
-      doc.text(line, M + 7, cardsY + 18.3 + i * 3.2);
-    });
-  }
+    doc.text(c.label, cardXs[i] + 4.5, cardTop + 6);
+    doc.setFontSize(c.size);
+    doc.setTextColor(...NAVY);
+    doc.text(
+      doc.splitTextToSize(c.value, cardW3 - 9) as string[],
+      cardXs[i] + 4.5,
+      cardTop + 11.2
+    );
+  });
 
+  // ============================================================
+  // DETAIL SECTION HEADING
+  // ============================================================
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  doc.setTextColor(...MUTED);
-  doc.text("INVOICE DATE", M + cardW + gaps + 7, cardsY + 7.5);
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT);
-  doc.text(formatDate(inv.date), M + cardW + gaps + 7, cardsY + 13.8);
-
-  doc.setFontSize(6.5);
-  doc.setTextColor(...MUTED);
-  doc.text("VALID DATE", M + 2 * (cardW + gaps) + 7, cardsY + 7.5);
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT);
-  doc.text(formatDate(inv.dueDate), M + 2 * (cardW + gaps) + 7, cardsY + 13.8);
-
-  // --- Detail table ---
-  const detailY = cardsY + cardsH + 6.5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setTextColor(...NAVY);
-  doc.text("DETAIL TAGIHAN", M, detailY);
+  doc.text("DETAIL TAGIHAN", MM, 80.5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text("Rincian pekerjaan dan material", M, detailY + 4.5);
+  doc.text("Rincian pekerjaan dan material", MM + 0.2, 84.5);
 
-  autoTable(doc, {
-    startY: detailY + 8,
-    margin: { left: M, right: M },
-    head: [["#", "Uraian", "Qty", "Sat.", "Harga Satuan", "Jumlah"]],
-    body: items.map((item, idx) => {
-      const descLines = String(item.description || buyerName).split("\n");
-      const product = descLines[0];
-      const notes = descLines.slice(1).map((n) => n.trim()).filter(Boolean);
-      return [
-        String(idx + 1),
-        [product, ...notes].join("\n"),
-        formatNumber(Number(item.qty) || 0),
-        String(item.unit || ""),
-        rupiah(Number(item.unitPrice)),
-        rupiah((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)),
-      ];
-    }),
-    theme: "plain",
-    headStyles: {
-      fillColor: NAVY,
-      textColor: WHITE,
-      fontStyle: "bold",
-      fontSize: 7.5,
-      halign: "left",
-      cellPadding: { top: 2, bottom: 2, left: 2.5, right: 2.5 },
-    },
-    styles: {
-      fontSize: 8,
-      textColor: TEXT,
-      cellPadding: { top: 1.8, bottom: 1.8, left: 2.5, right: 2.5 },
-    },
-    alternateRowStyles: { fillColor: LIGHT_NAVY },
-    columnStyles: {
-      0: { cellWidth: 7, halign: "center" },
-      1: { halign: "left" },
-      2: { cellWidth: 12, halign: "center" },
-      3: { cellWidth: 10, halign: "center" },
-      4: { cellWidth: 33, halign: "right" },
-      5: { cellWidth: 34, halign: "right", fontStyle: "bold" },
-    },
-    didDrawCell: (data) => {
-      if (data.section !== "body" || data.column.index !== 1) return;
-      const raw = data.row.raw as string[];
-      const parts = String(raw[1] || "").split("\n");
-      if (parts.length < 2) return;
-      const cell = data.cell;
-      const padL = cell.padding("left");
-      const padT = cell.padding("top");
-      const padR = cell.padding("right");
-      const innerW = cell.width - padL - padR;
-      const fs = 8;
-      const pt2mm = 0.3528;
-      const lh = fs * pt2mm * 1.15;
-      const prodLines = (
-        doc.splitTextToSize(parts[0], innerW) as string[]
-      ).length;
-      const total = prodLines + parts.length - 1;
-      let ty =
-        cell.y +
-        (cell.height - padT - padT * 0) / 2 +
-        padT +
-        fs * pt2mm * 0.85 -
-        (total / 2) * lh;
-      ty += prodLines * lh;
+  // ============================================================
+  // ITEM TABLE
+  // ============================================================
+  const colX = [
+    MM, // 1: no (13.5)
+    MM + 5.5, // 2: uraian (19)
+    MM + 71, // 3: qty (84.5)
+    MM + 80, // 4: sat (93.5)
+    MM + 88, // 5: harga satuan (101.5)
+    MM + 112.5, // 6: jumlah (126)
+  ];
+  const colRight = [
+    colX[0] + 5.5,
+    colX[1] + 65.5,
+    colX[2] + 9,
+    colX[3] + 8,
+    colX[4] + 24.5,
+    colX[5] + 25.5,
+  ];
+  const tableRight = colRight[5];
+  const headH = 7;
+  const headY = 88;
+  const headLabels = ["#", "URAIAN", "QTY", "SAT.", "HARGA SATUAN", "JUMLAH"];
+  const headAlign: Array<"left" | "center" | "right"> = [
+    "center",
+    "left",
+    "center",
+    "center",
+    "right",
+    "right",
+  ];
+  const headX = [
+    colX[0] + 2.75,
+    colX[1] + 2,
+    colX[2] + 4.5,
+    colX[3] + 4,
+    colRight[4] - 3,
+    colRight[5] - 3,
+  ];
+
+  const drawTableHead = (top: number): void => {
+    doc.setFillColor(...NAVY);
+    doc.rect(MM, top, tableRight - MM, headH, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...WHITE);
+    headLabels.forEach((label, i) =>
+      doc.text(label, headX[i], top + 4.8, { align: headAlign[i] })
+    );
+  };
+
+  drawTableHead(headY);
+  let y = headY + headH;
+  const lineH = 3.7;
+
+  items.forEach((item, idx) => {
+    const desc = String(item.description || buyerName);
+    const descLines = desc.split("\n");
+    const product = descLines[0];
+    const notes = descLines
+      .slice(1)
+      .map((n) => n.trim())
+      .filter(Boolean);
+    const wrap = doc.splitTextToSize(product, 61) as string[];
+    const noteLines: string[][] = notes.map(
+      (n) => doc.splitTextToSize(n, 61) as string[]
+    );
+    const noteCount = noteLines.reduce((s, ls) => s + ls.length, 0);
+    const rh = 5.6 + wrap.length * lineH + noteCount * 2.7;
+
+    if (y + rh > PAGE_BOTTOM) {
+      doc.addPage();
+      drawTableHead(20);
+      y = 27;
+    }
+
+    if (idx % 2 === 1) {
+      doc.setFillColor(...LIGHT_NAVY);
+      doc.rect(MM, y, tableRight - MM, rh, "F");
+    }
+
+    const base = y + 4.6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...MUTED);
+    doc.text(String(idx + 1).padStart(2, "0"), headX[0], base, {
+      align: "center",
+    });
+
+    let ty = base;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...TEXT);
+    wrap.forEach((l) => {
+      doc.text(l, colX[1] + 2, ty);
+      ty += lineH;
+    });
+    if (noteCount > 0) {
       doc.setFont("helvetica", "italic");
-      doc.setFontSize(7);
+      doc.setFontSize(6.5);
       doc.setTextColor(...MUTED);
-      parts.slice(1).forEach((note) => {
-        const noteLines = doc.splitTextToSize(note, innerW) as string[];
-        noteLines.forEach((line) => {
-          doc.text(line, cell.x + padL, ty);
-          ty += lh;
-        });
-      });
-    },
+      noteLines.forEach((ls) =>
+        ls.forEach((l) => {
+          doc.text(l, colX[1] + 2, ty);
+          ty += 2.7;
+        })
+      );
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...TEXT);
+    doc.text(numDec(Number(item.qty) || 0), headX[2], base, {
+      align: "center",
+    });
+    doc.text(String(item.unit || ""), headX[3], base, { align: "center" });
+    doc.text(rupiah(Number(item.unitPrice)), headX[4], base, {
+      align: "right",
+    });
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      rupiah((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)),
+      headX[5],
+      base,
+      { align: "right" }
+    );
+    y += rh;
   });
 
-  // --- Terbilang + summary ---
-  let sy = lastTableY(doc) + 9;
-  if (sy + 82 > H - 30) {
+  // ============================================================
+  // SUMMARY + TERBILANG
+  // ============================================================
+  let sumTop = y + 3;
+  if (sumTop + 45 > PAGE_BOTTOM) {
     doc.addPage();
-    sy = 18;
+    sumTop = 22;
   }
 
-  const terbilangLines = doc.splitTextToSize(
-    terbilang(isPaid ? grandTotal : remaining),
-    100
-  ) as string[];
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
-  doc.text("TERBILANG", M, sy);
-  const cardH = 9 + terbilangLines.length * 4.6;
-  drawCard(doc, M, sy + 4.5, 116, cardH, LIGHT_GOLD, GOLD_BORDER);
+  doc.text("TERBILANG", MM, sumTop);
+
+  const terbilangText = terbilang(remaining)
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+  const tWrap = doc.splitTextToSize(terbilangText, 92) as string[];
+  const tH = 4 + tWrap.length * 3.8 + 4;
+  doc.setFillColor(...LIGHT_GOLD);
+  doc.setDrawColor(247, 214, 151);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(MM, sumTop + 3, 100, tH, 2.2, 2.2, "FD");
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(...TEXT);
-  terbilangLines.forEach((line, i) => {
-    doc.text(line, M + 6.5, sy + 4.5 + 7 + i * 4.6);
+  tWrap.forEach((l, i) => doc.text(l, MM + 5, sumTop + 7.6 + i * 3.8));
+
+  const sumX = 126;
+  const sumW = CR - sumX;
+  const rows: Array<{
+    label: string;
+    value: string;
+    teal?: boolean;
+    bold?: boolean;
+  }> = [
+    { label: "Sub-Total", value: rupiah(subtotal), bold: true },
+    { label: "Sudah Terbayar", value: rupiah(paidSoFar) },
+    {
+      label: "Request Pembayaran 100%",
+      value: rupiah(remaining),
+      teal: true,
+      bold: true,
+    },
+    { label: "PPN", value: taxRate > 0 ? `${numDec(taxRate)}%` : "—" },
+  ];
+  let sy = sumTop + 4.5;
+  rows.forEach((r) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...(r.teal ? TEAL : MUTED));
+    doc.text(r.label, sumX, sy);
+    doc.setFont("helvetica", r.bold ? "bold" : "normal");
+    doc.setTextColor(...(r.teal ? TEAL : TEXT));
+    doc.text(r.value, CR, sy, { align: "right" });
+    sy += 5.6;
   });
-
-  const sumX = M + 116 + 5;
-  const sumW = XR - sumX;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text("Sub-Total", sumX, sy);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...TEXT);
-  doc.text(rupiah(subtotal), XR, sy, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...MUTED);
-  doc.text("Sudah Terbayar", sumX, sy + 6);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...TEXT);
-  doc.text(rupiah(paidSoFar), XR, sy + 6, { align: "right" });
-
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...TEAL);
-  doc.text("Request Pembayaran 100%", sumX, sy + 12);
-  doc.text(rupiah(isPaid ? 0 : remaining), XR, sy + 12, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...MUTED);
-  doc.text(`PPN (${formatNumber(taxRate)}%)`, sumX, sy + 18);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...TEXT);
-  doc.text(tax > 0 ? rupiah(tax) : "-", XR, sy + 18, { align: "right" });
 
   doc.setDrawColor(...LINE);
-  doc.setLineWidth(0.3);
-  doc.line(sumX, sy + 23.5, XR, sy + 23.5);
+  doc.setLineWidth(0.25);
+  doc.line(sumX, sy - 1.6, CR, sy - 1.6);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...NAVY);
-  doc.text("SISA PEMBAYARAN", sumX, sy + 27.5);
+  doc.text("SISA PEMBAYARAN", sumX, sy + 4.2);
   doc.setFontSize(15);
   doc.setTextColor(...GREEN);
-  doc.text(rupiah(remaining), XR, sy + 28.5, { align: "right" });
+  doc.text(rupiah(remaining), CR, sy + 4.2, { align: "right" });
 
-  // --- Payment + accepted cards ---
-  let py = Math.max(sy + 36, sy + 4.5 + cardH) + 7;
-  if (py + 32 > H - 32) {
+  // ============================================================
+  // PAYMENT + ACCEPTED BY
+  // ============================================================
+  let payTop = Math.max(sumTop + tH + 8, sy + 12) + 3;
+  const payH = 26;
+  if (payTop + payH > PAGE_BOTTOM) {
     doc.addPage();
-    py = 18;
+    payTop = 20;
   }
 
-  drawCard(doc, M, py, 90, 31, LIGHT_NAVY, LINE);
+  doc.setFillColor(...LIGHT_NAVY);
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(MM, payTop, 118, payH, 2.4, 2.4, "FD");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setTextColor(...NAVY);
-  doc.text("INFORMASI PEMBAYARAN", M + 6, py + 6.5);
+  doc.text("INFORMASI PEMBAYARAN", MM + 5, payTop + 8);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
+  doc.setFontSize(7);
   doc.setTextColor(...MUTED);
   doc.text(
     "Transfer pembayaran dapat dilakukan ke rekening berikut:",
-    M + 6,
-    py + 11.5
+    MM + 5,
+    payTop + 12.8
   );
-  const paymentRows: Array<[string, string]> = [
-    ["Bank", inv.paymentBank || "BSI / BCA"],
-    ["No. Rekening", inv.paymentAccountNumber || "-"],
-    ["A/N", inv.paymentAccountName || "-"],
+
+  const bank = inv.paymentBank || "BSI / BCA";
+  const account = inv.paymentAccountNumber || "1101101009";
+  const holderName = inv.paymentAccountName || "Rangga Donyta Putra";
+  const payRows: Array<[string, string]> = [
+    ["Bank", bank],
+    ["No. Rekening", account],
+    ["Atas Nama", holderName],
   ];
-  paymentRows.forEach(([label, value], i) => {
-    const y = py + 17 + i * 5;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...MUTED);
-    doc.text(label, M + 6, y);
+  payRows.forEach(([label, value], i) => {
+    const py = payTop + 17.8 + i * 3.6;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text(label, MM + 5, py);
+    doc.setFont("helvetica", "bold");
     doc.setTextColor(...TEXT);
-    doc.text(String(value), M + 36, y);
+    doc.text(
+      doc.splitTextToSize(value, 88) as string[],
+      MM + 27,
+      py
+    );
   });
 
-  drawCard(doc, M + 93, py, 90, 31, WHITE, LINE);
+  doc.setFillColor(...WHITE);
+  doc.setDrawColor(...LINE);
+  doc.roundedRect(137.5, payTop, CR - 137.5, payH, 2.4, 2.4, "FD");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setTextColor(...NAVY);
-  doc.text("ACCEPTED BY", M + 99, py + 6.5);
-  doc.setFontSize(14);
+  doc.text("ACCEPTED BY", 142.5, payTop + 8);
+  doc.setFontSize(13);
   doc.setTextColor(...TEXT);
-  doc.text(inv.financeName || "-", M + 99, py + 13);
+  doc.text(inv.financeName || "Rangga", 142.5, payTop + 14.5);
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
-  doc.text(COMPANY.name, M + 99, py + 19.5);
-  doc.text(COMPANY.website, M + 99, py + 23.5);
+  doc.text(COMPANY.name, 142.5, payTop + 19.5);
+  doc.text(COMPANY.website, 142.5, payTop + 22.5);
 
-  // --- Brand strip (last page) ---
-  const stripY = H - 24;
-  const stripH = 12;
+  // ============================================================
+  // FOOTER BRAND STRIP
+  // ============================================================
+  let stripTop = Math.max(payTop + payH + 8, 276);
+  if (stripTop + 11.5 > 287.5) {
+    doc.addPage();
+    stripTop = 20;
+  }
   doc.setFillColor(...NAVY);
-  doc.roundedRect(M, stripY, CW, stripH, 1.8, 1.8, "F");
+  doc.roundedRect(MM, stripTop, CR - MM, 11, 2.2, 2.2, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setTextColor(...WHITE);
-  doc.text(COMPANY.name, M + 6, stripY + 4.6);
+  doc.text(COMPANY.name, MM + 5, stripTop + 5.6);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(...WHITE75);
-  doc.text(COMPANY.address, M + 6, stripY + 9.2);
-  doc.text(COMPANY.contacts, XR - 6, stripY + 7.4, { align: "right" });
+  doc.text(
+    doc.splitTextToSize(COMPANY.address, 120) as string[],
+    MM + 5,
+    stripTop + 9
+  );
+  doc.text(
+    `${COMPANY.website}  |  ${COMPANY.email}  |  ${COMPANY.wa}`,
+    CR - 5,
+    stripTop + 9,
+    { align: "right" }
+  );
 
-  // --- Fancy footer on every page ---
+  // ============================================================
+  // PAGE FOOTER (quote + page number)
+  // ============================================================
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.12);
-    doc.line(M, H - 10, XR, H - 10);
+    doc.line(MM, 287.5, CR, 287.5);
     doc.setFont("helvetica", "italic");
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
-    doc.text(COMPANY.tagline, M, H - 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Halaman ${i} dari ${pages}`, XR, H - 5, { align: "right" });
+    doc.text(COMPANY.quote, MM, 291.5);
+    doc.text(`Halaman ${i} dari ${pages}`, CR, 291.5, { align: "right" });
   }
   doc.setPage(pages);
 

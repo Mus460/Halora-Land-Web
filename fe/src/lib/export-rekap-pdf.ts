@@ -187,17 +187,16 @@ export async function exportRekapPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(17);
   doc.setTextColor(...NAVY);
-  doc.text("RENCANA ANGGARAN", 52.5, 30.5);
-  doc.text("BIAYA", 52.5, 34.6);
+  doc.text("RENCANA ANGGARAN BIAYA", 52.5, 30.5);
   doc.setFontSize(8);
   doc.setTextColor(...TEAL);
-  doc.text(COMPANY.type, 52.5, 38.8);
+  doc.text(COMPANY.type, 52.5, 35.2);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text(COMPANY.addressLine1, XR, 30.5, { align: "right" });
-  doc.text(COMPANY.addressLine2, XR, 34, { align: "right" });
+  doc.text(COMPANY.addressLine1, XR, 31.5, { align: "right" });
+  doc.text(COMPANY.addressLine2, XR, 35, { align: "right" });
 
   const rightLine = (
     parts: Array<[string, boolean]>, // [text, bold]
@@ -222,7 +221,7 @@ export async function exportRekapPDF(
       ["W:", true],
       [COMPANY.website, false],
     ],
-    37.4
+    38.4
   );
   rightLine(
     [
@@ -232,20 +231,19 @@ export async function exportRekapPDF(
       ["  wa:", true],
       ["  +62 811 8622 225", false],
     ],
-    40.8
+    41.8
   );
 
   // --- Divider ---
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.19);
-  doc.line(M, 42.9, XR, 42.9);
+  doc.line(M, 43.5, XR, 43.5);
 
-  // --- Info card ---
-  const cardY = 46;
+  // --- Info card: label (teal) + value (text) on the same row ---
+  const cardY = 47;
   const padTop = 5.5;
   const padBottom = 5.5;
-  const vGap = 2.4;
-  const lineH = 3.4;
+  const lineH = 3.6;
 
   const info: Array<{ label: string; value: string }> = [
     { label: "PROYEK", value: project?.name || "-" },
@@ -256,11 +254,20 @@ export async function exportRekapPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   const valueLines = info.map(
-    (it) => doc.splitTextToSize(String(it.value), 78) as string[]
+    (it) => doc.splitTextToSize(String(it.value), 70) as string[]
   );
-  const rowH = (i: number) =>
-    Math.max(7.8, valueLines[i].length * lineH + vGap + 1.2);
-  const rowHs = [Math.max(rowH(0), rowH(1)), Math.max(rowH(2), rowH(3))];
+  const rowHs = [
+    Math.max(
+      valueLines[0].length * lineH,
+      valueLines[1].length * lineH,
+      lineH
+    ) + 2.2,
+    Math.max(
+      valueLines[2].length * lineH,
+      valueLines[3].length * lineH,
+      lineH
+    ) + 2.2,
+  ];
   const cardH = padTop + rowHs[0] + rowHs[1] + padBottom;
 
   doc.setFillColor(...LIGHT_GOLD);
@@ -269,19 +276,19 @@ export async function exportRekapPDF(
   doc.roundedRect(M, cardY, CW, cardH, 2.1, 2.1, "FD");
 
   let vy = cardY + padTop;
-  info.forEach(({ label }, i) => {
+  info.forEach(({ label, value }, i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
+    const lx = 12 + col * 92.4;
+    const vx = lx + 21;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...TEXT);
-    valueLines[i].forEach((l, j) => doc.text(l, 34 + col * 92.4, vy + j * lineH));
     doc.setFontSize(8);
     doc.setTextColor(...TEAL);
-    const labelLines = (doc.splitTextToSize(label, 19) as string[]).slice(0, 2);
-    labelLines.forEach((l, j) =>
-      doc.text(l, 12 + col * 92.4, vy + valueLines[i].length * lineH + vGap + j * 2.9)
-    );
+    doc.text(label, lx, vy + 3.4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(...TEXT);
+    valueLines[i].forEach((l, j) => doc.text(l, vx, vy + 3.4 + j * lineH));
     if (i % 2 === 1) vy += rowHs[row];
   });
 
@@ -433,10 +440,17 @@ export async function exportRekapPDF(
   });
 
   // --- Footer note ---
+  const noteY = Math.min(ty + 17, H - 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text(COMPANY.siteLine, XR, ty + 19, { align: "right" });
+  doc.text(
+    "Catatan: angka dan subtotal mengikuti dokumen RAB sumber.",
+    M,
+    noteY,
+    { maxWidth: 120 }
+  );
+  doc.text(COMPANY.siteLine, XR, noteY, { align: "right" });
 
   // --- Fancy footer on every page ---
   const pages = doc.getNumberOfPages();
