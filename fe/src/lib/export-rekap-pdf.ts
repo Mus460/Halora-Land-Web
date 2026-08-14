@@ -6,7 +6,7 @@ const NAVY: [number, number, number] = [16, 42, 67];
 const TEAL: [number, number, number] = [23, 126, 137];
 const GOLD: [number, number, number] = [232, 163, 23];
 const LIGHT_GOLD: [number, number, number] = [255, 245, 222];
-const GOLD_BORDER: [number, number, number] = [241, 200, 117];
+const GOLD_BORDER: [number, number, number] = [244, 214, 151];
 const TEXT: [number, number, number] = [36, 55, 70];
 const MUTED: [number, number, number] = [113, 128, 140];
 const LINE: [number, number, number] = [215, 224, 230];
@@ -16,14 +16,15 @@ const COMPANY = {
   short: "RAB - HALORA LAND",
   name: "HALORA LAND",
   type: "Construction",
-  addressLine1: "Jl. Adam Malik No. 58, Ruko No.1, Cipadu Jaya, Larangan,",
-  addressLine2: "Kota Tangerang, 15155 - Indonesia.",
-  website: "W: land.halora.id",
-  mailwa: "e: halo@halora.id | wa: +62 811 8622 225",
+  addressLine1: "Jl. Adam Malik No. 58, Ruko No.1, Cipadu Jaya,",
+  addressLine2: "Larangan, Kota Tangerang, 15155 - Indonesia.",
+  website: "land.halora.id",
+  email: "halo@halora.id",
+  wa: "+62 811 8622 225",
   siteLine: "HALORA LAND | land.halora.id",
 };
 
-const LOGO_RAB = "/halora_land_gold.jpeg";
+const LOGO_RAB = "/halora-land-logo.png";
 
 const logoCache = new Map<string, Promise<string>>();
 
@@ -153,33 +154,8 @@ function sanitizeFileName(name: string): string {
 }
 
 function lastTableY(doc: jsPDF): number {
-  return (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
-    ?.finalY ?? 0;
-}
-
-function drawTopAccent(doc: jsPDF, navyH: number, goldH: number): void {
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, doc.internal.pageSize.getWidth(), navyH, "F");
-  doc.setFillColor(...GOLD);
-  doc.rect(0, navyH, doc.internal.pageSize.getWidth(), goldH, "F");
-}
-
-function drawFooter(
-  doc: jsPDF,
-  left: string,
-  right: string,
-  ruleY: number
-): void {
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(...LINE);
-  doc.setLineWidth(0.12);
-  doc.line(9.5, ruleY, W - 9.5, ruleY);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED);
-  doc.text(left, 9.5, ruleY + 5);
-  doc.text(right, W - 9.5, ruleY + 5, { align: "right" });
+  return (doc as unknown as { lastAutoTable?: { finalY: number } })
+    .lastAutoTable?.finalY ?? 0;
 }
 
 export async function exportRekapPDF(
@@ -198,61 +174,115 @@ export async function exportRekapPDF(
   const logo = await loadLogo(LOGO_RAB).catch(() => null);
 
   // --- Top accent bands ---
-  drawTopAccent(doc, 1.5, 0.6);
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, W, 1.5, "F");
+  doc.setFillColor(...GOLD);
+  doc.rect(0, 1.5, W, 0.6, "F");
 
   // --- Header: logo | title | company contact ---
   if (logo) {
-    doc.addImage(logo, "JPEG", M, 8.5, 37, 13.5);
+    doc.addImage(logo, "PNG", M + 0.8, M, 28, 13.5);
   }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(17);
   doc.setTextColor(...NAVY);
-  doc.text("RENCANA ANGGARAN BIAYA", M + 41, 16, { align: "left" });
-  doc.setFontSize(9);
+  doc.text("RENCANA ANGGARAN", 52.5, 30.5);
+  doc.text("BIAYA", 52.5, 34.6);
+  doc.setFontSize(8);
   doc.setTextColor(...TEAL);
-  doc.text(COMPANY.type, M + 41, 21.5);
+  doc.text(COMPANY.type, 52.5, 38.8);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text(COMPANY.addressLine1, XR, 13.5, { align: "right" });
-  doc.text(COMPANY.addressLine2, XR, 17.5, { align: "right" });
-  doc.text(COMPANY.website, XR, 21.5, { align: "right" });
-  doc.text(COMPANY.mailwa, XR, 25.5, { align: "right" });
+  doc.text(COMPANY.addressLine1, XR, 30.5, { align: "right" });
+  doc.text(COMPANY.addressLine2, XR, 34, { align: "right" });
+
+  const rightLine = (
+    parts: Array<[string, boolean]>, // [text, bold]
+    y: number
+  ): void => {
+    const widths: number[] = [];
+    parts.forEach(([text, bold]) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      widths.push(doc.getTextWidth(text));
+    });
+    const total = widths.reduce((s, w) => s + w, 0);
+    let x = XR - total;
+    parts.forEach(([text, bold], i) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.text(text, x, y);
+      x += widths[i];
+    });
+  };
+
+  rightLine(
+    [
+      ["W:", true],
+      [COMPANY.website, false],
+    ],
+    37.4
+  );
+  rightLine(
+    [
+      ["e:", true],
+      [" halo@halora.id ", false],
+      ["|", false],
+      ["  wa:", true],
+      ["  +62 811 8622 225", false],
+    ],
+    40.8
+  );
 
   // --- Divider ---
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.19);
-  doc.line(M, 30, XR, 30);
+  doc.line(M, 42.9, XR, 42.9);
 
   // --- Info card ---
-  const cardY = 33;
-  const cardH = 15;
+  const cardY = 46;
+  const padTop = 5.5;
+  const padBottom = 5.5;
+  const vGap = 2.4;
+  const lineH = 3.4;
+
+  const info: Array<{ label: string; value: string }> = [
+    { label: "PROYEK", value: project?.name || "-" },
+    { label: "PEMILIK", value: options.ownerName || "-" },
+    { label: "LOKASI PROYEK", value: project?.location || "-" },
+    { label: "LUAS BANGUNAN", value: options.area || "-" },
+  ];
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  const valueLines = info.map(
+    (it) => doc.splitTextToSize(String(it.value), 78) as string[]
+  );
+  const rowH = (i: number) =>
+    Math.max(7.8, valueLines[i].length * lineH + vGap + 1.2);
+  const rowHs = [Math.max(rowH(0), rowH(1)), Math.max(rowH(2), rowH(3))];
+  const cardH = padTop + rowHs[0] + rowHs[1] + padBottom;
+
   doc.setFillColor(...LIGHT_GOLD);
   doc.setDrawColor(...GOLD_BORDER);
   doc.setLineWidth(0.3);
   doc.roundedRect(M, cardY, CW, cardH, 2.1, 2.1, "FD");
 
-  const info: Array<[string, string]> = [
-    ["PROYEK", project?.name || "-"],
-    ["PEMILIK", options.ownerName || "-"],
-    ["LOKASI PROYEK", project?.location || "-"],
-    ["LUAS BANGUNAN", options.area || "-"],
-  ];
-  doc.setFontSize(8);
-  info.forEach(([label, value], i) => {
-    const col = Math.floor(i / 2);
-    const row = i % 2;
-    const lx = M + 5 + col * 95;
-    const vx = lx + 30;
-    const y = cardY + 5.2 + row * 5.6;
+  let vy = cardY + padTop;
+  info.forEach(({ label }, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...TEAL);
-    doc.text(label, lx, y);
-    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     doc.setTextColor(...TEXT);
-    doc.text(String(value), vx, y);
+    valueLines[i].forEach((l, j) => doc.text(l, 34 + col * 92.4, vy + j * lineH));
+    doc.setFontSize(8);
+    doc.setTextColor(...TEAL);
+    const labelLines = (doc.splitTextToSize(label, 19) as string[]).slice(0, 2);
+    labelLines.forEach((l, j) =>
+      doc.text(l, 12 + col * 92.4, vy + valueLines[i].length * lineH + vGap + j * 2.9)
+    );
+    if (i % 2 === 1) vy += rowHs[row];
   });
 
   // --- Sectioned items ---
@@ -279,7 +309,7 @@ export async function exportRekapPDF(
 
     body.push([
       {
-        content: `${ROMAN[sectionIndex] || String(sectionIndex + 1)}. ${title}`,
+        content: `${ROMAN[sectionIndex] || String(sectionIndex + 1)} ${title}`,
         colSpan: 7,
         styles: {
           fillColor: NAVY,
@@ -287,7 +317,7 @@ export async function exportRekapPDF(
           fontStyle: "bold",
           fontSize: 8,
           halign: "left",
-          cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+          cellPadding: { top: 1.6, bottom: 1.6, left: 2.2, right: 2.2 },
         },
       },
     ]);
@@ -317,7 +347,7 @@ export async function exportRekapPDF(
           halign: "right",
           fontStyle: "bold",
           textColor: TEAL,
-          cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
+          cellPadding: { top: 1.4, bottom: 1.4, left: 2.2, right: 2.2 },
         },
       },
       {
@@ -327,18 +357,18 @@ export async function exportRekapPDF(
           halign: "right",
           fontStyle: "bold",
           textColor: NAVY,
-          cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
+          cellPadding: { top: 1.4, bottom: 1.4, left: 2.2, right: 2.2 },
         },
       },
     ]);
   }
 
   autoTable(doc, {
-    startY: cardY + cardH + 5,
+    startY: cardY + cardH + 6,
     margin: { left: M, right: M },
     head: [
       [
-        "No",
+        "No.",
         "Uraian Pekerjaan",
         "Spesifikasi",
         "Sat",
@@ -354,26 +384,22 @@ export async function exportRekapPDF(
       textColor: WHITE,
       fontStyle: "bold",
       fontSize: 8,
-      halign: "center",
-      cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+      halign: "left",
+      cellPadding: { top: 1.6, bottom: 1.6, left: 2.2, right: 2.2 },
     },
     styles: {
       fontSize: 8,
       textColor: TEXT,
-      cellPadding: { top: 1.4, bottom: 1.4, left: 2, right: 2 },
+      cellPadding: { top: 1.4, bottom: 1.4, left: 2.2, right: 2.2 },
     },
     columnStyles: {
-      0: {
-        cellWidth: 8,
-        halign: "center",
-        cellPadding: { top: 1.4, bottom: 1.4, left: 1, right: 1 },
-      },
-      1: { cellWidth: 78, halign: "left" },
-      2: { cellWidth: 37, halign: "left" },
-      3: { cellWidth: 8, halign: "center" },
-      4: { cellWidth: 11, halign: "right" },
-      5: { cellWidth: 24, halign: "right" },
-      6: { cellWidth: 25, halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 9, halign: "center", cellPadding: { top: 1.4, bottom: 1.4, left: 1, right: 1 } },
+      1: { halign: "left" },
+      2: { cellWidth: 31, halign: "left" },
+      3: { cellWidth: 8.5, halign: "center" },
+      4: { cellWidth: 9.5, halign: "right" },
+      5: { cellWidth: 19.5, halign: "right" },
+      6: { cellWidth: 20, halign: "right", fontStyle: "bold" },
     },
   });
 
@@ -389,9 +415,9 @@ export async function exportRekapPDF(
   }
 
   // --- Total bar ---
-  const totalFinal = Number(summary.totalFinal || 0);
+  const totalFinal = Number(summary.totalFinal || 0) || subtotal;
   let ty = lastTableY(doc) + 5;
-  if (ty + 16 > H - 14) {
+  if (ty + 16 > H - 13) {
     doc.addPage();
     ty = 15;
   }
@@ -416,7 +442,14 @@ export async function exportRekapPDF(
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    drawFooter(doc, COMPANY.short, `Halaman ${i} dari ${pages}`, H - 13);
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.12);
+    doc.line(M, H - 13, XR, H - 13);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...MUTED);
+    doc.text(COMPANY.short, M, H - 8);
+    doc.text(`Halaman ${i} dari ${pages}`, XR, H - 8, { align: "right" });
   }
   doc.setPage(pages);
 
