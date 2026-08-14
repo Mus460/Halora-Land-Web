@@ -1,16 +1,26 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import type { RowInput } from "jspdf-autotable";
 
-const DARK: [number, number, number] = [31, 41, 55];
-const GRAY: [number, number, number] = [107, 114, 128];
-const AMBER: [number, number, number] = [217, 119, 6];
-const LIGHT: [number, number, number] = [249, 250, 251];
+const NAVY: [number, number, number] = [16, 42, 67];
+const TEAL: [number, number, number] = [23, 126, 137];
+const GOLD: [number, number, number] = [232, 163, 23];
+const LIGHT_GOLD: [number, number, number] = [255, 245, 222];
+const GOLD_BORDER: [number, number, number] = [241, 200, 117];
+const TEXT: [number, number, number] = [36, 55, 70];
+const MUTED: [number, number, number] = [113, 128, 140];
+const LINE: [number, number, number] = [215, 224, 230];
+const WHITE: [number, number, number] = [255, 255, 255];
 
 const COMPANY = {
+  short: "RAB - HALORA LAND",
   name: "HALORA LAND",
+  type: "Construction",
   addressLine1: "Jl. Adam Malik No. 58, Ruko No.1, Cipadu Jaya, Larangan,",
   addressLine2: "Kota Tangerang, 15155 - Indonesia.",
-  contacts: "W: land.halora.id | e: halo@halora.id | wa: +62 811 8622 225",
+  website: "W: land.halora.id",
+  mailwa: "e: halo@halora.id | wa: +62 811 8622 225",
+  siteLine: "HALORA LAND | land.halora.id",
 };
 
 const LOGO_RAB = "/halora_land_gold.jpeg";
@@ -138,14 +148,6 @@ function formatNumber(value: number): string {
   }).format(value || 0);
 }
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
 function sanitizeFileName(name: string): string {
   return name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "RAB";
 }
@@ -155,6 +157,31 @@ function lastTableY(doc: jsPDF): number {
     ?.finalY ?? 0;
 }
 
+function drawTopAccent(doc: jsPDF, navyH: number, goldH: number): void {
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), navyH, "F");
+  doc.setFillColor(...GOLD);
+  doc.rect(0, navyH, doc.internal.pageSize.getWidth(), goldH, "F");
+}
+
+function drawFooter(
+  doc: jsPDF,
+  left: string,
+  right: string,
+  ruleY: number
+): void {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.12);
+  doc.line(9.5, ruleY, W - 9.5, ruleY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...MUTED);
+  doc.text(left, 9.5, ruleY + 5);
+  doc.text(right, W - 9.5, ruleY + 5, { align: "right" });
+}
+
 export async function exportRekapPDF(
   data: RekapData,
   options: RekapPdfOptions = {}
@@ -162,44 +189,71 @@ export async function exportRekapPDF(
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const X = 12;
-  const XR = W - 12;
-  const contentWidth = XR - X;
+  const M = 9.5;
+  const XR = W - M;
+  const CW = XR - M;
   const grouped = data.grouped || {};
   const project = data.project || data.projects;
 
   const logo = await loadLogo(LOGO_RAB).catch(() => null);
+
+  // --- Top accent bands ---
+  drawTopAccent(doc, 1.5, 0.6);
+
+  // --- Header: logo | title | company contact ---
   if (logo) {
-    doc.addImage(logo, "JPEG", 134.5, 21.5, 38.5, 22.3);
+    doc.addImage(logo, "JPEG", M, 8.5, 37, 13.5);
   }
 
-  // --- Title ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(...DARK);
-  doc.text("RENCANA ANGGARAN BIAYA", W / 2, 18, { align: "center" });
+  doc.setFontSize(17);
+  doc.setTextColor(...NAVY);
+  doc.text("RENCANA ANGGARAN BIAYA", M + 41, 16, { align: "left" });
+  doc.setFontSize(9);
+  doc.setTextColor(...TEAL);
+  doc.text(COMPANY.type, M + 41, 21.5);
 
-  // --- Info block ---
-  const infoRows: Array<[string, string]> = [
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...MUTED);
+  doc.text(COMPANY.addressLine1, XR, 13.5, { align: "right" });
+  doc.text(COMPANY.addressLine2, XR, 17.5, { align: "right" });
+  doc.text(COMPANY.website, XR, 21.5, { align: "right" });
+  doc.text(COMPANY.mailwa, XR, 25.5, { align: "right" });
+
+  // --- Divider ---
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.19);
+  doc.line(M, 30, XR, 30);
+
+  // --- Info card ---
+  const cardY = 33;
+  const cardH = 15;
+  doc.setFillColor(...LIGHT_GOLD);
+  doc.setDrawColor(...GOLD_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(M, cardY, CW, cardH, 2.1, 2.1, "FD");
+
+  const info: Array<[string, string]> = [
     ["PROYEK", project?.name || "-"],
     ["PEMILIK", options.ownerName || "-"],
     ["LOKASI PROYEK", project?.location || "-"],
     ["LUAS BANGUNAN", options.area || "-"],
   ];
-
-  autoTable(doc, {
-    startY: 46,
-    margin: { left: X, right: X },
-    theme: "grid",
-    body: infoRows,
-    styles: { fontSize: 9, cellPadding: 2.5, textColor: DARK },
-    headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontSize: 9 },
-    columnStyles: {
-      0: { cellWidth: 40, fontStyle: "bold", textColor: GRAY, halign: "left" },
-    },
+  doc.setFontSize(8);
+  info.forEach(([label, value], i) => {
+    const col = Math.floor(i / 2);
+    const row = i % 2;
+    const lx = M + 5 + col * 95;
+    const vx = lx + 30;
+    const y = cardY + 5.2 + row * 5.6;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEAL);
+    doc.text(label, lx, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...TEXT);
+    doc.text(String(value), vx, y);
   });
-
-  let y = lastTableY(doc) + 6;
 
   // --- Sectioned items ---
   const summary = data.summary || {};
@@ -215,143 +269,156 @@ export async function exportRekapPDF(
       0
     );
 
+  const body: RowInput[] = [];
   let sectionIndex = 0;
+  let hasItems = false;
   for (const [category, title] of CATEGORY_TITLES) {
     const items = (grouped[category] || []) as RekapItem[];
     if (items.length === 0) continue;
+    hasItems = true;
 
-    if (y + 14 > H - 34) {
-      doc.addPage();
-      y = 15;
-    }
-
-    // Section header
-    doc.setFillColor(...LIGHT);
-    doc.rect(X, y, contentWidth, 8, "F");
-    doc.setTextColor(...AMBER);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    const roman = ROMAN[sectionIndex] || String(sectionIndex + 1);
-    doc.text(`${roman}. ${title}`, X + 2, y + 5.5);
+    body.push([
+      {
+        content: `${ROMAN[sectionIndex] || String(sectionIndex + 1)}. ${title}`,
+        colSpan: 7,
+        styles: {
+          fillColor: NAVY,
+          textColor: WHITE,
+          fontStyle: "bold",
+          fontSize: 8,
+          halign: "left",
+          cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+        },
+      },
+    ]);
     sectionIndex += 1;
-    y += 10;
+
+    items.forEach((item, idx) => {
+      body.push([
+        String(idx + 1),
+        item.description,
+        item.level || "",
+        item.unit || "",
+        formatNumber(Number(item.volume)),
+        formatMoney(Number(item.unitPrice)),
+        formatMoney(Number(item.totalCost)),
+      ]);
+    });
 
     const sectionTotal = (items as RekapItem[]).reduce(
       (s, it) => s + Number(it.totalCost || 0),
       0
     );
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: X, right: X },
-      head: [["No", "Uraian Pekerjaan", "Spesifikasi", "Sat", "Vol", "Harga Sat", "Tot Harga"]],
-      body: [
-        ...(items as RekapItem[]).map((item, idx) => [
-          String(idx + 1),
-          item.description,
-          item.level || "-",
-          item.unit || "-",
-          formatNumber(Number(item.volume)),
-          formatMoney(Number(item.unitPrice)),
-          formatMoney(Number(item.totalCost)),
-        ]),
-        ["", "Sub Total :", "", "", "", "", formatMoney(sectionTotal)],
-      ],
-      theme: "grid",
-      styles: { fontSize: 8.5, cellPadding: 2, textColor: DARK },
-      headStyles: {
-        fillColor: DARK,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 8.5,
+    body.push([
+      {
+        content: "Sub Total :",
+        colSpan: 5,
+        styles: {
+          halign: "right",
+          fontStyle: "bold",
+          textColor: TEAL,
+          cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
+        },
       },
-      columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 60, halign: "left" },
-        2: { cellWidth: 34, halign: "left" },
-        3: { cellWidth: 14, halign: "center" },
-        4: { cellWidth: 18, halign: "right" },
-        5: { cellWidth: 24, halign: "right" },
-        6: { cellWidth: 26, halign: "right", fontStyle: "bold" },
+      {
+        content: `Rp ${formatMoney(sectionTotal)}`,
+        colSpan: 2,
+        styles: {
+          halign: "right",
+          fontStyle: "bold",
+          textColor: NAVY,
+          cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
+        },
       },
-      didParseCell: (cell) => {
-        if (cell.row.index === items.length) {
-          cell.cell.styles.fillColor = LIGHT;
-          cell.cell.styles.fontStyle = "bold";
-          cell.cell.styles.textColor = DARK;
-        }
-      },
-    });
-
-    y = lastTableY(doc) + 8;
-  }
-
-  if (sectionIndex === 0) {
-    doc.setTextColor(...GRAY);
-    doc.setFontSize(10);
-    doc.text("Belum ada item pekerjaan di RAB.", X, y);
-    y += 10;
-  }
-
-  // --- Grand totals ---
-  const totalFinal = Number(summary.totalFinal || 0);
-  const marginPct = Number(summary.margin || 0);
-  const ppnPct = Number(summary.ppn || 0);
-  const profit = Number(summary.subtotalWithMargin || 0) - subtotal;
-  const totalRows: string[][] = [
-    ["Sub Total :", formatMoney(subtotal)],
-    [`Profit (Margin ${formatNumber(marginPct)}%) :`, formatMoney(profit)],
-    ["Overhead :", formatMoney(Number(summary.overhead || 0))],
-    [`PPN (${formatNumber(ppnPct)}%) :`, formatMoney(Number(summary.totalPPN || 0))],
-    ["Total Keseluruhan :", `Rp ${formatMoney(totalFinal)}`],
-  ];
-
-  if (y + 50 > H - 34) {
-    doc.addPage();
-    y = 15;
+    ]);
   }
 
   autoTable(doc, {
-    startY: y,
-    margin: { left: XR - 100, right: X },
-    theme: "grid",
-    body: totalRows,
-    styles: { fontSize: 10, cellPadding: 3, textColor: DARK },
-    columnStyles: {
-      0: { cellWidth: 60, fontStyle: "bold" },
-      1: { cellWidth: 40, halign: "right", fontStyle: "bold" },
+    startY: cardY + cardH + 5,
+    margin: { left: M, right: M },
+    head: [
+      [
+        "No",
+        "Uraian Pekerjaan",
+        "Spesifikasi",
+        "Sat",
+        "Vol",
+        "Harga Sat",
+        "Tot Harga",
+      ],
+    ],
+    body,
+    theme: "plain",
+    headStyles: {
+      fillColor: NAVY,
+      textColor: WHITE,
+      fontStyle: "bold",
+      fontSize: 8,
+      halign: "center",
+      cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
     },
-    didParseCell: (cell) => {
-      if (cell.row.index === totalRows.length - 1) {
-        cell.cell.styles.fillColor = [250, 240, 225];
-        cell.cell.styles.textColor = AMBER;
-      }
+    styles: {
+      fontSize: 8,
+      textColor: TEXT,
+      cellPadding: { top: 1.4, bottom: 1.4, left: 2, right: 2 },
+    },
+    columnStyles: {
+      0: {
+        cellWidth: 8,
+        halign: "center",
+        cellPadding: { top: 1.4, bottom: 1.4, left: 1, right: 1 },
+      },
+      1: { cellWidth: 78, halign: "left" },
+      2: { cellWidth: 37, halign: "left" },
+      3: { cellWidth: 8, halign: "center" },
+      4: { cellWidth: 11, halign: "right" },
+      5: { cellWidth: 24, halign: "right" },
+      6: { cellWidth: 25, halign: "right", fontStyle: "bold" },
     },
   });
 
-  // --- Footer ---
-  const footerY = H - 28;
-  doc.setDrawColor(...GRAY);
-  doc.setLineWidth(0.3);
-  doc.line(X, footerY, XR, footerY);
+  if (!hasItems) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    doc.text(
+      "Belum ada item pekerjaan di RAB.",
+      M,
+      Math.max(lastTableY(doc) + 4, cardY + cardH + 12)
+    );
+  }
 
+  // --- Total bar ---
+  const totalFinal = Number(summary.totalFinal || 0);
+  let ty = lastTableY(doc) + 5;
+  if (ty + 16 > H - 14) {
+    doc.addPage();
+    ty = 15;
+  }
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(M, ty, CW, 13, 2.5, 2.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...DARK);
-  doc.text(COMPANY.name, X, footerY + 6);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY);
-  doc.text(COMPANY.addressLine1, X, footerY + 11);
-  doc.text(COMPANY.addressLine2, X, footerY + 16);
-  doc.text(COMPANY.contacts, X, footerY + 21);
+  doc.setFontSize(12);
+  doc.setTextColor(...WHITE);
+  doc.text("TOTAL KESELURUHAN", M + 5.5, ty + 8.6);
+  doc.setFontSize(18);
+  doc.text(`Rp ${formatMoney(totalFinal)}`, XR - 5.5, ty + 8.8, {
+    align: "right",
+  });
 
-  doc.text(
-    `Dicetak : ${formatDate(new Date())}`,
-    XR,
-    footerY + 6,
-    { align: "right" }
-  );
+  // --- Footer note ---
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...MUTED);
+  doc.text(COMPANY.siteLine, XR, ty + 19, { align: "right" });
+
+  // --- Fancy footer on every page ---
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    drawFooter(doc, COMPANY.short, `Halaman ${i} dari ${pages}`, H - 13);
+  }
+  doc.setPage(pages);
 
   const fileName = `Rekapitulasi-RAB-${sanitizeFileName(
     project?.name || "Project"
