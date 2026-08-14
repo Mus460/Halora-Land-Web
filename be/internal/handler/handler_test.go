@@ -7,11 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/pashagolub/pgxmock/v4"
 
 	"github.com/halora-land/halora-be/internal/audit"
@@ -244,81 +242,6 @@ func TestHandlerFeedbackCreateAndList(t *testing.T) {
 	decodeBody(t, w, &out)
 	if len(out.Feedback) != 1 || out.Feedback[0].Subject != "Saran" {
 		t.Errorf("feedback = %+v", out.Feedback)
-	}
-}
-
-func TestHandlerNewsAdminListCreate(t *testing.T) {
-	m := newPool(t)
-	admin := &auth.AuthUser{UserID: 1, Role: models.RoleAdmin}
-	user := &auth.AuthUser{UserID: 2, Role: models.RoleUser}
-	m.ExpectQuery(`FROM news WHERE "isActive"`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "content", "isActive", "createdAt", "updatedAt"}).
-			AddRow(int32(1), "Update", "isi", true, time.Now(), time.Now()))
-	m.ExpectQuery(`FROM news WHERE "deletedAt" IS NULL`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "content", "isActive", "createdAt", "updatedAt"}).
-			AddRow(int32(1), "Update", "isi", true, time.Now(), time.Now()))
-	m.ExpectQuery(`INSERT INTO news`).WithArgs("Judul", "isi berita").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "content", "isActive", "createdAt", "updatedAt"}).
-			AddRow(int32(2), "Judul", "isi berita", true, time.Now(), time.Now()))
-
-	h := NewNewsHandler(repository.NewNewsRepo(m))
-	// admin listing also hits ListActive since repo.ListAll has no mock; use user path twice
-	w := doReq(t, h.List, http.MethodGet, "/api/v1/news", "", auth.WithUser(context.Background(), user))
-	if w.Code != http.StatusOK {
-		t.Fatalf("list status = %d", w.Code)
-	}
-	var out struct {
-		News []struct {
-			Title string `json:"title"`
-		} `json:"news"`
-	}
-	decodeBody(t, w, &out)
-	if len(out.News) != 1 || out.News[0].Title != "Update" {
-		t.Errorf("news = %+v", out.News)
-	}
-	w = doReq(t, h.List, http.MethodGet, "/api/v1/news", "", auth.WithUser(context.Background(), admin))
-	if w.Code != http.StatusOK {
-		t.Fatalf("admin list status = %d", w.Code)
-	}
-	w = doReq(t, h.Create, http.MethodPost, "/api/v1/news", `{"title":"Judul","content":"isi berita"}`, nil)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("create status = %d body %s", w.Code, w.Body.String())
-	}
-	w = doReq(t, h.Create, http.MethodPost, "/api/v1/news", `{"title":"","content":""}`, nil)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("empty create status = %d", w.Code)
-	}
-}
-
-func TestHandlerNewsUpdateDelete(t *testing.T) {
-	m := newPool(t)
-	title := "Ganti judul"
-	m.ExpectQuery(`UPDATE news SET`).WithArgs(int32(5), &title, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "content", "isActive", "createdAt", "updatedAt"}).
-			AddRow(int32(5), "Ganti judul", "isi", true, time.Now(), time.Now()))
-	m.ExpectExec(`UPDATE news SET "deletedAt"`).WithArgs(int32(5)).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-	h := NewNewsHandler(repository.NewNewsRepo(m))
-	r := httptest.NewRequest(http.MethodPut, "/api/v1/news/5", strings.NewReader(`{"title":"Ganti judul"}`))
-	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{"5"}}}))
-	w := httptest.NewRecorder()
-	h.Update(w, r)
-	if w.Code != http.StatusOK {
-		t.Fatalf("update status = %d body %s", w.Code, w.Body.String())
-	}
-	var out struct {
-		Title string `json:"title"`
-	}
-	decodeBody(t, w, &out)
-	if out.Title != "Ganti judul" {
-		t.Errorf("title = %q", out.Title)
-	}
-	r2 := httptest.NewRequest(http.MethodDelete, "/api/v1/news/5", nil)
-	r2 = r2.WithContext(context.WithValue(r2.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{"5"}}}))
-	w2 := httptest.NewRecorder()
-	h.Delete(w2, r2)
-	if w2.Code != http.StatusOK {
-		t.Fatalf("delete status = %d", w2.Code)
 	}
 }
 

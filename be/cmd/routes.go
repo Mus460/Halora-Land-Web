@@ -31,7 +31,6 @@ func (app *App) routes() http.Handler {
 	dashRepo := repository.NewDashboardRepo(app.pool)
 	auditRepo := repository.NewAuditLogRepo(app.pool)
 	feedbackRepo := repository.NewFeedbackRepo(app.pool)
-	newsRepo := repository.NewNewsRepo(app.pool)
 
 	// Services
 	snap := service.NewSnapshotService(app.pool, pekerjaanRepo, maRepo, app.audit)
@@ -50,7 +49,6 @@ func (app *App) routes() http.Handler {
 	dashH := handler.NewDashboardHandler(app.pool, dashRepo)
 	feedbackH := handler.NewFeedbackHandler(feedbackRepo)
 	auditH := handler.NewAuditLogHandler(auditRepo)
-	newsH := handler.NewNewsHandler(newsRepo)
 	adminH := handler.NewAdminAHSPHandler(app.pool, importer, app.ahspPath)
 	monH := handler.NewMonitoringHandler(app.pool, progress)
 
@@ -144,7 +142,6 @@ func (app *App) routes() http.Handler {
 			r.Get("/audit-log", auditH.List)
 			r.Get("/feedback", feedbackH.List)
 			r.Post("/feedback", feedbackH.Create)
-			r.Get("/news", newsH.List)
 			r.Get("/monitoring", monH.List)
 
 			// Admin-only (ARCHITECTURE.md §3.9 — protect at middleware layer)
@@ -155,9 +152,6 @@ func (app *App) routes() http.Handler {
 				r.Delete("/users/{id}", authH.DeleteUser)
 				r.Get("/admin/ahsp/import", adminH.ImportStatus)
 				r.Post("/admin/ahsp/import", adminH.Import)
-				r.Post("/news", newsH.Create)
-				r.Put("/news/{id}", newsH.Update)
-				r.Delete("/news/{id}", newsH.Delete)
 			})
 		})
 	})

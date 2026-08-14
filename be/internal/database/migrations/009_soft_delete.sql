@@ -6,7 +6,6 @@ ALTER TABLE "pekerjaan" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
 ALTER TABLE "master_harga" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
 ALTER TABLE "master_analisa" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
 ALTER TABLE "rincian_analisa" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
-ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
 
 -- Unique indexes must ignore soft-deleted rows so re-creating the same
 -- nama/kode after a delete is allowed again. The full-index versions were

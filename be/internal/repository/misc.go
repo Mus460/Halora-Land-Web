@@ -453,7 +453,7 @@ func (r *TransactionRepo) TagReverted(ctx context.Context, projectID, id int32) 
 	return err
 }
 
-// --- Feedback + News ---
+// --- Feedback ---
 
 type FeedbackRepo struct{ pool database.Pool }
 
@@ -486,76 +486,4 @@ func (r *FeedbackRepo) Create(ctx context.Context, userID int32, subject, messag
 		return nil, err
 	}
 	return &f, nil
-}
-
-type NewsRepo struct{ pool database.Pool }
-
-func NewNewsRepo(pool database.Pool) *NewsRepo { return &NewsRepo{pool: pool} }
-
-func (r *NewsRepo) ListActive(ctx context.Context) ([]models.News, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "isActive" = true AND "deletedAt" IS NULL ORDER BY id DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []models.News
-	for rows.Next() {
-		var n models.News
-		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.IsActive, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, n)
-	}
-	return out, rows.Err()
-}
-
-func (r *NewsRepo) ListAll(ctx context.Context) ([]models.News, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, title, content, "isActive", "createdAt", "updatedAt" FROM news WHERE "deletedAt" IS NULL ORDER BY id DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []models.News
-	for rows.Next() {
-		var n models.News
-		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.IsActive, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, n)
-	}
-	return out, rows.Err()
-}
-
-func (r *NewsRepo) Create(ctx context.Context, title, content string) (*models.News, error) {
-	var n models.News
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO news (title, content, "isActive") VALUES ($1, $2, true)
-		RETURNING id, title, content, "isActive", "createdAt", "updatedAt"`, title, content).
-		Scan(&n.ID, &n.Title, &n.Content, &n.IsActive, &n.CreatedAt, &n.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &n, nil
-}
-
-func (r *NewsRepo) Update(ctx context.Context, id int32, title, content *string) (*models.News, error) {
-	var n models.News
-	err := r.pool.QueryRow(ctx, `
-		UPDATE news SET
-			title = COALESCE($2, title),
-			content = COALESCE($3, content),
-			"updatedAt" = NOW()
-		WHERE id = $1
-		RETURNING id, title, content, "isActive", "createdAt", "updatedAt"`,
-		id, title, content).
-		Scan(&n.ID, &n.Title, &n.Content, &n.IsActive, &n.CreatedAt, &n.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &n, nil
-}
-
-func (r *NewsRepo) Delete(ctx context.Context, id int32) error {
-	_, err := r.pool.Exec(ctx, `UPDATE news SET "deletedAt" = NOW() WHERE id = $1`, id)
-	return err
 }
