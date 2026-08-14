@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,16 +35,33 @@ export function ProjectForm({
   onSubmit,
 }: ProjectFormProps) {
   const [form, setForm] = useState({
-    name: project?.name || "",
-    location: project?.location || "",
-    type: project?.type || "building",
-    isPitching: project?.isPitching || false,
-    isDone: project?.isDone || false,
-    contractValue: project?.contractValue || 0,
-    timelineMonths: project?.timelineMonths || 0,
-    timelineDays: project?.timelineDays || 0,
+    name: "",
+    location: "",
+    type: "building" as "building" | "infrastructure",
+    isPitching: false,
+    isDone: false,
+    contractValue: 0,
+    buildingArea: 0,
+    timelineMonths: 0,
+    timelineDays: 0,
   });
   const [boqFile, setBoqFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      name: project?.name || "",
+      location: project?.location || "",
+      type: (project?.type as "building" | "infrastructure") || "building",
+      isPitching: project?.isPitching || false,
+      isDone: project?.isDone || false,
+      contractValue: project?.contractValue || 0,
+      buildingArea: project?.buildingArea || 0,
+      timelineMonths: project?.timelineMonths || 0,
+      timelineDays: project?.timelineDays || 0,
+    });
+    setBoqFile(null);
+  }, [open, project]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +74,7 @@ export function ProjectForm({
       isPitching: false,
       isDone: false,
       contractValue: 0,
+      buildingArea: 0,
       timelineMonths: 0,
       timelineDays: 0,
     });
@@ -156,6 +174,23 @@ export function ProjectForm({
             value={form.contractValue}
             onChange={(value) => setForm({ ...form, contractValue: value })}
           />
+          <div className="space-y-2">
+            <Label htmlFor="buildingArea">Luas Bangunan (m²)</Label>
+            <Input
+              id="buildingArea"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.buildingArea || ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  buildingArea: Math.max(0, Number(e.target.value) || 0),
+                })
+              }
+              placeholder="0"
+            />
+          </div>
           <div className="space-y-2">
             <Label>Timeline</Label>
             <div className="grid grid-cols-2 gap-3">

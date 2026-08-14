@@ -127,6 +127,7 @@ type Project struct {
 	IsPitching     bool             `json:"isPitching"`
 	IsDone         bool             `json:"isDone"`
 	ContractValue  *decimal.Decimal `json:"contractValue"`
+	BuildingArea   *decimal.Decimal `json:"buildingArea"`
 	TimelineMonths int              `json:"timelineMonths"`
 	TimelineDays   int              `json:"timelineDays"`
 	CreatedAt      time.Time        `json:"createdAt"`

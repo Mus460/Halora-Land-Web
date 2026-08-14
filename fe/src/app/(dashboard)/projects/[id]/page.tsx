@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency, formatTimeline } from "@/lib/utils";
+import { formatCurrency, formatTimeline, formatVolume } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
@@ -348,7 +348,7 @@ export default function ProyekDetailPage() {
                           {workItem.description}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {workItem.volume} {workItem.unit} × {formatCurrency(workItem.unitPrice)}
+                          {formatVolume(workItem.volume)} {workItem.unit} × {formatCurrency(workItem.unitPrice)}
                         </p>
                       </div>
                       <div className="text-right">

@@ -22,6 +22,7 @@ export interface Project {
   isPitching: boolean;
   isDone: boolean;
   contractValue: number | null;
+  buildingArea: number | null;
   timelineMonths: number;
   timelineDays: number;
   createdAt: string;

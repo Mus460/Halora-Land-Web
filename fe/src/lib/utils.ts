@@ -26,6 +26,17 @@ export function formatWeight(value: number | null | undefined): string {
   return `${value.toFixed(1)}%`;
 }
 
+// formatVolume renders a work-item volume with at most 2 decimals
+// (id-ID grouping), trimming trailing zeros ("12.5", "1.3333" -> "1.33").
+export function formatVolume(value: number | string | null | undefined): string {
+  if (value == null || value === "") return "0";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  return new Intl.NumberFormat("id-ID", {
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
 export function formatTimeline(months: number, days: number): string {
   const parts: string[] = [];
   if (months > 0) parts.push(`${months} bulan`);

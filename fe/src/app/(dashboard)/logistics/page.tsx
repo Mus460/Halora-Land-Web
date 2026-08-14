@@ -16,7 +16,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { CurrencyInput } from "@/components/shared/currency-input";
-import { formatCurrency, formatDateShort } from "@/lib/utils";
+import { formatCurrency, formatDateShort, formatVolume } from "@/lib/utils";
 import type { Logistics, Transaction } from "@/types";
 import toast from "react-hot-toast";
 import { useProject } from "@/contexts/ProjectContext";
@@ -131,7 +131,7 @@ export default function LogistikPage() {
       header: "Volume",
       cell: ({ row }) => (
         <span>
-          {row.original.volume} {row.original.unit}
+          {formatVolume(row.original.volume)} {row.original.unit}
         </span>
       ),
     },

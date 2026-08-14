@@ -219,10 +219,19 @@ function ClientFormDialog({
   onSubmit: (data: Partial<Client>) => void;
 }) {
   const [form, setForm] = useState({
-    name: item?.name || "",
-    address: item?.address || "",
-    contact: item?.contact || "",
+    name: "",
+    address: "",
+    contact: "",
   });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      name: item?.name || "",
+      address: item?.address || "",
+      contact: item?.contact || "",
+    });
+  }, [open, item]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

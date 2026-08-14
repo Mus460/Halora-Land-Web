@@ -27,9 +27,9 @@ func (r *ProjectRepo) List(ctx context.Context, f ListProjectFilter) ([]models.P
 	var q string
 	var args []any
 	if f.IsAdmin {
-		q = `SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt" FROM projects WHERE "deletedAt" IS NULL`
+		q = `SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt" FROM projects WHERE "deletedAt" IS NULL`
 	} else {
-		q = `SELECT DISTINCT p.id, p."userId", p."name", p.location, p.type, p."isPitching", p."isDone", p."contractValue", p."timelineMonths", p."timelineDays", p."createdAt", p."updatedAt"
+		q = `SELECT DISTINCT p.id, p."userId", p."name", p.location, p.type, p."isPitching", p."isDone", p."contractValue", p."buildingArea", p."timelineMonths", p."timelineDays", p."createdAt", p."updatedAt"
 			FROM projects p LEFT JOIN project_team tp ON tp."projectId" = p.id
 			WHERE (p."userId" = $1 OR tp."userId" = $1) AND p."deletedAt" IS NULL`
 		args = append(args, f.UserID)
@@ -69,18 +69,19 @@ type rowScanner interface {
 
 func scanProjectRow(s rowScanner) (*models.Project, error) {
 	var p models.Project
-	var location, contractValue sql.NullString
-	if err := s.Scan(&p.ID, &p.UserID, &p.Name, &location, &p.Type, &p.IsPitching, &p.IsDone, &contractValue, &p.TimelineMonths, &p.TimelineDays, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	var location, contractValue, buildingArea sql.NullString
+	if err := s.Scan(&p.ID, &p.UserID, &p.Name, &location, &p.Type, &p.IsPitching, &p.IsDone, &contractValue, &buildingArea, &p.TimelineMonths, &p.TimelineDays, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, err
 	}
 	p.Location = strPtr(location)
 	p.ContractValue = scanDecPtr(contractValue)
+	p.BuildingArea = scanDecPtr(buildingArea)
 	return &p, nil
 }
 
 func (r *ProjectRepo) Get(ctx context.Context, id int32) (*models.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"
+		SELECT id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt"
 		FROM projects WHERE id = $1 AND "deletedAt" IS NULL`, id)
 	p, err := scanProjectRow(row)
 	if err != nil {
@@ -193,16 +194,17 @@ type CreateProjectInput struct {
 	IsPitching     bool
 	IsDone         bool
 	ContractValue  *decimal.Decimal
+	BuildingArea   *decimal.Decimal
 	TimelineMonths int
 	TimelineDays   int
 }
 
 func (r *ProjectRepo) Create(ctx context.Context, in CreateProjectInput) (*models.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays")
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
-		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays)
+		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays")
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), decPtrArg(in.BuildingArea), in.TimelineMonths, in.TimelineDays)
 	return scanProjectRow(row)
 }
 
@@ -233,10 +235,10 @@ func (r *ProjectRepo) ImportBOQ(ctx context.Context, in CreateProjectInput, item
 	defer tx.Rollback(ctx)
 
 	p, err := scanProjectRow(tx.QueryRow(ctx, `
-		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays")
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
-		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays))
+		INSERT INTO projects ("userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays")
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		in.UserID, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), decPtrArg(in.BuildingArea), in.TimelineMonths, in.TimelineDays))
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +280,7 @@ type UpdateProjectInput struct {
 	IsPitching     *bool               `json:"isPitching"`
 	IsDone         *bool               `json:"isDone"`
 	ContractValue  *decimal.Decimal    `json:"contractValue"`
+	BuildingArea   *decimal.Decimal    `json:"buildingArea"`
 	TimelineMonths *int                `json:"timelineMonths"`
 	TimelineDays   *int                `json:"timelineDays"`
 }
@@ -291,12 +294,13 @@ func (r *ProjectRepo) Update(ctx context.Context, id int32, in UpdateProjectInpu
 			"isPitching" = COALESCE($5, "isPitching"),
 			"isDone" = COALESCE($6, "isDone"),
 			"contractValue" = COALESCE($7, "contractValue"),
-			"timelineMonths" = COALESCE($8, "timelineMonths"),
-			"timelineDays" = COALESCE($9, "timelineDays"),
+			"buildingArea" = COALESCE($8, "buildingArea"),
+			"timelineMonths" = COALESCE($9, "timelineMonths"),
+			"timelineDays" = COALESCE($10, "timelineDays"),
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
-		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
-		id, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), in.TimelineMonths, in.TimelineDays)
+		RETURNING id, "userId", "name", location, type, "isPitching", "isDone", "contractValue", "buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt"`,
+		id, in.Name, in.Location, in.Type, in.IsPitching, in.IsDone, decPtrArg(in.ContractValue), decPtrArg(in.BuildingArea), in.TimelineMonths, in.TimelineDays)
 	return scanProjectRow(row)
 }
 
@@ -322,6 +326,7 @@ type SummaryProject struct {
 	Name          string
 	Location      *string
 	ContractValue *decimal.Decimal
+	BuildingArea  *decimal.Decimal
 }
 
 func (r *ProjectRepo) Summary(ctx context.Context, id int32) (*SummaryProject, error) {
@@ -329,5 +334,5 @@ func (r *ProjectRepo) Summary(ctx context.Context, id int32) (*SummaryProject, e
 	if err != nil {
 		return nil, err
 	}
-	return &SummaryProject{ID: p.ID, Name: p.Name, Location: p.Location, ContractValue: p.ContractValue}, nil
+	return &SummaryProject{ID: p.ID, Name: p.Name, Location: p.Location, ContractValue: p.ContractValue, BuildingArea: p.BuildingArea}, nil
 }

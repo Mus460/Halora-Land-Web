@@ -14,15 +14,15 @@ import (
 
 func projectRow() []string {
 	return []string{"id", "userId", "name", "location", "type", "isPitching", "isDone", "contractValue",
-		"timelineMonths", "timelineDays", "createdAt", "updatedAt"}
+		"buildingArea", "timelineMonths", "timelineDays", "createdAt", "updatedAt"}
 }
 
 func TestProjectListForUser(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM projects p LEFT JOIN project_team`).WithArgs(int32(4)).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(1), int32(4), "Ruko 2 Lantai", "Jakarta", models.ProjectTypeBuilding, false, false, "2500000000", 6, 0, time.Now(), time.Now()).
-			AddRow(int32(2), int32(9), "Rumah 70", nil, models.ProjectTypeBuilding, true, false, nil, 3, 15, time.Now(), time.Now()))
+			AddRow(int32(1), int32(4), "Ruko 2 Lantai", "Jakarta", models.ProjectTypeBuilding, false, false, "2500000000", nil, 6, 0, time.Now(), time.Now()).
+			AddRow(int32(2), int32(9), "Rumah 70", nil, models.ProjectTypeBuilding, true, false, nil, nil, 3, 15, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	ps, err := r.List(context.Background(), ListProjectFilter{UserID: 4})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestProjectListAdminWithSearchAndType(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM projects WHERE "deletedAt" IS NULL`).
 		WithArgs("%ruko%", "building").
-		WillReturnRows(pgxmock.NewRows(projectRow()).AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, nil, 6, 0, time.Now(), time.Now()))
+		WillReturnRows(pgxmock.NewRows(projectRow()).AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, nil, nil, 6, 0, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	ps, err := r.List(context.Background(), ListProjectFilter{IsAdmin: true, Search: "ruko", Type: "building"})
 	if err != nil {
@@ -61,7 +61,7 @@ func TestProjectGet(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM projects WHERE id =`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", 6, 0, time.Now(), time.Now()))
+			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", nil, 6, 0, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	p, err := r.Get(context.Background(), 1)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestProjectGetDetail(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM projects WHERE id =`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", 6, 0, time.Now(), time.Now()))
+			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", nil, 6, 0, time.Now(), time.Now()))
 	m.ExpectQuery(`FROM users WHERE id =`).WithArgs(int32(4)).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "fullName", "email"}).AddRow(int32(4), "Budi", "budi@x.id"))
 	m.ExpectQuery(`FROM project_team tp`).WithArgs(int32(1)).
@@ -125,9 +125,9 @@ func TestProjectCreate(t *testing.T) {
 	loc := "Depok"
 	cv := decimal.NewFromInt(1500000000)
 	m.ExpectQuery(`INSERT INTO projects`).
-		WithArgs(int32(4), "Rumah", &loc, models.ProjectTypeBuilding, false, true, "1500000000", 4, 10).
+		WithArgs(int32(4), "Rumah", &loc, models.ProjectTypeBuilding, false, true, "1500000000", nil, 4, 10).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(7), int32(4), "Rumah", "Depok", "building", false, true, "1500000000", 4, 10, time.Now(), time.Now()))
+			AddRow(int32(7), int32(4), "Rumah", "Depok", "building", false, true, "1500000000", nil, 4, 10, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	p, err := r.Create(context.Background(), CreateProjectInput{
 		UserID: 4, Name: "Rumah", Location: &loc, Type: models.ProjectTypeBuilding,
@@ -146,9 +146,9 @@ func TestProjectImportBOQ(t *testing.T) {
 	loc := "Bogor"
 	m.ExpectBegin()
 	m.ExpectQuery(`INSERT INTO projects`).
-		WithArgs(int32(4), "Gedung", &loc, models.ProjectTypeBuilding, false, false, nil, 0, 0).
+		WithArgs(int32(4), "Gedung", &loc, models.ProjectTypeBuilding, false, false, nil, nil, 0, 0).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(8), int32(4), "Gedung", "Bogor", "building", false, false, nil, 0, 0, time.Now(), time.Now()))
+			AddRow(int32(8), int32(4), "Gedung", "Bogor", "building", false, false, nil, nil, 0, 0, time.Now(), time.Now()))
 	m.ExpectExec(`INSERT INTO work_items`).
 		WithArgs(int32(8), models.CategoryWall, "Pasang bata", "20", "m2", "120000", "2400000").
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
@@ -179,9 +179,9 @@ func TestProjectImportBOQSkipsEmptyDescriptions(t *testing.T) {
 	m := newPool(t)
 	m.ExpectBegin()
 	m.ExpectQuery(`INSERT INTO projects`).
-		WithArgs(int32(4), "Gedung", (*string)(nil), models.ProjectTypeBuilding, false, false, nil, 0, 0).
+		WithArgs(int32(4), "Gedung", (*string)(nil), models.ProjectTypeBuilding, false, false, nil, nil, 0, 0).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(8), int32(4), "Gedung", nil, "building", false, false, nil, 0, 0, time.Now(), time.Now()))
+			AddRow(int32(8), int32(4), "Gedung", nil, "building", false, false, nil, nil, 0, 0, time.Now(), time.Now()))
 	m.ExpectCommit()
 	r := NewProjectRepo(m)
 	_, err := r.ImportBOQ(context.Background(), CreateProjectInput{UserID: 4, Name: "Gedung", Type: models.ProjectTypeBuilding},
@@ -195,9 +195,9 @@ func TestProjectUpdate(t *testing.T) {
 	m := newPool(t)
 	name := "Ruko Baru"
 	m.ExpectQuery(`UPDATE projects SET`).
-		WithArgs(int32(1), &name, (*string)(nil), (*models.ProjectType)(nil), (*bool)(nil), (*bool)(nil), nil, (*int)(nil), (*int)(nil)).
+		WithArgs(int32(1), &name, (*string)(nil), (*models.ProjectType)(nil), (*bool)(nil), (*bool)(nil), nil, nil, (*int)(nil), (*int)(nil)).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(1), int32(4), "Ruko Baru", "Jakarta", "building", false, false, nil, 6, 0, time.Now(), time.Now()))
+			AddRow(int32(1), int32(4), "Ruko Baru", "Jakarta", "building", false, false, nil, nil, 6, 0, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	p, err := r.Update(context.Background(), 1, UpdateProjectInput{Name: &name})
 	if err != nil {
@@ -226,7 +226,7 @@ func TestProjectSummary(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(`FROM projects WHERE id =`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows(projectRow()).
-			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", 6, 0, time.Now(), time.Now()))
+			AddRow(int32(1), int32(4), "Ruko", "Jakarta", "building", false, false, "2500000000", nil, 6, 0, time.Now(), time.Now()))
 	r := NewProjectRepo(m)
 	s, err := r.Summary(context.Background(), 1)
 	if err != nil {

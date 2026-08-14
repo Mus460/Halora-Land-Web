@@ -67,6 +67,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		IsPitching     bool             `json:"isPitching"`
 		IsDone         bool             `json:"isDone"`
 		ContractValue  *decimal.Decimal `json:"contractValue"`
+		BuildingArea   *decimal.Decimal `json:"buildingArea"`
 		TimelineMonths int              `json:"timelineMonths"`
 		TimelineDays   int              `json:"timelineDays"`
 	}
@@ -92,6 +93,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	p, err := h.repo.Create(r.Context(), repository.CreateProjectInput{
 		UserID: u.UserID, Name: in.Name, Location: in.Location, Type: ptype,
 		IsPitching: in.IsPitching, IsDone: in.IsDone, ContractValue: nk,
+		BuildingArea: in.BuildingArea,
 		TimelineMonths: in.TimelineMonths, TimelineDays: in.TimelineDays,
 	})
 	if err != nil {
@@ -165,6 +167,12 @@ func (h *ProjectHandler) Import(w http.ResponseWriter, r *http.Request) {
 		d := doc.Total
 		cv = &d
 	}
+	var ba *decimal.Decimal
+	if s := strings.TrimSpace(r.FormValue("buildingArea")); s != "" {
+		if d, err := decimal.NewFromString(s); err == nil && d.IsPositive() {
+			ba = &d
+		}
+	}
 
 	items := make([]repository.ImportedWorkItem, 0, len(doc.Items))
 	for _, it := range doc.Items {
@@ -182,7 +190,7 @@ func (h *ProjectHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	p, err := h.repo.ImportBOQ(r.Context(), repository.CreateProjectInput{
 		UserID: u.UserID, Name: name, Location: location, Type: ptype,
-		ContractValue: cv, TimelineMonths: tMonths, TimelineDays: tDays,
+		ContractValue: cv, BuildingArea: ba, TimelineMonths: tMonths, TimelineDays: tDays,
 	}, items, divisions)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

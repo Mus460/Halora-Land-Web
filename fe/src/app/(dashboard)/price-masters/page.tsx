@@ -314,11 +314,21 @@ function HargaFormDialog({
   onSubmit: (data: Partial<PriceMaster>) => void;
 }) {
   const [form, setForm] = useState({
-    name: item?.name || "",
-    unit: item?.unit || "",
-    price: item?.price || 0,
-    type: item?.type || "material",
+    name: "",
+    unit: "",
+    price: 0,
+    type: "material",
   });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      name: item?.name || "",
+      unit: item?.unit || "",
+      price: item?.price || 0,
+      type: item?.type || "material",
+    });
+  }, [open, item]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

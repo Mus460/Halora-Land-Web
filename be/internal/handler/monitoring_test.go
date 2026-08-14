@@ -15,7 +15,7 @@ import (
 )
 
 const projectAccessSQL = `SELECT p."userId", tp.role`
-const progressItemsSQL = `SELECT id, category, description, volume::text`
+const progressItemsSQL = `SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text`
 const lastUpdatedSQL = `DISTINCT ON \("workItemId"\)`
 
 func monHandler(m pgxmock.PgxPoolIface) *MonitoringHandler {

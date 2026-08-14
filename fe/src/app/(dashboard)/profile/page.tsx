@@ -177,7 +177,7 @@ export default function ProfilePage() {
                 onChange={(e) =>
                   setPassword({ ...password, new: e.target.value })
                 }
-                placeholder="Minimal 8 karakter"
+                placeholder="Minimal 6 karakter"
               />
             </div>
             <div className="space-y-2">

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
 import { EmptyProjectState } from "@/components/shared/empty-project-state";
-import { formatWeight } from "@/lib/utils";
+import { formatWeight, formatVolume } from "@/lib/utils";
 
 interface MonItem {
   id: number;
@@ -256,7 +256,7 @@ export default function MonitoringPage() {
                         {item.description}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {item.volume} {item.unit}
+                        {formatVolume(item.volume)} {item.unit}
                       </p>
                       {item.lastUpdated ? (
                         <p className="text-xs text-gray-400 tabular-nums">

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency, formatDuration } from '@/lib/utils'
+import { formatCurrency, formatDuration, formatVolume } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 interface SearchResult {
@@ -281,7 +281,7 @@ export default function RABPage() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm truncate">{item.description}</div>
                             <div className="text-xs text-gray-500 mt-1">
-                              {item.volume} {item.unit} × {formatCurrency(item.unitPrice)}
+                              {formatVolume(item.volume)} {item.unit} × {formatCurrency(item.unitPrice)}
                             </div>
                             <div className="text-xs text-gray-400 mt-0.5">
                               Estimasi Waktu: {formatDuration(item.totalDuration)}
