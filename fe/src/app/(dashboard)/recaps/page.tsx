@@ -1,22 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calculator, FileDown, Settings } from "lucide-react";
+import { Calculator, FileDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatVolume } from "@/lib/utils";
 import toast from "react-hot-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useProject } from "@/contexts/ProjectContext";
 import { EmptyProjectState } from "@/components/shared/empty-project-state";
 
@@ -36,8 +27,6 @@ export default function RekapPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [showMargin, setShowMargin] = useState(false);
-  const [margin, setMargin] = useState(10);
   const [ownerName, setOwnerName] = useState("");
 
   useEffect(() => {
@@ -62,9 +51,6 @@ export default function RekapPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setData(result);
-      if (result?.summary?.margin != null) {
-        setMargin(Number(result.summary.margin));
-      }
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Gagal memuat data');
@@ -80,32 +66,12 @@ export default function RekapPage() {
   const grouped = data.grouped || {};
   const summary = data.summary || {};
   const subtotal = Number(summary.subtotal || 0);
-  const overhead = Number(summary.overhead || 0);
   const ppn = Number(summary.totalPPN || 0);
   const total = Number(summary.totalFinal || 0);
   const rekapItemCount = Object.values(grouped).reduce(
     (sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0),
     0
   );
-
-  const handleSaveMargin = async () => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}/recaps`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ margin }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Gagal menyimpan margin');
-      }
-      setShowMargin(false);
-      await fetchData();
-      toast.success('Margin berhasil disimpan');
-    } catch (error: any) {
-      toast.error(error.message || 'Gagal menyimpan margin');
-    }
-  };
 
   const handleExportPDF = async () => {
     try {
@@ -121,20 +87,13 @@ export default function RekapPage() {
     }
   };
 
-  const previewMarginAmount = subtotal * margin / 100;
-  const previewTotal = subtotal * (1 + margin / 100) * 1.10 * 1.11;
-
-  return (
+return (
     <div className="space-y-6">
       <PageHeader
         title="Rekapitulasi RAB"
         description="Ringkasan Rencana Anggaran Biaya proyek"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowMargin(true)}>
-              <Settings className="w-4 h-4 mr-2" />
-              Margin ({margin}%)
-            </Button>
             <Button
               className="bg-amber-500 hover:bg-amber-600"
               onClick={handleExportPDF}
@@ -236,14 +195,6 @@ export default function RekapPage() {
                 <span className="font-semibold">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Overhead</span>
-                <span>{formatCurrency(overhead)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Profit (Margin {margin}%)</span>
-                <span>{formatCurrency(Number(summary.subtotalWithMargin || 0) - subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-gray-600">PPN</span>
                 <span>{formatCurrency(ppn)}</span>
               </div>
@@ -269,44 +220,6 @@ export default function RekapPage() {
         </div>
       </div>
 
-      {/* Margin Dialog */}
-      <Dialog open={showMargin} onOpenChange={setShowMargin}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Atur Margin Profit</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Margin (%)</Label>
-              <Input
-                type="number"
-                value={margin}
-                onChange={(e) => setMargin(Number(e.target.value) || 0)}
-                min={0}
-                max={100}
-              />
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg text-sm">
-              <div className="flex justify-between mb-1">
-                <span>Profit (Margin)</span>
-                <span className="font-semibold">
-                  {formatCurrency(previewMarginAmount)}
-                </span>
-              </div>
-              <div className="flex justify-between font-bold">
-                <span>Grand Total</span>
-                <span className="text-amber-600">
-                  {formatCurrency(previewTotal)}
-                </span>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMargin(false)}>Batal</Button>
-            <Button onClick={handleSaveMargin}>Simpan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      </div>
   );
 }
