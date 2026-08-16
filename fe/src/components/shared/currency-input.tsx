@@ -10,6 +10,7 @@ interface CurrencyInputProps {
   label?: string;
   placeholder?: string;
   disabled?: boolean;
+  required?: boolean;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export function CurrencyInput({
   label,
   placeholder = "0",
   disabled,
+  required,
   className,
 }: CurrencyInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,6 +42,7 @@ export function CurrencyInput({
           onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
+          required={required}
           className="pl-10"
           inputMode="numeric"
         />
