@@ -123,11 +123,6 @@ export interface RekapData {
   subtotals?: Record<string, number>;
   summary?: {
     subtotal?: number;
-    margin?: number;
-    subtotalWithMargin?: number;
-    overhead?: number;
-    profit?: number;
-    ppn?: number;
     totalPPN?: number;
     totalFinal?: number;
     totalDuration?: number;

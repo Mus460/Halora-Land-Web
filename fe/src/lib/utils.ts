@@ -100,18 +100,6 @@ export function calculateAHS(
   };
 }
 
-export function calculateRAB(
-  subtotal: number,
-  marginPercent: number = 0
-) {
-  const overhead = subtotal * 0.1;
-  const profit = (subtotal + overhead) * (marginPercent / 100);
-  const ppn = (subtotal + overhead + profit) * 0.11;
-  const total = subtotal + overhead + profit + ppn;
-
-  return { subtotal, overhead, profit, ppn, total };
-}
-
 export function generateId(): number {
   return Date.now() + Math.floor(Math.random() * 1000);
 }

@@ -57,7 +57,7 @@ func TestWorkItemListMergesWeightsWithProjectFilter(t *testing.T) {
 
 	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m),
 		service.NewSnapshotService(m, repository.NewWorkItemRepo(m), nil, nil),
-		service.NewProgressService(m))
+		service.NewProgressService(m), nil)
 	w := doReq(t, h.List, http.MethodGet, "/api/v1/work-items?projectId=3", "", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d body %s", w.Code, w.Body.String())
@@ -81,7 +81,7 @@ func TestWorkItemListWithoutProjectFilterKeepsWeightsZero(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(workItemsSQL + ` ORDER BY id ASC`).WithArgs().
 		WillReturnRows(workItemListRows(wiRow(1, 3, models.CategoryFoundation, "Pondasi", "40000")))
-	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m))
+	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m), nil)
 	w := doReq(t, h.List, http.MethodGet, "/api/v1/work-items", "", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
@@ -99,7 +99,7 @@ func TestWorkItemListProjectFilterNoMatches(t *testing.T) {
 	m.ExpectQuery(`SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text`).WithArgs(pid).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "category", "description", "volume", "unit",
 			"totalCost", "progress", "duration"}))
-	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m))
+	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m), nil)
 	w := doReq(t, h.List, http.MethodGet, "/api/v1/work-items?projectId=9", "", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
@@ -114,7 +114,7 @@ func TestWorkItemListCategorySearchFilter(t *testing.T) {
 	m.ExpectQuery(workItemsSQL+` AND category = \$1 AND "description" ILIKE \$2`).
 		WithArgs(string(models.CategoryFoundation), "%besi%").
 		WillReturnRows(workItemListRows(wiRow(1, 3, models.CategoryFoundation, "Besi", "40000")))
-	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, nil)
+	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, nil, nil)
 	w := doReq(t, h.List, http.MethodGet,
 		"/api/v1/work-items?category=foundation&search=besi", "", nil)
 	if w.Code != http.StatusOK {
@@ -128,7 +128,7 @@ func TestWorkItemListCategorySearchFilter(t *testing.T) {
 func TestWorkItemListQueryError(t *testing.T) {
 	m := newPool(t)
 	m.ExpectQuery(workItemsSQL).WithArgs().WillReturnError(errors.New("boom"))
-	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m))
+	h := NewWorkItemHandler(m, repository.NewWorkItemRepo(m), nil, service.NewProgressService(m), nil)
 	w := doReq(t, h.List, http.MethodGet, "/api/v1/work-items", "", nil)
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500", w.Code)

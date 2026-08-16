@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CurrencyInput } from "@/components/shared/currency-input";
 import type { Project } from "@/types";
 
 interface ProjectFormProps {
@@ -40,7 +39,6 @@ export function ProjectForm({
     type: "building" as "building" | "infrastructure",
     isPitching: false,
     isDone: false,
-    contractValue: 0,
     buildingArea: 0,
     timelineMonths: 0,
     timelineDays: 0,
@@ -55,7 +53,6 @@ export function ProjectForm({
       type: (project?.type as "building" | "infrastructure") || "building",
       isPitching: project?.isPitching || false,
       isDone: project?.isDone || false,
-      contractValue: project?.contractValue || 0,
       buildingArea: project?.buildingArea || 0,
       timelineMonths: project?.timelineMonths || 0,
       timelineDays: project?.timelineDays || 0,
@@ -73,7 +70,6 @@ export function ProjectForm({
       type: "building",
       isPitching: false,
       isDone: false,
-      contractValue: 0,
       buildingArea: 0,
       timelineMonths: 0,
       timelineDays: 0,
@@ -102,8 +98,8 @@ export function ProjectForm({
                 }
               />
               <p className="text-xs text-gray-500">
-                Pilih file BOQ untuk otomatis mengisi item pekerjaan, rekap
-                per divisi, dan nilai kontrak dari total RAB. Nama proyek bisa
+                Pilih file BOQ untuk otomatis mengisi item pekerjaan. Nilai
+                kontrak disinkronkan otomatis dari total RAB. Nama proyek bisa
                 dikosongkan agar diambil dari judul BOQ.
               </p>
             </div>
@@ -169,12 +165,6 @@ export function ProjectForm({
               </SelectContent>
             </Select>
           </div>
-          <CurrencyInput
-            label={`Nilai Kontrak${!project ? " *" : ""}`}
-            value={form.contractValue}
-            onChange={(value) => setForm({ ...form, contractValue: value })}
-            required={!project}
-          />
           <div className="space-y-2">
             <Label htmlFor="buildingArea">Luas Bangunan (m²){!project ? " *" : ""}</Label>
             <Input

@@ -11,17 +11,15 @@ import (
 )
 
 // RABService computes the RAB rollup centrally in the BE (ARCHITECTURE.md §3.5,
-// §8.3). Rates are configurable (no longer hardcoded 0.10/0.11).
+// §8.3). The PPN rate is configurable; overhead/profit/margin are not applied.
 type RABService struct {
-	pool         database.Pool
-	work_items   *repository.WorkItemRepo
-	recaps       *repository.RecapRepo
-	overheadRate decimal.Decimal
-	ppnRate      decimal.Decimal
+	pool       database.Pool
+	work_items *repository.WorkItemRepo
+	ppnRate    decimal.Decimal
 }
 
-func NewRABService(pool database.Pool, pr *repository.WorkItemRepo, rr *repository.RecapRepo, overhead, ppn decimal.Decimal) *RABService {
-	return &RABService{pool: pool, work_items: pr, recaps: rr, overheadRate: overhead, ppnRate: ppn}
+func NewRABService(pool database.Pool, pr *repository.WorkItemRepo, ppn decimal.Decimal) *RABService {
+	return &RABService{pool: pool, work_items: pr, ppnRate: ppn}
 }
 
 type RecapGroup struct {
@@ -60,33 +58,20 @@ type projectSummary struct {
 }
 
 type rabSummary struct {
-	Subtotal           decimal.Decimal `json:"subtotal"`
-	Margin             decimal.Decimal `json:"margin"`
-	SubtotalWithMargin decimal.Decimal `json:"subtotalWithMargin"`
-	Overhead           decimal.Decimal `json:"overhead"`
-	Profit             decimal.Decimal `json:"profit"`
-	SubtotalBeforeTax  decimal.Decimal `json:"subtotalBeforeTax"`
-	PPNPct             decimal.Decimal `json:"ppn"`
-	TotalPPN           decimal.Decimal `json:"totalPPN"`
-	TotalAkhir         decimal.Decimal `json:"totalFinal"`
-	TotalDuration      decimal.Decimal `json:"totalDuration"`
+	Subtotal      decimal.Decimal `json:"subtotal"`
+	PPNPct        decimal.Decimal `json:"ppn"`
+	TotalPPN      decimal.Decimal `json:"totalPPN"`
+	TotalAkhir    decimal.Decimal `json:"totalFinal"`
+	TotalDuration decimal.Decimal `json:"totalDuration"`
 }
 
-// Compute builds the full recaps for a project. Formula (§8.3):
+// Compute builds the full recaps for a project. Formula (§8.3, no margin/overhead):
 //
 //	subtotal = Σ work_items.totalCost
-//	subtotalWithMargin = subtotal × (1 + margin/100)
-//	overhead = subtotalWithMargin × overheadRate
-//	profit = (subtotalWithMargin + overhead) × ... (0 here; margin captures profit)
-//	subtotalBeforeTax = subtotalWithMargin + overhead + profit
-//	totalPPN = subtotalBeforeTax × ppnRate
-//	totalFinal = subtotalBeforeTax + totalPPN
+//	totalPPN = subtotal × ppnRate
+//	totalFinal = subtotal + totalPPN
 func (s *RABService) Compute(ctx context.Context, projectID int32, projects *repository.SummaryProject) (*RecapResult, error) {
 	items, err := s.work_items.List(ctx, repository.ListWorkItemFilter{ProjectID: &projectID})
-	if err != nil {
-		return nil, err
-	}
-	margin, err := s.recaps.GetMargin(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,29 +96,19 @@ func (s *RABService) Compute(ctx context.Context, projectID int32, projects *rep
 		}
 	}
 
-	marginFactor := decimal.NewFromInt(1).Add(margin.Div(decimal.NewFromInt(100)))
-	subtotalWithMargin := grandTotal.Mul(marginFactor)
-	overhead := subtotalWithMargin.Mul(s.overheadRate)
-	profit := decimal.Zero
-	subtotalBeforeTax := subtotalWithMargin.Add(overhead).Add(profit)
-	totalPPN := subtotalBeforeTax.Mul(s.ppnRate)
-	totalFinal := subtotalBeforeTax.Add(totalPPN)
+	totalPPN := grandTotal.Mul(s.ppnRate)
+	totalFinal := grandTotal.Add(totalPPN)
 
 	res := &RecapResult{
 		Grouped:          grouped,
 		Subtotals:        subtotals,
 		SubtotalDuration: subtotalDuration,
 		Summary: rabSummary{
-			Subtotal:           grandTotal,
-			Margin:             margin,
-			SubtotalWithMargin: subtotalWithMargin,
-			Overhead:           overhead,
-			Profit:             profit,
-			SubtotalBeforeTax:  subtotalBeforeTax,
-			PPNPct:             s.ppnRate.Mul(decimal.NewFromInt(100)),
-			TotalPPN:           totalPPN,
-			TotalAkhir:         totalFinal,
-			TotalDuration:      totalDuration,
+			Subtotal:      grandTotal,
+			PPNPct:        s.ppnRate.Mul(decimal.NewFromInt(100)),
+			TotalPPN:      totalPPN,
+			TotalAkhir:    totalFinal,
+			TotalDuration: totalDuration,
 		},
 	}
 	if projects != nil {
@@ -144,6 +119,18 @@ func (s *RABService) Compute(ctx context.Context, projectID int32, projects *rep
 		}
 	}
 	return res, nil
+}
+
+// SyncContractValue recomputes the project's total RAB and writes it into
+// projects.contractValue, keeping the contract value in sync with the RAB.
+func (s *RABService) SyncContractValue(ctx context.Context, projectID int32) error {
+	res, err := s.Compute(ctx, projectID, nil)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `UPDATE projects SET "contractValue" = $2 WHERE id = $1`,
+		projectID, res.Summary.TotalAkhir.String())
+	return err
 }
 
 // SortedCategoryes returns the subtotals map keys in deterministic order.

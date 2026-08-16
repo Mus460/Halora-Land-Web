@@ -34,7 +34,6 @@ services:
       PORT: "8080"
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/halora"
       ALLOWED_ORIGINS: "https://halora.co.id"
-      OVERHEAD_RATE: "0.10"
       PPN_RATE: "0.11"
       JWT_SECRET: ${JWT_SECRET}
 

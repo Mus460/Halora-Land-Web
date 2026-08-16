@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -14,33 +13,6 @@ import (
 
 	"github.com/halora-land/halora-be/internal/models"
 )
-
-// RecapRepo manages the per-project margin settings row (category='settings').
-type RecapRepo struct{ pool database.Pool }
-
-func NewRecapRepo(pool database.Pool) *RecapRepo { return &RecapRepo{pool: pool} }
-
-func (r *RecapRepo) GetMargin(ctx context.Context, projectID int32) (decimal.Decimal, error) {
-	var m sql.NullString
-	err := r.pool.QueryRow(ctx, `SELECT margin::text FROM recaps WHERE "projectId" = $1 AND category = 'settings'`, projectID).Scan(&m)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return decimal.Zero, err
-	}
-	if !m.Valid {
-		return decimal.Zero, nil
-	}
-	return scanDec(m.String), nil
-}
-
-func (r *RecapRepo) UpsertMargin(ctx context.Context, projectID int32, margin decimal.Decimal) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO recaps ("projectId", category, description, sequence, margin)
-		VALUES ($1, 'settings', 'Margin & Overhead Settings', 0, $2)
-		ON CONFLICT ("projectId", category)
-		DO UPDATE SET margin = EXCLUDED.margin, "updatedAt" = CURRENT_TIMESTAMP`,
-		projectID, decArg(margin))
-	return err
-}
 
 // --- Invoice ---
 

@@ -26,7 +26,6 @@ func (app *App) routes() http.Handler {
 	pekerjaanRepo := repository.NewWorkItemRepo(app.pool)
 	maRepo := repository.NewAnalysisMasterRepo(app.pool)
 	mhRepo := repository.NewPriceMasterRepo(app.pool)
-	rekapRepo := repository.NewRecapRepo(app.pool)
 	clientRepo := repository.NewClientRepo(app.pool)
 	dashRepo := repository.NewDashboardRepo(app.pool)
 	auditRepo := repository.NewAuditLogRepo(app.pool)
@@ -34,15 +33,15 @@ func (app *App) routes() http.Handler {
 
 	// Services
 	snap := service.NewSnapshotService(app.pool, pekerjaanRepo, maRepo, app.audit)
-	rab := service.NewRABService(app.pool, pekerjaanRepo, rekapRepo, app.cfg.OverheadRate, app.cfg.PPNRate)
+	rab := service.NewRABService(app.pool, pekerjaanRepo, app.cfg.PPNRate)
 	progress := service.NewProgressService(app.pool)
 	importer := ahsp.NewImporter(app.pool)
 
 	// Handlers
 	authH := handler.NewAuthHandler(app.cfg, app.verifier, app.audit)
-	proyekH := handler.NewProjectHandler(app.pool, proyekRepo)
-	pekerjaanH := handler.NewWorkItemHandler(app.pool, pekerjaanRepo, snap, progress)
-	subH := handler.NewProjectSubHandler(app.pool, proyekRepo, rekapRepo, rab, snap, progress)
+	proyekH := handler.NewProjectHandler(app.pool, proyekRepo, rab)
+	pekerjaanH := handler.NewWorkItemHandler(app.pool, pekerjaanRepo, snap, progress, rab)
+	subH := handler.NewProjectSubHandler(app.pool, proyekRepo, rab, snap, progress)
 	maH := handler.NewAnalysisMasterHandler(app.pool, maRepo)
 	mhH := handler.NewPriceMasterHandler(app.pool, mhRepo)
 	clientH := handler.NewClientHandler(clientRepo)
@@ -89,7 +88,6 @@ func (app *App) routes() http.Handler {
 			r.Put("/projects/{id}", proyekH.Update)
 			r.Delete("/projects/{id}", proyekH.Delete)
 			r.Get("/projects/{id}/recaps", subH.RecapGet)
-			r.Put("/projects/{id}/recaps", subH.RecapPut)
 			r.Post("/projects/{id}/recalculate-all", subH.RecalculateAll)
 			r.Get("/projects/{id}/transactions", subH.TransactionList)
 			r.Post("/projects/{id}/transactions", subH.TransactionCreate)

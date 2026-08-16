@@ -200,7 +200,6 @@ export default function ProjectPage() {
         fd.append("name", (data as any).name || "");
         fd.append("location", (data as any).location || "");
         fd.append("type", (data as any).type || "building");
-        fd.append("contractValue", String((data as any).contractValue || 0));
         fd.append("buildingArea", String((data as any).buildingArea || 0));
         fd.append("timelineMonths", String((data as any).timelineMonths || 0));
         fd.append("timelineDays", String((data as any).timelineDays || 0));
@@ -222,7 +221,7 @@ export default function ProjectPage() {
         refreshProjectList();
         const imported = result.imported || {};
         toast.success(
-          `Proyek berhasil dibuat dari BOQ (${imported.workItems || 0} pekerjaan, ${imported.recaps || 0} rekap)`
+          `Proyek berhasil dibuat dari BOQ (${imported.workItems || 0} pekerjaan)`
         );
       } else {
         // Create new

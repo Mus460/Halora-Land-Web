@@ -152,10 +152,8 @@ export default function RABPage() {
   // Calculate totals
   const subtotal = workItem.reduce((sum, p) => sum + Number(p.totalCost), 0)
   const totalDuration = workItem.reduce((sum, p) => sum + (p.totalDuration || 0), 0)
-  const overhead = subtotal * 0.10
-  const profit = (subtotal + overhead) * 0.10
-  const ppn = (subtotal + overhead + profit) * 0.11
-  const total = subtotal + overhead + profit + ppn
+  const ppn = subtotal * 0.11
+  const total = subtotal + ppn
 
   // Group by category
   const grouped = workItem.reduce((acc, item) => {
@@ -306,14 +304,6 @@ export default function RABPage() {
                 <div className="flex justify-between text-sm">
                   <span>Estimasi Waktu:</span>
                   <span className="font-medium">{formatDuration(totalDuration)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Overhead (10%):</span>
-                  <span className="font-medium">{formatCurrency(overhead)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Profit (10%):</span>
-                  <span className="font-medium">{formatCurrency(profit)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>PPN (11%):</span>
