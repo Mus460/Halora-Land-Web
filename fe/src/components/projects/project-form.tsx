@@ -24,7 +24,7 @@ interface ProjectFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project?: Project | null;
-  onSubmit: (data: Partial<Project>, boqFile?: File | null) => void;
+  onSubmit: (data: Partial<Project>) => void;
 }
 
 export function ProjectForm({
@@ -43,7 +43,6 @@ export function ProjectForm({
     timelineMonths: 0,
     timelineDays: 0,
   });
-  const [boqFile, setBoqFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -57,12 +56,11 @@ export function ProjectForm({
       timelineMonths: project?.timelineMonths || 0,
       timelineDays: project?.timelineDays || 0,
     });
-    setBoqFile(null);
   }, [open, project]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(form, boqFile);
+    onSubmit(form);
     onOpenChange(false);
     setForm({
       name: "",
@@ -74,7 +72,6 @@ export function ProjectForm({
       timelineMonths: 0,
       timelineDays: 0,
     });
-    setBoqFile(null);
   };
 
   return (
@@ -86,34 +83,16 @@ export function ProjectForm({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!project && (
-            <div className="space-y-2">
-              <Label htmlFor="boq">File BOQ / RAB (xlsx)</Label>
-              <Input
-                id="boq"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) =>
-                  setBoqFile(e.target.files?.[0] || null)
-                }
-              />
-              <p className="text-xs text-gray-500">
-                Pilih file BOQ untuk otomatis mengisi item pekerjaan. Nilai
-                kontrak disinkronkan otomatis dari total RAB. Nama proyek bisa
-                dikosongkan agar diambil dari judul BOQ.
-              </p>
-            </div>
-          )}
           <div className="space-y-2">
-            <Label htmlFor="name">Nama Proyek {!boqFile ? "*" : ""}</Label>
+            <Label htmlFor="name">Nama Proyek *</Label>
             <Input
               id="name"
               value={form.name}
               onChange={(e) =>
                 setForm({ ...form, name: e.target.value })
               }
-              placeholder={boqFile ? "Dari judul BOQ" : "Masukkan nama proyek"}
-              required={!boqFile}
+              placeholder="Masukkan nama proyek"
+              required
             />
           </div>
           <div className="space-y-2">

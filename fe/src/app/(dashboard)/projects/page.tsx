@@ -169,10 +169,7 @@ export default function ProjectPage() {
     }
   };
 
-  const handleSubmit = async (
-    data: Partial<Project>,
-    boqFile?: File | null
-  ) => {
+  const handleSubmit = async (data: Partial<Project>) => {
     try {
       if (editProject) {
         // Update existing
@@ -193,36 +190,6 @@ export default function ProjectPage() {
         );
         refreshProjectList();
         toast.success("Proyek berhasil diupdate");
-      } else if (boqFile) {
-        // Create from BOQ file (multipart)
-        const fd = new FormData();
-        fd.append("boq", boqFile);
-        fd.append("name", (data as any).name || "");
-        fd.append("location", (data as any).location || "");
-        fd.append("type", (data as any).type || "building");
-        fd.append("buildingArea", String((data as any).buildingArea || 0));
-        fd.append("timelineMonths", String((data as any).timelineMonths || 0));
-        fd.append("timelineDays", String((data as any).timelineDays || 0));
-
-        const response = await fetch("/api/projects/import", {
-          method: 'POST',
-          body: fd,
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to import BOQ');
-        }
-
-        setProjects((prev) => [result.projects, ...prev]);
-        setActiveProject(result.projects);
-        setCurrentProjectId(result.projects.id);
-        refreshProjectList();
-        const imported = result.imported || {};
-        toast.success(
-          `Proyek berhasil dibuat dari BOQ (${imported.workItems || 0} pekerjaan)`
-        );
       } else {
         // Create new
         const response = await fetch("/api/projects", {
