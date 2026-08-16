@@ -325,7 +325,10 @@ function PekerjaanFormDialog({
       level: item?.level || "",
       type: item?.type || "",
       calculationMethod: item?.calculationMethod || "ahsp",
-      durationHours: Number(item?.totalDuration || 0),
+      durationHours:
+        item?.calculationMethod === "manual"
+          ? Number(item?.totalDuration || 0)
+          : 0,
     });
     setAhspQuery("");
     setAhspResults([]);
@@ -410,7 +413,7 @@ function PekerjaanFormDialog({
       totalCost,
       calculationMethod: metode,
       duration:
-        durationHours > 0 && volume > 0 ? durationHours / volume : undefined,
+        metode === "manual" && volume > 0 ? durationHours / volume : undefined,
       analysisMasterId: item ? undefined : (selectedAhsp?.id ?? null),
     });
     if (ok) {
@@ -652,31 +655,37 @@ function PekerjaanFormDialog({
           )}
 
           {(metode === "manual" || item) && (
-            <div className="grid grid-cols-2 gap-4">
+            <div
+              className={
+                metode === "manual" ? "grid grid-cols-2 gap-4" : "space-y-2"
+              }
+            >
               <CurrencyInput
                 label="Harga Satuan"
                 value={form.unitPrice}
                 onChange={(value) => setForm({ ...form, unitPrice: value })}
               />
-              <div className="space-y-2">
-                <Label>Estimasi Waktu (jam)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.5"
-                  value={form.durationHours || ""}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      durationHours: Math.max(0, Number(e.target.value) || 0),
-                    })
-                  }
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-500">
-                  Total durasi pengerjaan item (1 hari = 24 jam)
-                </p>
-              </div>
+              {metode === "manual" && (
+                <div className="space-y-2">
+                  <Label>Estimasi Waktu (jam)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={form.durationHours || ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        durationHours: Math.max(0, Number(e.target.value) || 0),
+                      })
+                    }
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Total durasi pengerjaan item (1 hari = 24 jam)
+                  </p>
+                </div>
+              )}
               {item && item.calculationMethod === "ahsp" && (
                 <p className="text-xs text-gray-500 col-span-2">
                   Harga satuan diinput manual, rincian AHSP tidak diubah.
@@ -700,7 +709,7 @@ function PekerjaanFormDialog({
                   {formatCurrency(form.unitPrice)}
                 </span>
               </div>
-              {form.durationHours > 0 && (
+              {form.durationHours > 0 && metode === "manual" && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Estimasi Waktu</span>
                   <span className="font-medium">

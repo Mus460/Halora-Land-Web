@@ -10,7 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const progressQuery = `SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text, unit, "totalCost"::text, progress, duration::text`
+const progressQuery = `SELECT id, category, description, trim_scale\(ROUND\(volume, 2\)\)::text, unit, "totalCost"::text, progress, COALESCE\(duration, 0\)::text`
 
 func progressRows() []string {
 	return []string{"id", "category", "description", "volume", "unit", "totalCost", "progress", "duration"}
