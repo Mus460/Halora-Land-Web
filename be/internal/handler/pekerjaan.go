@@ -89,6 +89,7 @@ func (h *WorkItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Level             *string         `json:"level"`
 		Type              *string         `json:"type"`
 		AnalysisMasterID  *int32          `json:"analysisMasterId"`
+		Duration          *decimal.Decimal `json:"duration"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -119,6 +120,8 @@ func (h *WorkItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		duration = wk
+	} else {
+		duration = in.Duration
 	}
 	p, err := h.repo.Create(r.Context(), nil, repository.CreateWorkItemInput{
 		ProjectID: in.ProjectID, Category: models.WorkCategory(in.Category),
@@ -161,6 +164,7 @@ func (h *WorkItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Level             *string          `json:"level"`
 		Type              *string          `json:"type"`
 		CalculationMethod *string          `json:"calculationMethod"`
+		Duration          *decimal.Decimal `json:"duration"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
@@ -178,7 +182,7 @@ func (h *WorkItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	updated, err := h.repo.Update(r.Context(), id, repository.UpdateWorkItemInput{
 		Volume: in.Volume, UnitPrice: in.UnitPrice, TotalCost: tb,
 		Description: in.Description, Unit: in.Unit, Level: in.Level,
-		Type: in.Type, CalculationMethod: mh,
+		Type: in.Type, CalculationMethod: mh, Duration: in.Duration,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

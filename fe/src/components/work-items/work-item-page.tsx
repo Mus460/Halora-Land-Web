@@ -305,6 +305,7 @@ function PekerjaanFormDialog({
     level: "",
     type: "",
     calculationMethod: "ahsp" as CalculationMethod,
+    durationHours: 0,
   });
   const [ahspQuery, setAhspQuery] = useState("");
   const [ahspResults, setAhspResults] = useState<AHSPResult[]>([]);
@@ -324,6 +325,7 @@ function PekerjaanFormDialog({
       level: item?.level || "",
       type: item?.type || "",
       calculationMethod: item?.calculationMethod || "ahsp",
+      durationHours: Number(item?.totalDuration || 0),
     });
     setAhspQuery("");
     setAhspResults([]);
@@ -400,12 +402,15 @@ function PekerjaanFormDialog({
       setAhspError("Volume/jumlah wajib diisi");
       return;
     }
+    const { durationHours, ...payload } = form;
     const ok = await onSubmit({
-      ...form,
+      ...payload,
       volume,
       unitPrice: form.unitPrice,
       totalCost,
       calculationMethod: metode,
+      duration:
+        durationHours > 0 && volume > 0 ? durationHours / volume : undefined,
       analysisMasterId: item ? undefined : (selectedAhsp?.id ?? null),
     });
     if (ok) {
@@ -647,14 +652,33 @@ function PekerjaanFormDialog({
           )}
 
           {(metode === "manual" || item) && (
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4">
               <CurrencyInput
                 label="Harga Satuan"
                 value={form.unitPrice}
                 onChange={(value) => setForm({ ...form, unitPrice: value })}
               />
-              {item && item.calculationMethod === "ahsp" && (
+              <div className="space-y-2">
+                <Label>Estimasi Waktu (jam)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={form.durationHours || ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      durationHours: Math.max(0, Number(e.target.value) || 0),
+                    })
+                  }
+                  placeholder="0"
+                />
                 <p className="text-xs text-gray-500">
+                  Total durasi pengerjaan item (1 hari = 24 jam)
+                </p>
+              </div>
+              {item && item.calculationMethod === "ahsp" && (
+                <p className="text-xs text-gray-500 col-span-2">
                   Harga satuan diinput manual, rincian AHSP tidak diubah.
                 </p>
               )}
@@ -676,6 +700,14 @@ function PekerjaanFormDialog({
                   {formatCurrency(form.unitPrice)}
                 </span>
               </div>
+              {form.durationHours > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Estimasi Waktu</span>
+                  <span className="font-medium">
+                    {formatDuration(form.durationHours)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-bold border-t pt-1">
                 <span>Total Biaya</span>
                 <span className="text-amber-600">

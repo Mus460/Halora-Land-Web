@@ -182,7 +182,7 @@ func TestWorkItemUpdate(t *testing.T) {
 	vol := decimal.NewFromInt(20)
 	desc := "Updated"
 	m.ExpectQuery(`UPDATE work_items SET`).
-		WithArgs(int32(2), "20", nil, nil, &desc, (*string)(nil), (*string)(nil), (*string)(nil), (*models.CalculationMethod)(nil)).
+		WithArgs(int32(2), "20", nil, nil, &desc, (*string)(nil), (*string)(nil), (*string)(nil), (*models.CalculationMethod)(nil), nil).
 		WillReturnRows(pgxmock.NewRows(workItemRow()).
 			AddRow(int32(2), int32(1), models.CategoryRoof, "Updated", "20", "m2", "522451", "10449020",
 				models.MethodAHSP, nil, nil, nil, nil, nil, nil, time.Now(), time.Now()))

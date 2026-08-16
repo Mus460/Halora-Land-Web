@@ -164,6 +164,7 @@ type UpdateWorkItemInput struct {
 	Level             *string
 	Type              *string
 	CalculationMethod *models.CalculationMethod
+	Duration          *decimal.Decimal
 }
 
 func (r *WorkItemRepo) Update(ctx context.Context, id int32, in UpdateWorkItemInput) (*models.WorkItem, error) {
@@ -177,13 +178,14 @@ func (r *WorkItemRepo) Update(ctx context.Context, id int32, in UpdateWorkItemIn
 			"level" = COALESCE($7, "level"),
 			"type" = COALESCE($8, "type"),
 			"calculationMethod" = COALESCE($9, "calculationMethod"),
+			duration = COALESCE($10, duration),
 			"updatedAt" = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING id, "projectId", category, "description", volume, unit, "unitPrice", "totalCost",
 			"calculationMethod", "level", "type", "analysisMasterId", "basePrice", duration, (duration * volume) AS "totalDuration",
 			"createdAt", "updatedAt"`,
 		id, decPtrArg(in.Volume), decPtrArg(in.UnitPrice), decPtrArg(in.TotalCost),
-		in.Description, in.Unit, in.Level, in.Type, in.CalculationMethod)
+		in.Description, in.Unit, in.Level, in.Type, in.CalculationMethod, decPtrArg(in.Duration))
 	return scanWorkItem(row)
 }
 
