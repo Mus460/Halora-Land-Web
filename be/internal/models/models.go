@@ -249,17 +249,6 @@ type Client struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-type Recap struct {
-	ID          int32            `json:"id"`
-	ProjectID   int32            `json:"projectId"`
-	Category    string           `json:"category"`
-	Description string           `json:"description"`
-	Sequence    int32            `json:"sequence"`
-	Margin      *decimal.Decimal `json:"margin"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	UpdatedAt   time.Time        `json:"updatedAt"`
-}
-
 type Invoice struct {
 	ID                   int32           `json:"id"`
 	ProjectID            int32           `json:"projectId"`

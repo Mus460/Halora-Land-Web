@@ -87,9 +87,6 @@ func TestLoad(t *testing.T) {
 	if len(cfg.AllowedOrigins) != 2 || cfg.AllowedOrigins[1] != "http://b.com" {
 		t.Errorf("AllowedOrigins = %v", cfg.AllowedOrigins)
 	}
-	if !cfg.OverheadRate.Equal(decimal.RequireFromString("0.05")) {
-		t.Errorf("OverheadRate = %s", cfg.OverheadRate)
-	}
 	if !cfg.PPNRate.Equal(decimal.RequireFromString("0.12")) {
 		t.Errorf("PPNRate = %s", cfg.PPNRate)
 	}
@@ -105,7 +102,6 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://default")
 	os.Unsetenv("PORT")
 	os.Unsetenv("ALLOWED_ORIGINS")
-	os.Unsetenv("OVERHEAD_RATE")
 	os.Unsetenv("PPN_RATE")
 	os.Unsetenv("NODE_ENV")
 	cfg, err := Load()
@@ -117,9 +113,6 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if len(cfg.AllowedOrigins) != 1 || cfg.AllowedOrigins[0] != "http://localhost:3000" {
 		t.Errorf("AllowedOrigins = %v", cfg.AllowedOrigins)
-	}
-	if !cfg.OverheadRate.Equal(decimal.RequireFromString("0.10")) {
-		t.Errorf("OverheadRate = %s", cfg.OverheadRate)
 	}
 	if !cfg.PPNRate.Equal(decimal.RequireFromString("0.11")) {
 		t.Errorf("PPNRate = %s", cfg.PPNRate)

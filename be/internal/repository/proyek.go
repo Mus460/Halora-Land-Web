@@ -114,7 +114,6 @@ type ProjectDetailWorkItem struct {
 
 type ProjectDetailCount struct {
 	WorkItem int32 `json:"work_items"`
-	Recap    int32 `json:"recaps"`
 	Invoice  int32 `json:"invoices"`
 }
 
@@ -177,11 +176,10 @@ func (r *ProjectRepo) GetDetail(ctx context.Context, id int32) (*ProjectDetail, 
 		}
 	}
 
-	var workItemCount, recapCount, invoiceCount int32
+	var workItemCount, invoiceCount int32
 	r.pool.QueryRow(ctx, `SELECT count(*) FROM work_items WHERE "projectId" = $1 AND "deletedAt" IS NULL`, id).Scan(&workItemCount)
-	r.pool.QueryRow(ctx, `SELECT count(*) FROM recaps WHERE "projectId" = $1`, id).Scan(&recapCount)
 	r.pool.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE "projectId" = $1`, id).Scan(&invoiceCount)
-	detail.Count = ProjectDetailCount{WorkItem: workItemCount, Recap: recapCount, Invoice: invoiceCount}
+	detail.Count = ProjectDetailCount{WorkItem: workItemCount, Invoice: invoiceCount}
 
 	return detail, nil
 }
@@ -218,16 +216,9 @@ type ImportedWorkItem struct {
 	TotalCost   decimal.Decimal
 }
 
-// ImportedRecap is one row of the BOQ REKAP PER DIVISI section.
-type ImportedRecap struct {
-	Category    string
-	Description string
-	Amount      decimal.Decimal
-}
-
-// ImportBOQ creates a project together with its work_items and recaps inside a
-// single transaction (used when creating a project from a BOQ/RAB file).
-func (r *ProjectRepo) ImportBOQ(ctx context.Context, in CreateProjectInput, items []ImportedWorkItem, divisions []ImportedRecap) (*models.Project, error) {
+// ImportBOQ creates a project together with its work_items inside a single
+// transaction (used when creating a project from a BOQ/RAB file).
+func (r *ProjectRepo) ImportBOQ(ctx context.Context, in CreateProjectInput, items []ImportedWorkItem) (*models.Project, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -251,18 +242,6 @@ func (r *ProjectRepo) ImportBOQ(ctx context.Context, in CreateProjectInput, item
 			INSERT INTO work_items ("projectId", category, "description", volume, unit, "unitPrice", "totalCost", "calculationMethod")
 			VALUES ($1,$2,$3,$4,$5,$6,$7,'manual')`,
 			p.ID, it.Category, it.Description, decArg(it.Volume), it.Unit, decArg(it.UnitPrice), decArg(it.TotalCost)); err != nil {
-			return nil, err
-		}
-	}
-
-	for i, d := range divisions {
-		if d.Category == "" {
-			continue
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO recaps ("projectId", category, description, sequence, margin)
-			VALUES ($1,$2,$3,$4,NULL)`,
-			p.ID, d.Category, d.Description, i+1); err != nil {
 			return nil, err
 		}
 	}

@@ -174,17 +174,6 @@ export interface Client {
   updatedAt: string;
 }
 
-export interface Recap {
-  id: number;
-  projectId: number;
-  category: string;
-  description: string;
-  sequence: number;
-  margin: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface InvoiceItem {
   id?: number;
   description: string;
@@ -264,8 +253,6 @@ export interface CalculationResult {
 
 export interface RABResult {
   subtotal: number;
-  overhead: number;
-  profit: number;
   ppn: number;
   total: number;
 }

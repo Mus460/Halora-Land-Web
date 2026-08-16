@@ -14,9 +14,8 @@ type Config struct {
 	DatabaseURL    string
 	AllowedOrigins []string
 
-	// Rollup defaults (configurable per ARCHITECTURE.md §3.5/§8.3 — no longer hardcoded 0.10/0.11)
-	OverheadRate decimal.Decimal
-	PPNRate      decimal.Decimal
+	// PPN rate applied to the RAB subtotal (configurable per ARCHITECTURE.md §3.5/§8.3).
+	PPNRate decimal.Decimal
 
 	IsProd bool
 
@@ -31,7 +30,6 @@ func Load() (*Config, error) {
 		Port:           GetEnvString("PORT", "8080"),
 		DatabaseURL:    mustEnv("DATABASE_URL"),
 		AllowedOrigins: strings.Split(GetEnvString("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
-		OverheadRate:   GetEnvDecimal("OVERHEAD_RATE", decimal.RequireFromString("0.10")),
 		PPNRate:        GetEnvDecimal("PPN_RATE", decimal.RequireFromString("0.11")),
 		IsProd:         GetEnvString("NODE_ENV", "development") == "production",
 		JWTSecret:      GetEnvString("JWT_SECRET", ""),

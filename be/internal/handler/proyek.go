@@ -15,15 +15,17 @@ import (
 	"github.com/halora-land/halora-be/internal/boq"
 	"github.com/halora-land/halora-be/internal/models"
 	"github.com/halora-land/halora-be/internal/repository"
+	"github.com/halora-land/halora-be/service"
 )
 
 type ProjectHandler struct {
 	pool database.Pool
 	repo *repository.ProjectRepo
+	rab  *service.RABService
 }
 
-func NewProjectHandler(pool database.Pool, repo *repository.ProjectRepo) *ProjectHandler {
-	return &ProjectHandler{pool: pool, repo: repo}
+func NewProjectHandler(pool database.Pool, repo *repository.ProjectRepo, rab *service.RABService) *ProjectHandler {
+	return &ProjectHandler{pool: pool, repo: repo, rab: rab}
 }
 
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +107,8 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Import creates a project from an uploaded BOQ/RAB xlsx (multipart/form-data
 // with a "boq" file and the standard project form fields). It parses the file,
-// then creates the project together with its work_items and recaps.
+// then creates the project together with its work_items. The contract value is
+// synced from the total RAB computed afterwards.
 func (h *ProjectHandler) Import(w http.ResponseWriter, r *http.Request) {
 	u := auth.FromContext(r.Context())
 	if err := r.ParseMultipartForm(20 << 20); err != nil {
@@ -157,16 +160,6 @@ func (h *ProjectHandler) Import(w http.ResponseWriter, r *http.Request) {
 	if l := strings.TrimSpace(r.FormValue("location")); l != "" {
 		location = &l
 	}
-	var cv *decimal.Decimal
-	if s := strings.TrimSpace(r.FormValue("contractValue")); s != "" {
-		if d, err := decimal.NewFromString(s); err == nil && !d.IsZero() {
-			cv = &d
-		}
-	}
-	if cv == nil && !doc.Total.IsZero() {
-		d := doc.Total
-		cv = &d
-	}
 	var ba *decimal.Decimal
 	if s := strings.TrimSpace(r.FormValue("buildingArea")); s != "" {
 		if d, err := decimal.NewFromString(s); err == nil && d.IsPositive() {
@@ -181,24 +174,19 @@ func (h *ProjectHandler) Import(w http.ResponseWriter, r *http.Request) {
 			Unit: it.Unit, UnitPrice: it.UnitPrice, TotalCost: it.TotalCost,
 		})
 	}
-	divisions := make([]repository.ImportedRecap, 0, len(doc.Divisions))
-	for _, d := range doc.Divisions {
-		divisions = append(divisions, repository.ImportedRecap{
-			Category: d.Letter, Description: d.Description, Amount: d.Amount,
-		})
-	}
 
 	p, err := h.repo.ImportBOQ(r.Context(), repository.CreateProjectInput{
 		UserID: u.UserID, Name: name, Location: location, Type: ptype,
-		ContractValue: cv, BuildingArea: ba, TimelineMonths: tMonths, TimelineDays: tDays,
-	}, items, divisions)
+		BuildingArea: ba, TimelineMonths: tMonths, TimelineDays: tDays,
+	}, items)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.rab.SyncContractValue(r.Context(), p.ID)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"projects": p,
-		"imported": map[string]any{"workItems": len(items), "recaps": len(divisions)},
+		"imported": map[string]any{"workItems": len(items)},
 	})
 }
 

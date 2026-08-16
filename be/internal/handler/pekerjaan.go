@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -20,10 +21,22 @@ type WorkItemHandler struct {
 	repo     *repository.WorkItemRepo
 	snapshot *service.SnapshotService
 	progress *service.ProgressService
+	rab      *service.RABService
 }
 
-func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService, progress *service.ProgressService) *WorkItemHandler {
-	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss, progress: progress}
+func NewWorkItemHandler(pool database.Pool, repo *repository.WorkItemRepo, ss *service.SnapshotService, progress *service.ProgressService, rab *service.RABService) *WorkItemHandler {
+	return &WorkItemHandler{pool: pool, repo: repo, snapshot: ss, progress: progress, rab: rab}
+}
+
+// syncContractValue keeps projects.contractValue in sync with the total RAB.
+// A nil RABService (tests) is a no-op.
+func (h *WorkItemHandler) syncContractValue(ctx context.Context, projectID int32) {
+	if h.rab == nil {
+		return
+	}
+	if err := h.rab.SyncContractValue(ctx, projectID); err != nil {
+		return
+	}
 }
 
 func (h *WorkItemHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +122,7 @@ func (h *WorkItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		h.syncContractValue(r.Context(), in.ProjectID)
 		writeJSON(w, http.StatusCreated, p)
 		return
 	}
@@ -134,6 +148,7 @@ func (h *WorkItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), in.ProjectID)
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -188,6 +203,7 @@ func (h *WorkItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), p.ProjectID)
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -214,6 +230,7 @@ func (h *WorkItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), p.ProjectID)
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
@@ -247,6 +264,7 @@ func (h *WorkItemHandler) FromAHSP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), pid)
 	writeJSON(w, http.StatusCreated, map[string]any{"success": true, "work_items": p})
 }
 
@@ -346,6 +364,7 @@ func (h *WorkItemHandler) UpdateDetails(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), p.ProjectID)
 	updated, err := h.repo.Get(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -389,6 +408,7 @@ func (h *WorkItemHandler) Recalculate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.syncContractValue(r.Context(), p.ProjectID)
 	writeJSON(w, http.StatusOK, out)
 }
 

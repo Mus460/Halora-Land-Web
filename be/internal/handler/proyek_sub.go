@@ -22,7 +22,6 @@ import (
 type ProjectSubHandler struct {
 	pool     database.Pool
 	projects *repository.ProjectRepo
-	recaps   *repository.RecapRepo
 	rab      *service.RABService
 	snap     *service.SnapshotService
 	progress *service.ProgressService
@@ -31,9 +30,9 @@ type ProjectSubHandler struct {
 	inv      *repository.InvoiceRepo
 }
 
-func NewProjectSubHandler(pool database.Pool, pr *repository.ProjectRepo, rr *repository.RecapRepo, rab *service.RABService, ss *service.SnapshotService, progress *service.ProgressService) *ProjectSubHandler {
+func NewProjectSubHandler(pool database.Pool, pr *repository.ProjectRepo, rab *service.RABService, ss *service.SnapshotService, progress *service.ProgressService) *ProjectSubHandler {
 	return &ProjectSubHandler{
-		pool: pool, projects: pr, recaps: rr, rab: rab, snap: ss, progress: progress,
+		pool: pool, projects: pr, rab: rab, snap: ss, progress: progress,
 		real: repository.NewTransactionRepo(pool),
 		log:  repository.NewLogisticsRepo(pool),
 		inv:  repository.NewInvoiceRepo(pool),
@@ -67,32 +66,6 @@ func (h *ProjectSubHandler) RecapGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-func (h *ProjectSubHandler) RecapPut(w http.ResponseWriter, r *http.Request) {
-	pid, ok := parseIntParam(w, r, "id")
-	if !ok {
-		return
-	}
-	if _, _, found, ok := auth.ProjectAccess(r.Context(), h.pool, pid, auth.AccessEdit); !ok {
-		if !found {
-			writeError(w, http.StatusNotFound, "Project tidak ditemukan")
-		} else {
-			writeError(w, http.StatusForbidden, "Forbidden")
-		}
-		return
-	}
-	var in struct {
-		Margin decimal.Decimal `json:"margin"`
-	}
-	if !decodeJSON(w, r, &in) {
-		return
-	}
-	if err := h.recaps.UpsertMargin(r.Context(), pid, in.Margin); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "margin": in.Margin})
-}
-
 func (h *ProjectSubHandler) RecalculateAll(w http.ResponseWriter, r *http.Request) {
 	pid, ok := parseIntParam(w, r, "id")
 	if !ok {
@@ -109,6 +82,10 @@ func (h *ProjectSubHandler) RecalculateAll(w http.ResponseWriter, r *http.Reques
 	u := auth.FromContext(r.Context())
 	n, err := h.snap.RecalculateAll(r.Context(), pid, u)
 	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := h.rab.SyncContractValue(r.Context(), pid); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

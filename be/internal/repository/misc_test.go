@@ -11,47 +11,6 @@ import (
 	"github.com/halora-land/halora-be/internal/models"
 )
 
-// --- RecapRepo (margin) ---
-
-func TestRecapGetMargin(t *testing.T) {
-	m := newPool(t)
-	m.ExpectQuery(`SELECT margin::text FROM recaps`).WithArgs(int32(1)).
-		WillReturnRows(pgxmock.NewRows([]string{"margin"}).AddRow("0.15"))
-	r := NewRecapRepo(m)
-	g, err := r.GetMargin(context.Background(), 1)
-	if err != nil {
-		t.Fatalf("GetMargin: %v", err)
-	}
-	if !g.Equal(decimal.RequireFromString("0.15")) {
-		t.Errorf("margin = %s", g)
-	}
-}
-
-func TestRecapGetMarginNone(t *testing.T) {
-	m := newPool(t)
-	m.ExpectQuery(`SELECT margin::text FROM recaps`).WithArgs(int32(1)).
-		WillReturnRows(pgxmock.NewRows([]string{"margin"}).AddRow(nil))
-	r := NewRecapRepo(m)
-	g, err := r.GetMargin(context.Background(), 1)
-	if err != nil {
-		t.Fatalf("GetMargin: %v", err)
-	}
-	if !g.IsZero() {
-		t.Errorf("margin = %s want zero", g)
-	}
-}
-
-func TestRecapUpsertMargin(t *testing.T) {
-	m := newPool(t)
-	m.ExpectExec(`INSERT INTO recaps`).
-		WithArgs(int32(1), "0.12").
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
-	r := NewRecapRepo(m)
-	if err := r.UpsertMargin(context.Background(), 1, decimal.RequireFromString("0.12")); err != nil {
-		t.Fatalf("UpsertMargin: %v", err)
-	}
-}
-
 // --- InvoiceRepo ---
 
 func invoiceRow() []string {

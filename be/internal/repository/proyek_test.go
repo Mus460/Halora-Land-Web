@@ -96,8 +96,6 @@ func TestProjectGetDetail(t *testing.T) {
 			AddRow(int32(5), "Galian", "12", "m3", "50000", "600000", models.CategoryPreparation))
 	m.ExpectQuery(`FROM work_items WHERE`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows([]string{"c"}).AddRow(int32(3)))
-	m.ExpectQuery(`FROM recaps WHERE`).WithArgs(int32(1)).
-		WillReturnRows(pgxmock.NewRows([]string{"c"}).AddRow(int32(1)))
 	m.ExpectQuery(`FROM invoices WHERE`).WithArgs(int32(1)).
 		WillReturnRows(pgxmock.NewRows([]string{"c"}).AddRow(int32(2)))
 
@@ -115,7 +113,7 @@ func TestProjectGetDetail(t *testing.T) {
 	if len(d.WorkItem) != 1 || !d.WorkItem[0].Volume.Equal(decimal.NewFromInt(12)) {
 		t.Errorf("workItems = %+v", d.WorkItem)
 	}
-	if d.Count.WorkItem != 3 || d.Count.Recap != 1 || d.Count.Invoice != 2 {
+	if d.Count.WorkItem != 3 || d.Count.Invoice != 2 {
 		t.Errorf("count = %+v", d.Count)
 	}
 }
@@ -155,9 +153,6 @@ func TestProjectImportBOQ(t *testing.T) {
 	m.ExpectExec(`INSERT INTO work_items`).
 		WithArgs(int32(8), models.CategoryRoof, "Atap", "30", "m2", "200000", "6000000").
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
-	m.ExpectExec(`INSERT INTO recaps`).
-		WithArgs(int32(8), "wall", "Dinding & Plesteran", 1).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	m.ExpectCommit()
 
 	r := NewProjectRepo(m)
@@ -165,8 +160,7 @@ func TestProjectImportBOQ(t *testing.T) {
 		[]ImportedWorkItem{
 			{Category: models.CategoryWall, Description: "Pasang bata", Volume: decimal.NewFromInt(20), Unit: "m2", UnitPrice: decimal.NewFromInt(120000), TotalCost: decimal.NewFromInt(2400000)},
 			{Category: models.CategoryRoof, Description: "Atap", Volume: decimal.NewFromInt(30), Unit: "m2", UnitPrice: decimal.NewFromInt(200000), TotalCost: decimal.NewFromInt(6000000)},
-		},
-		[]ImportedRecap{{Category: "wall", Description: "Dinding & Plesteran"}})
+		})
 	if err != nil {
 		t.Fatalf("ImportBOQ: %v", err)
 	}
@@ -185,7 +179,7 @@ func TestProjectImportBOQSkipsEmptyDescriptions(t *testing.T) {
 	m.ExpectCommit()
 	r := NewProjectRepo(m)
 	_, err := r.ImportBOQ(context.Background(), CreateProjectInput{UserID: 4, Name: "Gedung", Type: models.ProjectTypeBuilding},
-		[]ImportedWorkItem{{Description: "", Volume: decimal.NewFromInt(1)}}, nil)
+		[]ImportedWorkItem{{Description: "", Volume: decimal.NewFromInt(1)}})
 	if err != nil {
 		t.Fatalf("ImportBOQ: %v", err)
 	}
