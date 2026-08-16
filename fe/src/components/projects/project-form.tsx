@@ -170,12 +170,13 @@ export function ProjectForm({
             </Select>
           </div>
           <CurrencyInput
-            label="Nilai Kontrak"
+            label={`Nilai Kontrak${!project ? " *" : ""}`}
             value={form.contractValue}
             onChange={(value) => setForm({ ...form, contractValue: value })}
+            required={!project}
           />
           <div className="space-y-2">
-            <Label htmlFor="buildingArea">Luas Bangunan (m²)</Label>
+            <Label htmlFor="buildingArea">Luas Bangunan (m²){!project ? " *" : ""}</Label>
             <Input
               id="buildingArea"
               type="number"
@@ -189,10 +190,11 @@ export function ProjectForm({
                 })
               }
               placeholder="0"
+              required={!project}
             />
           </div>
           <div className="space-y-2">
-            <Label>Timeline</Label>
+            <Label>Timeline{!project ? " *" : ""}</Label>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Input
@@ -203,6 +205,7 @@ export function ProjectForm({
                     setForm({ ...form, timelineMonths: Math.max(0, Number(e.target.value) || 0) })
                   }
                   placeholder="0"
+                  required={!project}
                 />
                 <p className="text-xs text-gray-500">Bulan</p>
               </div>
@@ -216,6 +219,7 @@ export function ProjectForm({
                     setForm({ ...form, timelineDays: Math.max(0, Number(e.target.value) || 0) })
                   }
                   placeholder="0"
+                  required={!project}
                 />
                 <p className="text-xs text-gray-500">Hari</p>
               </div>
