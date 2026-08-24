@@ -191,12 +191,12 @@ func TestCurveSpan(t *testing.T) {
 		want        int
 	}{
 		{"zero", 0, 0, 1},
-		{"fractional stays ceil", 0.7, 0, 1},
-		{"ceil upper", 2.3, 0, 3},
-		{"elapsed dominates", 2, 10.1, 11},
-		{"elapsed exact week boundary", 2, 10, 10},
-		{"elapsed below cum", 1, 0.5, 1},
-		{"negative elapsed ignored", 2, -5, 2},
+		{"fractional stays ceil", 0.7, 0, 2},
+		{"ceil upper", 2.3, 0, 4},
+		{"elapsed dominates", 2, 10.1, 12},
+		{"elapsed exact week boundary", 2, 10, 11},
+		{"elapsed below cum", 1, 0.5, 2},
+		{"negative elapsed ignored", 2, -5, 3},
 		{"cap cumulative", 400, 0, sCurveWeekCap},
 		{"cap elapsed", 1, 900, sCurveWeekCap},
 		{"cap boundary kept", sCurveWeekCap, 0, sCurveWeekCap},

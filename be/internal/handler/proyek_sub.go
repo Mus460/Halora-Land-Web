@@ -866,12 +866,12 @@ func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, flo
 	return items, cum
 }
 
-// curveSpan returns the number of chart weeks: the scheduled duration,
-// extended to cover elapsed weeks, at least 1, capped at sCurveWeekCap.
+// curveSpan returns the number of chart points (W0..WN inclusive): the scheduled
+// duration, extended to cover elapsed weeks, at least 1, capped at sCurveWeekCap.
 func curveSpan(cumWeeks, elapsedWeeks float64) int {
-	span := int(math.Ceil(cumWeeks))
-	if int(math.Ceil(elapsedWeeks)) > span {
-		span = int(math.Ceil(elapsedWeeks))
+	span := int(math.Ceil(cumWeeks)) + 1
+	if e := int(math.Ceil(elapsedWeeks)) + 1; e > span {
+		span = e
 	}
 	if span < 1 {
 		span = 1
