@@ -38,8 +38,8 @@ func routeCtx(r *http.Request, name, value string) *http.Request {
 
 func TestScheduleCurveItemsDurationsFillPlan(t *testing.T) {
 	items, cum := scheduleCurveItems([]curveItem{
-		citem(1, "100", 50, 80),
-		citem(2, "100", 50, 40),
+		citem(1, "100", 50, 336),
+		citem(2, "100", 50, 168),
 	}, 0, 0)
 	wantWeeks := []float64{2, 1}
 	for i, w := range wantWeeks {
@@ -56,7 +56,7 @@ func TestScheduleCurveItemsDurationsFillPlan(t *testing.T) {
 }
 
 func TestScheduleCurveItemsTimelineExtendsPlan(t *testing.T) {
-	items, cum := scheduleCurveItems([]curveItem{citem(1, "100", 100, 40)}, 4, 0)
+	items, cum := scheduleCurveItems([]curveItem{citem(1, "100", 100, 168)}, 4, 0)
 	if items[0].weeks != 1 {
 		t.Errorf("weeks = %v, want 1", items[0].weeks)
 	}
@@ -71,7 +71,7 @@ func TestScheduleCurveItemsTimelineExtendsPlan(t *testing.T) {
 func TestScheduleCurveItemsNoDurationSplitsSlackByCost(t *testing.T) {
 	// Dynamic duration: total weeks = work duration (2), timeline ignored when work exists.
 	items, cum := scheduleCurveItems([]curveItem{
-		citem(1, "100", 25, 80),
+		citem(1, "100", 25, 336),
 		citem(2, "300", 75, 0),
 	}, 4, 0)
 	if items[1].weeks != 0.5 {
@@ -88,7 +88,7 @@ func TestScheduleCurveItemsNoDurationSplitsSlackByCost(t *testing.T) {
 func TestScheduleCurveItemsNoDurationCostProportional(t *testing.T) {
 	// Dynamic: no-duration items get 0.5 fallback, not timeline slack.
 	items, cum := scheduleCurveItems([]curveItem{
-		citem(1, "100", 10, 40),
+		citem(1, "100", 10, 168),
 		citem(2, "100", 30, 0),
 		citem(3, "300", 60, 0),
 	}, 2, 0)
@@ -102,7 +102,7 @@ func TestScheduleCurveItemsNoDurationCostProportional(t *testing.T) {
 
 func TestScheduleCurveItemsZeroSlackFallsBackToHalfWeek(t *testing.T) {
 	items, _ := scheduleCurveItems([]curveItem{
-		citem(1, "100", 50, 160),
+		citem(1, "100", 50, 672),
 		citem(2, "100", 50, 0),
 	}, 0, 0)
 	if items[1].weeks != 0.5 {
@@ -128,7 +128,7 @@ func TestScheduleCurveItemsAllNoDurationProportionalWhenSlack(t *testing.T) {
 
 func TestScheduleCurveItemsZeroCostItemGetsZeroWeeksNotNaN(t *testing.T) {
 	items, cum := scheduleCurveItems([]curveItem{
-		citem(1, "100", 25, 40),
+		citem(1, "100", 25, 168),
 		citem(2, "0", 0, 0),
 		citem(3, "300", 75, 0),
 	}, 2, 0)
@@ -151,8 +151,8 @@ func TestScheduleCurveItemsZeroCostItemGetsZeroWeeksNotNaN(t *testing.T) {
 
 func TestScheduleCurveItemsSubWeekDurations(t *testing.T) {
 	items, cum := scheduleCurveItems([]curveItem{
-		citem(1, "100", 50, 60),
-		citem(2, "100", 50, 10),
+		citem(1, "100", 50, 252),
+		citem(2, "100", 50, 42),
 	}, 0, 0)
 	if items[0].weeks != 1.5 || items[1].weeks != 0.25 {
 		t.Errorf("weeks = %v, %v; want 1.5, 0.25", items[0].weeks, items[1].weeks)
