@@ -657,8 +657,8 @@ func (h *ProjectSubHandler) SCurve(w http.ResponseWriter, r *http.Request) {
 
 const (
 	// hoursPerWeek converts work-item duration hours into schedule weeks
-	// (5 workdays × 8h).
-	hoursPerWeek = 40.0
+	// (7 calendar days × 24h).
+	hoursPerWeek = 168.0
 	// sCurveWeekCap keeps pathological schedules from producing huge charts.
 	sCurveWeekCap = 156
 )
@@ -701,7 +701,7 @@ type curveItem struct {
 //   - Planned: work items are weighted by their cost share of the project
 //     subtotal (w_i = totalCost_i / ΣtotalCost), sequenced in construction
 //     flow order (persiapan → struktur → arsitektur → MEP), and each item
-//     occupies its estimated duration in weeks (duration_hours × volume / 40h).
+//     occupies its estimated duration in weeks (duration_hours × volume / 168h).
 //     Items without an estimated duration receive a weight-proportional share
 //     of the schedule slack (or a 0.5-week slot when durations fill the plan).
 //     Cumulative percent is sampled at the end of every integer week.
@@ -822,7 +822,7 @@ func clamp01(v float64) float64 {
 // scheduleCurveItems assigns each curve item its duration in weeks and start
 // week, in the order given (callers must already sort by construction flow).
 // Duration is dynamic from total work: items with an estimated duration occupy
-// hoursPerWeek (40h) weeks each; total planned weeks equals the sum of those
+// hoursPerWeek (168h) weeks each; total planned weeks equals the sum of those
 // durations (e.g. 10 weeks work → 10 weeks curve). Project timeline is only
 // used as fallback when no work has a duration. Items without a duration get a
 // 0.5-week slot (or a cost-proportional share of slack when timeline fallback
