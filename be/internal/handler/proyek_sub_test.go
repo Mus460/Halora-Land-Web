@@ -69,37 +69,34 @@ func TestScheduleCurveItemsTimelineExtendsPlan(t *testing.T) {
 }
 
 func TestScheduleCurveItemsNoDurationSplitsSlackByCost(t *testing.T) {
+	// Dynamic duration: total weeks = work duration (2), timeline ignored when work exists.
 	items, cum := scheduleCurveItems([]curveItem{
 		citem(1, "100", 25, 80),
 		citem(2, "300", 75, 0),
 	}, 4, 0)
-	wantSlack := 4*4.333 - 2
-	if diff := math.Abs(items[1].weeks - wantSlack); diff > 0.001 {
-		t.Errorf("no-duration weeks = %v, want %v", items[1].weeks, wantSlack)
+	if items[1].weeks != 0.5 {
+		t.Errorf("no-duration weeks = %v, want 0.5 (dynamic, no slack)", items[1].weeks)
 	}
 	if items[0].start != 0 || math.Abs(items[1].start-2) > 0.001 {
 		t.Errorf("starts = %v, %v; want 0, 2", items[0].start, items[1].start)
 	}
-	if math.Abs(cum-4*4.333) > 0.001 {
-		t.Errorf("cum = %v, want %v", cum, 4*4.333)
+	if math.Abs(cum-2.5) > 0.001 {
+		t.Errorf("cum = %v, want 2.5", cum)
 	}
 }
 
 func TestScheduleCurveItemsNoDurationCostProportional(t *testing.T) {
+	// Dynamic: no-duration items get 0.5 fallback, not timeline slack.
 	items, cum := scheduleCurveItems([]curveItem{
 		citem(1, "100", 10, 40),
 		citem(2, "100", 30, 0),
 		citem(3, "300", 60, 0),
 	}, 2, 0)
-	wantSlack := 2*4.333 - 1
-	if diff := math.Abs(items[1].weeks - wantSlack/4); diff > 0.001 {
-		t.Errorf("item2 weeks = %v, want %v", items[1].weeks, wantSlack/4)
+	if items[1].weeks != 0.5 || items[2].weeks != 0.5 {
+		t.Errorf("weeks = %v, %v; want 0.5, 0.5", items[1].weeks, items[2].weeks)
 	}
-	if diff := math.Abs(items[2].weeks - 3*wantSlack/4); diff > 0.001 {
-		t.Errorf("item3 weeks = %v, want %v", items[2].weeks, 3*wantSlack/4)
-	}
-	if math.Abs(cum-2*4.333) > 0.001 {
-		t.Errorf("cum = %v, want %v", cum, 2*4.333)
+	if math.Abs(cum-2.0) > 0.001 {
+		t.Errorf("cum = %v, want 2.0", cum)
 	}
 }
 
@@ -191,12 +188,12 @@ func TestCurveSpan(t *testing.T) {
 		want        int
 	}{
 		{"zero", 0, 0, 1},
-		{"fractional stays ceil", 0.7, 0, 1},
-		{"ceil upper", 2.3, 0, 3},
-		{"elapsed dominates", 2, 10.1, 11},
-		{"elapsed exact week boundary", 2, 10, 10},
-		{"elapsed below cum", 1, 0.5, 1},
-		{"negative elapsed ignored", 2, -5, 2},
+		{"fractional stays ceil", 0.7, 0, 2},
+		{"ceil upper", 2.3, 0, 4},
+		{"elapsed dominates", 2, 10.1, 12},
+		{"elapsed exact week boundary", 2, 10, 11},
+		{"elapsed below cum", 1, 0.5, 2},
+		{"negative elapsed ignored", 2, -5, 3},
 		{"cap cumulative", 400, 0, sCurveWeekCap},
 		{"cap elapsed", 1, 900, sCurveWeekCap},
 		{"cap boundary kept", sCurveWeekCap, 0, sCurveWeekCap},

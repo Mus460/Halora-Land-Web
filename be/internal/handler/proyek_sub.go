@@ -821,11 +821,13 @@ func clamp01(v float64) float64 {
 
 // scheduleCurveItems assigns each curve item its duration in weeks and start
 // week, in the order given (callers must already sort by construction flow).
-// Items with an estimated duration occupy hoursPerWeek (40h) weeks each; the
-// plan must last at least the project timeline (months + days). Items without
-// a duration split the slack proportional to their cost, or get a 0.5-week
-// slot when durations already fill the plan. Returns the items with weeks and
-// start set, plus the total scheduled weeks.
+// Duration is dynamic from total work: items with an estimated duration occupy
+// hoursPerWeek (40h) weeks each; total planned weeks equals the sum of those
+// durations (e.g. 10 weeks work → 10 weeks curve). Project timeline is only
+// used as fallback when no work has a duration. Items without a duration get a
+// 0.5-week slot (or a cost-proportional share of slack when timeline fallback
+// applies). Returns the items with weeks and start set, plus the total
+// scheduled weeks.
 func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, float64) {
 	durationWeeks := 0.0
 	noDurWeight := decimal.Zero
@@ -838,8 +840,10 @@ func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, flo
 		}
 	}
 	totalWeeks := durationWeeks
-	if tl := float64(tMonths)*4.333 + float64(tDays)/7.0; tl > totalWeeks {
-		totalWeeks = tl
+	if totalWeeks < 0.001 {
+		if tl := float64(tMonths)*4.333 + float64(tDays)/7.0; tl > totalWeeks {
+			totalWeeks = tl
+		}
 	}
 	if totalWeeks < 1 {
 		totalWeeks = 1
@@ -854,7 +858,11 @@ func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, flo
 	} else {
 		for i := range items {
 			if items[i].weeks == 0 {
-				items[i].weeks = 0.5
+				if items[i].cost.IsZero() && noDurWeight.IsPositive() {
+					items[i].weeks = 0
+				} else {
+					items[i].weeks = 0.5
+				}
 			}
 		}
 	}
@@ -866,12 +874,12 @@ func scheduleCurveItems(items []curveItem, tMonths, tDays int) ([]curveItem, flo
 	return items, cum
 }
 
-// curveSpan returns the number of chart weeks: the scheduled duration,
-// extended to cover elapsed weeks, at least 1, capped at sCurveWeekCap.
+// curveSpan returns the number of chart points (W0..WN inclusive): the scheduled
+// duration, extended to cover elapsed weeks, at least 1, capped at sCurveWeekCap.
 func curveSpan(cumWeeks, elapsedWeeks float64) int {
-	span := int(math.Ceil(cumWeeks))
-	if int(math.Ceil(elapsedWeeks)) > span {
-		span = int(math.Ceil(elapsedWeeks))
+	span := int(math.Ceil(cumWeeks)) + 1
+	if e := int(math.Ceil(elapsedWeeks)) + 1; e > span {
+		span = e
 	}
 	if span < 1 {
 		span = 1
