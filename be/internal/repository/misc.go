@@ -408,6 +408,13 @@ func (r *TransactionRepo) Approve(ctx context.Context, projectID, id int32) (*mo
 		RETURNING id, "projectId", date, category, amount::text, description, type, status, "logisticsId", "invoiceId", "createdAt", "updatedAt"`, id, projectID))
 }
 
+func (r *TransactionRepo) RevertApproved(ctx context.Context, projectID, id int32) (*models.Transaction, error) {
+	return scanTransaction(r.pool.QueryRow(ctx, `
+		UPDATE transactions SET status = 'reverted', "updatedAt" = NOW()
+		WHERE id = $1 AND "projectId" = $2 AND status = 'approved'
+		RETURNING id, "projectId", date, category, amount::text, description, type, status, "logisticsId", "invoiceId", "createdAt", "updatedAt"`, id, projectID))
+}
+
 func (r *TransactionRepo) DeleteDraft(ctx context.Context, projectID, id int32) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM transactions WHERE id = $1 AND "projectId" = $2 AND status = 'draft'`, id, projectID)
 	if err != nil {

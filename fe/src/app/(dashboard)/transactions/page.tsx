@@ -3,7 +3,7 @@ import { useProject } from "@/contexts/ProjectContext";
 
 import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { Plus, Wallet, TrendingDown, TrendingUp, DollarSign, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, Wallet, TrendingDown, TrendingUp, DollarSign, CheckCircle2, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,8 @@ export default function RealisasiPage() {
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Transaction | null>(null);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
   const [form, setForm] = useState({
     date: "",
     category: REALISASI_KATEGORI[0],
@@ -114,10 +116,13 @@ export default function RealisasiPage() {
     );
   }
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreateConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId) return;
+    setShowCreateConfirm(true);
+  };
 
+  const confirmCreate = async () => {
+    if (!projectId) return;
     try {
       setSaving(true);
       const response = await fetch(`/api/projects/${projectId}/transactions`, {
@@ -136,6 +141,7 @@ export default function RealisasiPage() {
         throw new Error(result.error || "Gagal menambah transaksi");
       }
       setData((prev) => [result.transactions, ...prev]);
+      setShowCreateConfirm(false);
       setShowForm(false);
       setForm({
         date: "",
@@ -190,6 +196,29 @@ export default function RealisasiPage() {
       setData((prev) => prev.filter((r) => r.id !== id));
       setDeleteTarget(null);
       toast.success("Transaksi dihapus");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Terjadi kesalahan");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleCancel = async (id: number) => {
+    if (!projectId) return;
+    try {
+      setUpdatingId(id);
+      const response = await fetch(`/api/projects/${projectId}/transactions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "reverted" }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal membatalkan transaksi");
+      }
+      setData((prev) => prev.map((r) => (r.id === id ? result.transactions : r)));
+      setCancelTarget(null);
+      toast.success("Transaksi dibatalkan");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Terjadi kesalahan");
     } finally {
@@ -273,7 +302,23 @@ export default function RealisasiPage() {
       id: "actions",
       header: "Aksi",
       cell: ({ row }) => {
-        if (row.original.status !== "draft") return null;
+        const status = row.original.status;
+        if (status === "approved") {
+          return (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={updatingId === row.original.id}
+                onClick={() => setCancelTarget(row.original)}
+              >
+                <XCircle className="w-4 h-4 mr-1 text-amber-600" />
+                Batalkan
+              </Button>
+            </div>
+          );
+        }
+        if (status !== "draft") return null;
         return (
           <div className="flex items-center gap-1">
             <Button
@@ -365,7 +410,7 @@ export default function RealisasiPage() {
           <DialogHeader>
             <DialogTitle>Tambah Transaksi</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={openCreateConfirm} className="space-y-4">
             <div className="space-y-2">
               <Label>Jenis</Label>
               <Select
@@ -453,6 +498,16 @@ export default function RealisasiPage() {
       </Dialog>
 
       <ConfirmDialog
+        open={showCreateConfirm}
+        onOpenChange={setShowCreateConfirm}
+        title="Simpan Transaksi"
+        description={`Simpan ${JENIS_LABEL[form.type] || form.type} ${form.category} sebesar ${formatCurrency(form.amount)} pada ${form.date}${form.description ? ` (${form.description})` : ""}? Transaksi akan langsung berstatus Disetujui.`}
+        confirmText="Ya, Simpan"
+        loading={saving}
+        onConfirm={confirmCreate}
+      />
+
+      <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
         title="Hapus Transaksi"
@@ -462,6 +517,17 @@ export default function RealisasiPage() {
         confirmText="Ya, Hapus"
         variant="destructive"
         onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+      />
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onOpenChange={(o) => !o && setCancelTarget(null)}
+        title="Batalkan Transaksi"
+        description={`Batalkan transaksi ${cancelTarget?.description || cancelTarget?.category || ""} sebesar ${formatCurrency(cancelTarget?.amount || 0)}? Transaksi tidak akan dihitung dalam total keuangan.`}
+        confirmText="Ya, Batalkan"
+        variant="destructive"
+        loading={updatingId === cancelTarget?.id}
+        onConfirm={() => cancelTarget && handleCancel(cancelTarget.id)}
       />
     </div>
   );

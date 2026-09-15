@@ -187,17 +187,31 @@ func (h *ProjectSubHandler) TransactionApprove(w http.ResponseWriter, r *http.Re
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	if in.Status != models.TransactionApproved {
-		writeError(w, http.StatusBadRequest, "status tidak valid")
-		return
-	}
-	out, err := h.real.Approve(r.Context(), pid, rid)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "Transaksi tidak ditemukan atau sudah disetujui")
+	var out *models.Transaction
+	var err error
+	switch in.Status {
+	case models.TransactionApproved:
+		out, err = h.real.Approve(r.Context(), pid, rid)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "Transaksi tidak ditemukan atau sudah disetujui")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+	case models.TransactionReverted:
+		out, err = h.real.RevertApproved(r.Context(), pid, rid)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "Transaksi tidak ditemukan atau sudah dibatalkan")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	default:
+		writeError(w, http.StatusBadRequest, "status tidak valid")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"transactions": out})
